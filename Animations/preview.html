@@ -1,0 +1,2168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprite set preview</title>
+<style>
+  :root{--bg:#15171d;--panel:#1e2128;--line:#2c313b;--ink:#e6eaf2;--dim:#8b95a7;--accent:#5CF2DF}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.5 ui-sans-serif,system-ui,'Segoe UI',sans-serif}
+  header{position:sticky;top:0;z-index:10;background:rgba(21,23,29,.94);
+         backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 20px}
+  h1{margin:0 0 10px;font-size:16px;font-weight:600}
+  h1 small{color:var(--dim);font-weight:400;margin-left:8px}
+  .bar{display:flex;flex-wrap:wrap;gap:18px;align-items:center}
+  .grp{display:flex;gap:8px;align-items:center}
+  .grp>span{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
+  button{background:var(--panel);color:var(--ink);border:1px solid var(--line);
+         padding:6px 12px;border-radius:6px;cursor:pointer;font:inherit;font-size:13px}
+  button:hover{border-color:#3d4450}
+  button.on{background:var(--accent);color:#0d1114;border-color:var(--accent);font-weight:600}
+  input[type=range]{width:130px;accent-color:var(--accent)}
+  main{padding:20px;display:grid;gap:18px;align-items:start;
+       grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .head{display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line)}
+  .nm{font-weight:600}
+  .tag{font-size:11px;padding:2px 7px;border-radius:20px;border:1px solid var(--line);
+       color:var(--dim);white-space:nowrap}
+  .tag.shot{color:#ffcf70;border-color:#5a4420}
+  .head .sp{flex:1}
+  .head button{font-size:12px;padding:4px 9px}
+  .body{display:flex;flex-direction:column;align-items:center;gap:7px;padding:14px 10px 12px}
+  .stage{display:grid;place-items:center;border-radius:8px;overflow:hidden}
+  .stage svg{display:block}
+  .blurb{font-size:11px;color:var(--dim);text-align:center;min-height:16px}
+  .bg-dark .stage{background:#3a4152}
+  .bg-light .stage{background:#e9e4d8}
+  .bg-mid .stage{background:#7d8496}
+  .bg-checker .stage{background-image:
+      linear-gradient(45deg,#3a3f4b 25%,transparent 25%,transparent 75%,#3a3f4b 75%),
+      linear-gradient(45deg,#3a3f4b 25%,#2a2e37 25%,#2a2e37 75%,#3a3f4b 75%);
+      background-size:16px 16px;background-position:0 0,8px 8px}
+  footer{padding:4px 20px 28px;color:var(--dim);font-size:12px}
+  footer code{color:var(--ink)}
+</style>
+</head>
+<body class="bg-dark">
+
+<header>
+  <h1>Sprite set <small>robot &middot; boss &middot; animated SVG &middot; opens straight from disk</small></h1>
+  <div class="bar">
+    <div class="grp"><span>bg</span>
+      <button data-bg="dark" class="on">dark</button>
+      <button data-bg="light">light</button>
+      <button data-bg="mid">mid</button>
+      <button data-bg="checker">checker</button>
+    </div>
+    <div class="grp"><span>size</span>
+      <input id="size" type="range" min="90" max="380" value="230">
+      <span id="sizeval" style="min-width:46px">230px</span>
+    </div>
+    <div class="grp"><button id="pause">pause</button></div>
+  </div>
+</header>
+
+<main id="grid"></main>
+
+<footer>
+  Cargo shapes are placeholders in the <code>#payload</code> slots. One-shots
+  replay on a loop. <code>putdown</code> is <code>pickup</code> with every
+  keyframe list reversed at build time &mdash; no separate asset.
+  Sprites are scaled to fit a common box, so the robot (300&times;240) and the
+  boss (220&times;300) are NOT at true relative scale &mdash; on a shared ground
+  line he is about twice the robot's height. See README.md.
+</footer>
+
+<template id="tpl-idle"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 0 300 240" width="300" height="240"
+     role="img" aria-label="Cartoon delivery robot, three-quarter top-down view">
+
+  <!-- ============================================================
+       CARTOON DELIVERY ROBOT / STATE: IDLE  -  3/4 top-down view
+       Camera sits above and in front, ~55deg. You see the cargo lid
+       (foreshortened) and the front face. Symmetric, so it mirrors
+       cleanly for left/right facing sprites.
+       Origin: casters plant on y=195, sprite centred on x=120.
+       viewBox is widened to -30..270 (still centred on 120) purely to give
+       the arms room; the robot's own coordinates never moved.
+       ============================================================ -->
+
+  <defs>
+    <linearGradient id="bodyShade__idle" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"    stop-color="#FFFFFF" stop-opacity=".55"/>
+      <stop offset=".45"  stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset=".82"  stop-color="#8FA3BA" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#8FA3BA" stop-opacity=".45"/>
+    </linearGradient>
+    <linearGradient id="visorGlass__idle" x1="0" y1="0" x2=".4" y2="1">
+      <stop offset="0" stop-color="#33475C"/>
+      <stop offset="1" stop-color="#1B2838"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#1B2838" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- ground shadow: static, the robot never leaves the ground -->
+    <ellipse id="shadow__idle" cx="120" cy="200" rx="62" ry="12" fill="#1B2838" opacity=".20" stroke="none">
+      <animate attributeName="rx" values="62;60;62" dur="2.6s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <animate attributeName="opacity" values=".20;.18;.20" dur="2.6s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+    </ellipse>
+
+    <!-- Casters. NEVER transformed: they are the contact patch. Bottom edge
+         sits on y=195, same as the shadow's centre line. Drawn before the
+         chassis so the body hides their top half. -->
+    <g id="wheels__idle" fill="#2C3B4B">
+      <rect x="74"  y="170" width="25" height="25" rx="12.5"/>
+      <rect x="141" y="170" width="25" height="25" rx="12.5"/>
+    </g>
+
+    <!-- Body only. Rock / bob THIS group; pivot 120 194. The wheels stay
+         planted underneath, so a tilt reads as suspension travel. -->
+    <g id="chassis__idle">
+      <animateTransform attributeName="transform" type="translate"
+                        values="0 0; 0 -2.5; 0 0" dur="2.6s" repeatCount="indefinite"
+                        calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+
+      <!-- cargo lid (top face, foreshortened) -->
+      <path fill="#EEF3F9" d="M92 86 L148 86 Q158 86 162.8 94.8 L178.2 123.2
+                              Q183 132 173 132 L67 132 Q57 132 61.8 123.2
+                              L77.2 94.8 Q82 86 92 86 Z"/>
+      <path fill="#DCE5EF" stroke-width="4"
+            d="M99 95 L141 95 Q149 95 152.6 101.6 L165 121
+               Q169 126 161 126 L79 126 Q71 126 75 121 L87.4 101.6 Q91 95 99 95 Z"/>
+
+      <!-- parcel emblem on the lid -->
+      <g stroke-width="3.5">
+        <path fill="#F2A65A" d="M106 103 L134 103 L137 119 L103 119 Z"/>
+        <path fill="#C9762F" stroke="none" d="M116.6 103 L123.4 103 L124.6 119 L115.4 119 Z"/>
+      </g>
+
+      <!-- front face -->
+      <path fill="#EEF3F9"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+      <path fill="url(#bodyShade__idle)" stroke="none"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+
+      <!-- headlight strips -->
+      <g fill="#FFD166" stroke-width="3.5">
+        <rect x="71" y="174" width="17" height="8" rx="4"/>
+        <rect x="152" y="174" width="17" height="8" rx="4"/>
+      </g>
+
+      <!-- visor + face -->
+      <rect x="74" y="139" width="92" height="35" rx="15" fill="url(#visorGlass__idle)"/>
+
+      <g fill="#5CF2DF" stroke="none">
+        <!-- left eye -->
+        <ellipse cx="101" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- right eye -->
+        <ellipse cx="139" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- catchlights -->
+        <g fill="#FFFFFF" opacity=".9">
+          <circle cx="97.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="135.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+        </g>
+        <!-- smile -->
+        <path fill="none" stroke="#5CF2DF" stroke-width="3.5" d="M110 167 Q120 172.5 130 167"/>
+      </g>
+      <!-- glass gleam -->
+      <path fill="#FFFFFF" opacity=".15" stroke="none" d="M88 141 L99 141 L84 172 L77 168 Z"/>
+
+      <!-- lidar puck -->
+      <path fill="#3E5468" d="M106 84 L106 88 A14 6.5 0 0 0 134 88 L134 84 Z"/>
+      <ellipse cx="120" cy="84" rx="14" ry="6.5" fill="#5A7288"/>
+      <ellipse cx="120" cy="84" rx="5" ry="2.4" fill="#5CF2DF" stroke="none" opacity=".9"/>
+      <!-- antenna + delivery pennant -->
+      <g>
+        <animateTransform attributeName="transform" type="rotate"
+                          values="-2 152 90; 2.5 152 90; -2 152 90" dur="3.1s"
+                          repeatCount="indefinite" calcMode="spline"
+                          keySplines=".45 0 .55 1;.45 0 .55 1"/>
+        <path fill="none" stroke-width="4.5" d="M152 92 Q160 66 168 44"/>
+        <path fill="#FF8A3D" stroke-width="4"
+              d="M168 44 L194 51 L167 60 Z"/>
+        <circle cx="168" cy="42" r="4.5" fill="#FFD166" stroke-width="4"/>
+      </g>
+
+      <!-- Arms. Short, held high and clear of the ground line so they never
+           read as a second pair of legs. Segments are a dark stroke with a
+           lighter stroke laid over it: an outlined capsule in 2 paths.
+           Each arm is its own group - pose or animate them independently.
+           Pivots: shoulder-L 60,145  elbow-L 44,157  (mirror for R). -->
+      <g stroke-linecap="round" stroke-linejoin="round">
+
+        <g id="arm-l__idle">
+          <path d="M58 144 L26 150" stroke="#1B2838" stroke-width="16"/>
+          <path d="M26 150 L6 170"  stroke="#1B2838" stroke-width="15"/>
+          <path d="M6 170 L-4 178"  stroke="#1B2838" stroke-width="12"/>
+          <path d="M6 170 L11 181"  stroke="#1B2838" stroke-width="12"/>
+          <path d="M58 144 L26 150" stroke="#EEF3F9" stroke-width="9.5"/>
+          <path d="M26 150 L6 170"  stroke="#EEF3F9" stroke-width="9"/>
+          <path d="M6 170 L-4 178"  stroke="#EEF3F9" stroke-width="6.5"/>
+          <path d="M6 170 L11 181"  stroke="#EEF3F9" stroke-width="6.5"/>
+          <circle cx="6"  cy="170" r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="26" cy="150" r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="58" cy="144" r="7"   fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+        </g>
+
+        <g id="arm-r__idle">
+          <path d="M182 144 L214 150" stroke="#1B2838" stroke-width="16"/>
+          <path d="M214 150 L234 170" stroke="#1B2838" stroke-width="15"/>
+          <path d="M234 170 L244 178" stroke="#1B2838" stroke-width="12"/>
+          <path d="M234 170 L229 181" stroke="#1B2838" stroke-width="12"/>
+          <path d="M182 144 L214 150" stroke="#EEF3F9" stroke-width="9.5"/>
+          <path d="M214 150 L234 170" stroke="#EEF3F9" stroke-width="9"/>
+          <path d="M234 170 L244 178" stroke="#EEF3F9" stroke-width="6.5"/>
+          <path d="M234 170 L229 181" stroke="#EEF3F9" stroke-width="6.5"/>
+          <circle cx="234" cy="170" r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="214" cy="150" r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="182" cy="144" r="7"   fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+        </g>
+
+      </g>
+
+
+
+    </g>
+  </g>
+</svg>
+</template>
+<template id="tpl-walking"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 0 300 240" width="300" height="240"
+     role="img" aria-label="Cartoon delivery robot walking, three-quarter top-down view">
+
+  <!-- ============================================================
+       CARTOON DELIVERY ROBOT / STATE: WALKING  -  3/4 top-down view
+       Same pose as IDLE, driven hard. Two nested motions:
+         #chassis      rocks  +/-2.5deg about the contact point 120,194
+         #chassis-bob  bounces 5px, at DOUBLE the rock frequency
+       The casters never move - all of it is body travel on a fixed
+       contact patch, which is what makes a wheel-less roll convincing.
+       Camera sits above and in front, ~55deg. You see the cargo lid
+       (foreshortened) and the front face. Symmetric, so it mirrors
+       cleanly for left/right facing sprites.
+       Origin: casters plant on y=195, sprite centred on x=120.
+       viewBox is widened to -30..270 (still centred on 120) purely to give
+       the arms room; the robot's own coordinates never moved.
+       ============================================================ -->
+
+  <defs>
+    <linearGradient id="bodyShade__walking" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"    stop-color="#FFFFFF" stop-opacity=".55"/>
+      <stop offset=".45"  stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset=".82"  stop-color="#8FA3BA" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#8FA3BA" stop-opacity=".45"/>
+    </linearGradient>
+    <linearGradient id="visorGlass__walking" x1="0" y1="0" x2=".4" y2="1">
+      <stop offset="0" stop-color="#33475C"/>
+      <stop offset="1" stop-color="#1B2838"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#1B2838" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- ground shadow: tracks the bounce, so it tightens as the body lifts -->
+    <ellipse id="shadow__walking" cx="120" cy="200" rx="62" ry="12" fill="#1B2838" opacity=".20" stroke="none">
+      <animate attributeName="rx" values="62;53;62" dur=".26s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <animate attributeName="ry" values="12;10;12" dur=".26s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <animate attributeName="opacity" values=".20;.11;.20" dur=".26s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+    </ellipse>
+
+    <!-- Casters. NEVER transformed: they are the contact patch. Bottom edge
+         sits on y=195, same as the shadow's centre line. Drawn before the
+         chassis so the body hides their top half. -->
+    <g id="wheels__walking" fill="#2C3B4B">
+      <rect x="74"  y="170" width="25" height="25" rx="12.5"/>
+      <rect x="141" y="170" width="25" height="25" rx="12.5"/>
+    </g>
+
+    <!-- Body only. The wheels stay planted underneath, so all of this
+         reads as suspension travel rather than the sprite tilting.
+         Two groups because one animateTransform cannot hold two types:
+         outer rocks, inner bounces at twice the rate. -->
+    <g id="chassis__walking">
+      <animateTransform attributeName="transform" type="rotate"
+                        values="-2.5 120 194; 2.5 120 194; -2.5 120 194"
+                        dur=".52s" repeatCount="indefinite"
+                        calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <g id="chassis-bob__walking">
+      <animateTransform attributeName="transform" type="translate"
+                        values="0 0; 0 -5; 0 0" dur=".26s" repeatCount="indefinite"
+                        calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+
+      <!-- cargo lid (top face, foreshortened) -->
+      <path fill="#EEF3F9" d="M92 86 L148 86 Q158 86 162.8 94.8 L178.2 123.2
+                              Q183 132 173 132 L67 132 Q57 132 61.8 123.2
+                              L77.2 94.8 Q82 86 92 86 Z"/>
+      <path fill="#DCE5EF" stroke-width="4"
+            d="M99 95 L141 95 Q149 95 152.6 101.6 L165 121
+               Q169 126 161 126 L79 126 Q71 126 75 121 L87.4 101.6 Q91 95 99 95 Z"/>
+
+      <!-- parcel emblem on the lid -->
+      <g stroke-width="3.5">
+        <path fill="#F2A65A" d="M106 103 L134 103 L137 119 L103 119 Z"/>
+        <path fill="#C9762F" stroke="none" d="M116.6 103 L123.4 103 L124.6 119 L115.4 119 Z"/>
+      </g>
+
+      <!-- front face -->
+      <path fill="#EEF3F9"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+      <path fill="url(#bodyShade__walking)" stroke="none"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+
+      <!-- headlight strips -->
+      <g fill="#FFD166" stroke-width="3.5">
+        <rect x="71" y="174" width="17" height="8" rx="4"/>
+        <rect x="152" y="174" width="17" height="8" rx="4"/>
+      </g>
+
+      <!-- visor + face -->
+      <rect x="74" y="139" width="92" height="35" rx="15" fill="url(#visorGlass__walking)"/>
+
+      <g fill="#5CF2DF" stroke="none">
+        <!-- left eye -->
+        <ellipse cx="101" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- right eye -->
+        <ellipse cx="139" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- catchlights -->
+        <g fill="#FFFFFF" opacity=".9">
+          <circle cx="97.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="135.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+        </g>
+        <!-- smile -->
+        <path fill="none" stroke="#5CF2DF" stroke-width="3.5" d="M110 167 Q120 172.5 130 167"/>
+      </g>
+      <!-- glass gleam -->
+      <path fill="#FFFFFF" opacity=".15" stroke="none" d="M88 141 L99 141 L84 172 L77 168 Z"/>
+
+      <!-- lidar puck -->
+      <path fill="#3E5468" d="M106 84 L106 88 A14 6.5 0 0 0 134 88 L134 84 Z"/>
+      <ellipse cx="120" cy="84" rx="14" ry="6.5" fill="#5A7288"/>
+      <ellipse cx="120" cy="84" rx="5" ry="2.4" fill="#5CF2DF" stroke="none" opacity=".9"/>
+      <!-- antenna + delivery pennant -->
+      <g>
+        <animateTransform attributeName="transform" type="rotate"
+                          values="-7 152 90; 6 152 90; -7 152 90" dur=".62s"
+                          repeatCount="indefinite" calcMode="spline"
+                          keySplines=".45 0 .55 1;.45 0 .55 1"/>
+        <path fill="none" stroke-width="4.5" d="M152 92 Q160 66 168 44"/>
+        <path fill="#FF8A3D" stroke-width="4"
+              d="M168 44 L194 51 L167 60 Z"/>
+        <circle cx="168" cy="42" r="4.5" fill="#FFD166" stroke-width="4"/>
+      </g>
+
+      <!-- Arms. Short, held high and clear of the ground line so they never
+           read as a second pair of legs. Segments are a dark stroke with a
+           lighter stroke laid over it: an outlined capsule in 2 paths.
+           Each arm is its own group - pose or animate them independently.
+           Pivots: shoulder-L 60,145  elbow-L 44,157  (mirror for R). -->
+      <g stroke-linecap="round" stroke-linejoin="round">
+
+        <g id="arm-l__walking">
+          <animateTransform attributeName="transform" type="rotate"
+                            values="-3 58 144; 3 58 144; -3 58 144"
+                            dur=".52s" begin="-.13s" repeatCount="indefinite"
+                            calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+          <path d="M58 144 L26 150" stroke="#1B2838" stroke-width="16"/>
+          <path d="M26 150 L6 170"  stroke="#1B2838" stroke-width="15"/>
+          <path d="M6 170 L-4 178"  stroke="#1B2838" stroke-width="12"/>
+          <path d="M6 170 L11 181"  stroke="#1B2838" stroke-width="12"/>
+          <path d="M58 144 L26 150" stroke="#EEF3F9" stroke-width="9.5"/>
+          <path d="M26 150 L6 170"  stroke="#EEF3F9" stroke-width="9"/>
+          <path d="M6 170 L-4 178"  stroke="#EEF3F9" stroke-width="6.5"/>
+          <path d="M6 170 L11 181"  stroke="#EEF3F9" stroke-width="6.5"/>
+          <circle cx="6"  cy="170" r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="26" cy="150" r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="58" cy="144" r="7"   fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+        </g>
+
+        <g id="arm-r__walking">
+          <animateTransform attributeName="transform" type="rotate"
+                            values="-3 182 144; 3 182 144; -3 182 144"
+                            dur=".52s" begin="-.13s" repeatCount="indefinite"
+                            calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+          <path d="M182 144 L214 150" stroke="#1B2838" stroke-width="16"/>
+          <path d="M214 150 L234 170" stroke="#1B2838" stroke-width="15"/>
+          <path d="M234 170 L244 178" stroke="#1B2838" stroke-width="12"/>
+          <path d="M234 170 L229 181" stroke="#1B2838" stroke-width="12"/>
+          <path d="M182 144 L214 150" stroke="#EEF3F9" stroke-width="9.5"/>
+          <path d="M214 150 L234 170" stroke="#EEF3F9" stroke-width="9"/>
+          <path d="M234 170 L244 178" stroke="#EEF3F9" stroke-width="6.5"/>
+          <path d="M234 170 L229 181" stroke="#EEF3F9" stroke-width="6.5"/>
+          <circle cx="234" cy="170" r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="214" cy="150" r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="182" cy="144" r="7"   fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+        </g>
+
+      </g>
+
+
+
+      </g>
+    </g>
+  </g>
+</svg>
+</template>
+<template id="tpl-holding"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 0 300 240" width="300" height="240"
+     role="img" aria-label="Cartoon delivery robot holding an object, three-quarter top-down view">
+
+  <!-- ============================================================
+       CARTOON DELIVERY ROBOT / STATE: HOLDING  -  3/4 top-down view
+       Camera sits above and in front, ~55deg. You see the cargo lid
+       (foreshortened) and the front face. Symmetric, so it mirrors
+       cleanly for left/right facing sprites.
+       Origin: casters plant on y=195, sprite centred on x=120.
+       viewBox is widened to -30..270 (still centred on 120) purely to give
+       the arms room; the robot's own coordinates never moved.
+       ============================================================ -->
+
+  <defs>
+    <linearGradient id="bodyShade__holding" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"    stop-color="#FFFFFF" stop-opacity=".55"/>
+      <stop offset=".45"  stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset=".82"  stop-color="#8FA3BA" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#8FA3BA" stop-opacity=".45"/>
+    </linearGradient>
+    <linearGradient id="visorGlass__holding" x1="0" y1="0" x2=".4" y2="1">
+      <stop offset="0" stop-color="#33475C"/>
+      <stop offset="1" stop-color="#1B2838"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#1B2838" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- ground shadow: static, the robot never leaves the ground -->
+    <ellipse id="shadow__holding" cx="120" cy="200" rx="62" ry="12" fill="#1B2838" opacity=".20" stroke="none">
+      <animate attributeName="rx" values="62;60;62" dur="2.6s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <animate attributeName="opacity" values=".20;.18;.20" dur="2.6s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+    </ellipse>
+
+    <!-- Casters. NEVER transformed: they are the contact patch. Bottom edge
+         sits on y=195, same as the shadow's centre line. Drawn before the
+         chassis so the body hides their top half. -->
+    <g id="wheels__holding" fill="#2C3B4B">
+      <rect x="74"  y="170" width="25" height="25" rx="12.5"/>
+      <rect x="141" y="170" width="25" height="25" rx="12.5"/>
+    </g>
+
+    <!-- Body only. Rock / bob THIS group; pivot 120 194. The wheels stay
+         planted underneath, so a tilt reads as suspension travel.
+         The held object must move WITH the hands. Put it in #payload
+         below and it inherits every transform on this group for free. -->
+    <g id="chassis__holding">
+      <animateTransform attributeName="transform" type="translate"
+                        values="0 0; 0 -2.5; 0 0" dur="2.6s" repeatCount="indefinite"
+                        calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <!-- cargo lid (top face, foreshortened) -->
+      <path fill="#EEF3F9" d="M92 86 L148 86 Q158 86 162.8 94.8 L178.2 123.2
+                              Q183 132 173 132 L67 132 Q57 132 61.8 123.2
+                              L77.2 94.8 Q82 86 92 86 Z"/>
+      <path fill="#DCE5EF" stroke-width="4"
+            d="M99 95 L141 95 Q149 95 152.6 101.6 L165 121
+               Q169 126 161 126 L79 126 Q71 126 75 121 L87.4 101.6 Q91 95 99 95 Z"/>
+
+      <!-- parcel emblem on the lid -->
+      <g stroke-width="3.5">
+        <path fill="#F2A65A" d="M106 103 L134 103 L137 119 L103 119 Z"/>
+        <path fill="#C9762F" stroke="none" d="M116.6 103 L123.4 103 L124.6 119 L115.4 119 Z"/>
+      </g>
+
+      <!-- front face -->
+      <path fill="#EEF3F9"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+      <path fill="url(#bodyShade__holding)" stroke="none"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+
+      <!-- headlight strips -->
+      <g fill="#FFD166" stroke-width="3.5">
+        <rect x="71" y="174" width="17" height="8" rx="4"/>
+        <rect x="152" y="174" width="17" height="8" rx="4"/>
+      </g>
+
+      <!-- visor + face -->
+      <rect x="74" y="139" width="92" height="35" rx="15" fill="url(#visorGlass__holding)"/>
+
+      <g fill="#5CF2DF" stroke="none">
+        <!-- left eye -->
+        <ellipse cx="101" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- right eye -->
+        <ellipse cx="139" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- catchlights -->
+        <g fill="#FFFFFF" opacity=".9">
+          <circle cx="97.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="135.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+        </g>
+        <!-- smile -->
+        <path fill="none" stroke="#5CF2DF" stroke-width="3.5" d="M110 167 Q120 172.5 130 167"/>
+      </g>
+      <!-- glass gleam -->
+      <path fill="#FFFFFF" opacity=".15" stroke="none" d="M88 141 L99 141 L84 172 L77 168 Z"/>
+
+
+      <!-- lidar puck -->
+      <path fill="#3E5468" d="M106 84 L106 88 A14 6.5 0 0 0 134 88 L134 84 Z"/>
+      <ellipse cx="120" cy="84" rx="14" ry="6.5" fill="#5A7288"/>
+      <ellipse cx="120" cy="84" rx="5" ry="2.4" fill="#5CF2DF" stroke="none" opacity=".9"/>
+      <!-- antenna + delivery pennant -->
+      <g>
+        <animateTransform attributeName="transform" type="rotate"
+                          values="-2 152 90; 2.5 152 90; -2 152 90" dur="3.1s"
+                          repeatCount="indefinite" calcMode="spline"
+                          keySplines=".45 0 .55 1;.45 0 .55 1"/>
+        <path fill="none" stroke-width="4.5" d="M152 92 Q160 66 168 44"/>
+        <path fill="#FF8A3D" stroke-width="4"
+              d="M168 44 L194 51 L167 60 Z"/>
+        <circle cx="168" cy="42" r="4.5" fill="#FFD166" stroke-width="4"/>
+      </g>
+
+      <!-- PAYLOAD SLOT. Empty by design - drop the held object in here and
+           it is already centred, already gripped, and already inherits the
+           chassis bob/rock. Drawn before the arms on purpose: the claws
+           close over the front of it. Local origin 0,0 = the grip centre,
+           so a crate is just <rect x="-27" y="-27" width="54" height="54"/>. -->
+      <g id="payload__holding" transform="translate(120,96)"><rect x="-17" y="-17" width="34" height="34" rx="5" fill="#F2A65A" stroke="#1B2838" stroke-width="4" stroke-linejoin="round"/></g>
+
+      <!-- ATTACHMENT POINT for the held object: centre 120,96
+             wrists      78,96  and  162,96   (84 apart)
+             fingertips  x=90   and  x=150    (60 apart)
+           Draw the object centred on 120,96. Keep it under ~56 wide and the
+           claws stay visible on both sides of it, which is what sells the
+           grip. Anything wider swallows the fingertips.
+
+           Arms. Short, held high and clear of the ground line so they never
+           read as a second pair of legs. Segments are a dark stroke with a
+           lighter stroke laid over it: an outlined capsule in 2 paths.
+           Each arm is its own group - pose or animate them independently.
+           Pivots: shoulder-L 60,145  elbow-L 44,157  (mirror for R). -->
+      <g stroke-linecap="round" stroke-linejoin="round">
+
+        <g id="arm-l__holding">
+          <path d="M58 144 L53 112" stroke="#1B2838" stroke-width="16"/>
+          <path d="M53 112 L78 96"  stroke="#1B2838" stroke-width="15"/>
+          <path d="M78 96 L90 91"   stroke="#1B2838" stroke-width="12"/>
+          <path d="M78 96 L89 103"  stroke="#1B2838" stroke-width="12"/>
+          <path d="M58 144 L53 112" stroke="#EEF3F9" stroke-width="9.5"/>
+          <path d="M53 112 L78 96"  stroke="#EEF3F9" stroke-width="9"/>
+          <path d="M78 96 L90 91"   stroke="#EEF3F9" stroke-width="6.5"/>
+          <path d="M78 96 L89 103"  stroke="#EEF3F9" stroke-width="6.5"/>
+          <circle cx="78" cy="96"  r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="53" cy="112" r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="58" cy="144" r="7"   fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+        </g>
+
+        <g id="arm-r__holding">
+          <path d="M182 144 L187 112" stroke="#1B2838" stroke-width="16"/>
+          <path d="M187 112 L162 96"  stroke="#1B2838" stroke-width="15"/>
+          <path d="M162 96 L150 91"   stroke="#1B2838" stroke-width="12"/>
+          <path d="M162 96 L151 103"  stroke="#1B2838" stroke-width="12"/>
+          <path d="M182 144 L187 112" stroke="#EEF3F9" stroke-width="9.5"/>
+          <path d="M187 112 L162 96"  stroke="#EEF3F9" stroke-width="9"/>
+          <path d="M162 96 L150 91"   stroke="#EEF3F9" stroke-width="6.5"/>
+          <path d="M162 96 L151 103"  stroke="#EEF3F9" stroke-width="6.5"/>
+          <circle cx="162" cy="96"  r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="187" cy="112" r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="182" cy="144" r="7"   fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+        </g>
+
+      </g>
+
+
+    </g>
+  </g>
+</svg>
+</template>
+<template id="tpl-walking_holding"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 0 300 240" width="300" height="240"
+     role="img" aria-label="Cartoon delivery robot walking while holding an object, three-quarter top-down view">
+
+  <!-- ============================================================
+       CARTOON DELIVERY ROBOT / STATE: WALKING-HOLDING  -  3/4 top-down
+       The HOLDING pose under the WALKING motion. Timing is identical to
+       delivery-robot-walking.svg to the millisecond, so you can swap
+       between the two mid-stride without a hitch in the cycle.
+       The arms do NOT sway here: they are gripping cargo, so they stay
+       rigid with the body while the chassis rocks under them.
+       Camera sits above and in front, ~55deg. You see the cargo lid
+       (foreshortened) and the front face. Symmetric, so it mirrors
+       cleanly for left/right facing sprites.
+       Origin: casters plant on y=195, sprite centred on x=120.
+       viewBox is widened to -30..270 (still centred on 120) purely to give
+       the arms room; the robot's own coordinates never moved.
+       ============================================================ -->
+
+  <defs>
+    <linearGradient id="bodyShade__walking_holding" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"    stop-color="#FFFFFF" stop-opacity=".55"/>
+      <stop offset=".45"  stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset=".82"  stop-color="#8FA3BA" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#8FA3BA" stop-opacity=".45"/>
+    </linearGradient>
+    <linearGradient id="visorGlass__walking_holding" x1="0" y1="0" x2=".4" y2="1">
+      <stop offset="0" stop-color="#33475C"/>
+      <stop offset="1" stop-color="#1B2838"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#1B2838" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- ground shadow: tracks the bounce, so it tightens as the body lifts -->
+    <ellipse id="shadow__walking_holding" cx="120" cy="200" rx="62" ry="12" fill="#1B2838" opacity=".20" stroke="none">
+      <animate attributeName="rx" values="62;53;62" dur=".26s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <animate attributeName="ry" values="12;10;12" dur=".26s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <animate attributeName="opacity" values=".20;.11;.20" dur=".26s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+    </ellipse>
+
+    <!-- Casters. NEVER transformed: they are the contact patch. Bottom edge
+         sits on y=195, same as the shadow's centre line. Drawn before the
+         chassis so the body hides their top half. -->
+    <g id="wheels__walking_holding" fill="#2C3B4B">
+      <rect x="74"  y="170" width="25" height="25" rx="12.5"/>
+      <rect x="141" y="170" width="25" height="25" rx="12.5"/>
+    </g>
+
+    <!-- Body only. The wheels stay planted underneath, so all of this
+         reads as suspension travel rather than the sprite tilting.
+         Outer group rocks, inner bounces at twice the rate.
+         #payload sits inside both, so the held object rocks, bounces and
+         tilts with the robot without a single line of game code. -->
+    <g id="chassis__walking_holding">
+      <animateTransform attributeName="transform" type="rotate"
+                        values="-2.5 120 194; 2.5 120 194; -2.5 120 194"
+                        dur=".52s" repeatCount="indefinite"
+                        calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <g id="chassis-bob__walking_holding">
+      <animateTransform attributeName="transform" type="translate"
+                        values="0 0; 0 -5; 0 0" dur=".26s" repeatCount="indefinite"
+                        calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <!-- cargo lid (top face, foreshortened) -->
+      <path fill="#EEF3F9" d="M92 86 L148 86 Q158 86 162.8 94.8 L178.2 123.2
+                              Q183 132 173 132 L67 132 Q57 132 61.8 123.2
+                              L77.2 94.8 Q82 86 92 86 Z"/>
+      <path fill="#DCE5EF" stroke-width="4"
+            d="M99 95 L141 95 Q149 95 152.6 101.6 L165 121
+               Q169 126 161 126 L79 126 Q71 126 75 121 L87.4 101.6 Q91 95 99 95 Z"/>
+
+      <!-- parcel emblem on the lid -->
+      <g stroke-width="3.5">
+        <path fill="#F2A65A" d="M106 103 L134 103 L137 119 L103 119 Z"/>
+        <path fill="#C9762F" stroke="none" d="M116.6 103 L123.4 103 L124.6 119 L115.4 119 Z"/>
+      </g>
+
+      <!-- front face -->
+      <path fill="#EEF3F9"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+      <path fill="url(#bodyShade__walking_holding)" stroke="none"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+
+      <!-- headlight strips -->
+      <g fill="#FFD166" stroke-width="3.5">
+        <rect x="71" y="174" width="17" height="8" rx="4"/>
+        <rect x="152" y="174" width="17" height="8" rx="4"/>
+      </g>
+
+      <!-- visor + face -->
+      <rect x="74" y="139" width="92" height="35" rx="15" fill="url(#visorGlass__walking_holding)"/>
+
+      <g fill="#5CF2DF" stroke="none">
+        <!-- left eye -->
+        <ellipse cx="101" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- right eye -->
+        <ellipse cx="139" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- catchlights -->
+        <g fill="#FFFFFF" opacity=".9">
+          <circle cx="97.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="135.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+        </g>
+        <!-- smile -->
+        <path fill="none" stroke="#5CF2DF" stroke-width="3.5" d="M110 167 Q120 172.5 130 167"/>
+      </g>
+      <!-- glass gleam -->
+      <path fill="#FFFFFF" opacity=".15" stroke="none" d="M88 141 L99 141 L84 172 L77 168 Z"/>
+
+
+      <!-- lidar puck -->
+      <path fill="#3E5468" d="M106 84 L106 88 A14 6.5 0 0 0 134 88 L134 84 Z"/>
+      <ellipse cx="120" cy="84" rx="14" ry="6.5" fill="#5A7288"/>
+      <ellipse cx="120" cy="84" rx="5" ry="2.4" fill="#5CF2DF" stroke="none" opacity=".9"/>
+      <!-- antenna + delivery pennant -->
+      <g>
+        <animateTransform attributeName="transform" type="rotate"
+                          values="-7 152 90; 6 152 90; -7 152 90" dur=".62s"
+                          repeatCount="indefinite" calcMode="spline"
+                          keySplines=".45 0 .55 1;.45 0 .55 1"/>
+        <path fill="none" stroke-width="4.5" d="M152 92 Q160 66 168 44"/>
+        <path fill="#FF8A3D" stroke-width="4"
+              d="M168 44 L194 51 L167 60 Z"/>
+        <circle cx="168" cy="42" r="4.5" fill="#FFD166" stroke-width="4"/>
+      </g>
+
+      <!-- PAYLOAD SLOT. Empty by design - drop the held object in here and
+           it is already centred, already gripped, and already inherits the
+           chassis bob/rock. Drawn before the arms on purpose: the claws
+           close over the front of it. Local origin 0,0 = the grip centre,
+           so a crate is just <rect x="-27" y="-27" width="54" height="54"/>. -->
+      <g id="payload__walking_holding" transform="translate(120,96)"><rect x="-17" y="-17" width="34" height="34" rx="5" fill="#F2A65A" stroke="#1B2838" stroke-width="4" stroke-linejoin="round"/></g>
+
+      <!-- ATTACHMENT POINT for the held object: centre 120,96
+             wrists      78,96  and  162,96   (84 apart)
+             fingertips  x=90   and  x=150    (60 apart)
+           Draw the object centred on 120,96. Keep it under ~56 wide and the
+           claws stay visible on both sides of it, which is what sells the
+           grip. Anything wider swallows the fingertips.
+
+           Arms. Short, held high and clear of the ground line so they never
+           read as a second pair of legs. Segments are a dark stroke with a
+           lighter stroke laid over it: an outlined capsule in 2 paths.
+           Each arm is its own group - pose or animate them independently.
+           Pivots: shoulder-L 60,145  elbow-L 44,157  (mirror for R). -->
+      <g stroke-linecap="round" stroke-linejoin="round">
+
+        <g id="arm-l__walking_holding">
+          <path d="M58 144 L53 112" stroke="#1B2838" stroke-width="16"/>
+          <path d="M53 112 L78 96"  stroke="#1B2838" stroke-width="15"/>
+          <path d="M78 96 L90 91"   stroke="#1B2838" stroke-width="12"/>
+          <path d="M78 96 L89 103"  stroke="#1B2838" stroke-width="12"/>
+          <path d="M58 144 L53 112" stroke="#EEF3F9" stroke-width="9.5"/>
+          <path d="M53 112 L78 96"  stroke="#EEF3F9" stroke-width="9"/>
+          <path d="M78 96 L90 91"   stroke="#EEF3F9" stroke-width="6.5"/>
+          <path d="M78 96 L89 103"  stroke="#EEF3F9" stroke-width="6.5"/>
+          <circle cx="78" cy="96"  r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="53" cy="112" r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="58" cy="144" r="7"   fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+        </g>
+
+        <g id="arm-r__walking_holding">
+          <path d="M182 144 L187 112" stroke="#1B2838" stroke-width="16"/>
+          <path d="M187 112 L162 96"  stroke="#1B2838" stroke-width="15"/>
+          <path d="M162 96 L150 91"   stroke="#1B2838" stroke-width="12"/>
+          <path d="M162 96 L151 103"  stroke="#1B2838" stroke-width="12"/>
+          <path d="M182 144 L187 112" stroke="#EEF3F9" stroke-width="9.5"/>
+          <path d="M187 112 L162 96"  stroke="#EEF3F9" stroke-width="9"/>
+          <path d="M162 96 L150 91"   stroke="#EEF3F9" stroke-width="6.5"/>
+          <path d="M162 96 L151 103"  stroke="#EEF3F9" stroke-width="6.5"/>
+          <circle cx="162" cy="96"  r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="187" cy="112" r="5.5" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+          <circle cx="182" cy="144" r="7"   fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+        </g>
+
+      </g>
+
+
+      </g>
+    </g>
+  </g>
+</svg>
+</template>
+<template id="tpl-pickup"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 0 300 240" width="300" height="240"
+     role="img" aria-label="Cartoon delivery robot, three-quarter top-down, animated idle to holding">
+
+  <!-- ============================================================
+       CARTOON DELIVERY ROBOT / STATE: PICKUP  -  3/4 top-down view
+       ONE-SHOT, 1.1s. IDLE -> reach down to FRONT-CENTRE -> grab ->
+       lift into HOLDING, then freezes there.
+
+       "Front-centre" is the grid cell directly below the robot. Both
+       hands converge on the centre line, so the grab point is exactly
+       x=120 by symmetry.
+
+       Statically (no SMIL) it renders the IDLE pose.
+       Camera sits above and in front, ~55deg. You see the cargo lid
+       (foreshortened) and the front face. Symmetric, so it mirrors
+       cleanly for left/right facing sprites.
+       Origin: casters plant on y=195, sprite centred on x=120.
+       viewBox is widened to -30..270 (still centred on 120) purely to give
+       the arms room; the robot's own coordinates never moved.
+       ============================================================ -->
+
+  <defs>
+    <linearGradient id="bodyShade__pickup" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"    stop-color="#FFFFFF" stop-opacity=".55"/>
+      <stop offset=".45"  stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset=".82"  stop-color="#8FA3BA" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#8FA3BA" stop-opacity=".45"/>
+    </linearGradient>
+    <linearGradient id="visorGlass__pickup" x1="0" y1="0" x2=".4" y2="1">
+      <stop offset="0" stop-color="#33475C"/>
+      <stop offset="1" stop-color="#1B2838"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#1B2838" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- ground shadow: static, the robot never leaves the ground -->
+    <ellipse id="shadow__pickup" cx="120" cy="200" rx="62" ry="12" fill="#1B2838" opacity=".20" stroke="none">
+      <animate attributeName="rx" values="62;60;62" dur="2.6s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <animate attributeName="opacity" values=".20;.18;.20" dur="2.6s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+    </ellipse>
+
+    <!-- Casters. NEVER transformed: they are the contact patch. Bottom edge
+         sits on y=195, same as the shadow's centre line. Drawn before the
+         chassis so the body hides their top half. -->
+    <g id="wheels__pickup" fill="#2C3B4B">
+      <rect x="74"  y="170" width="25" height="25" rx="12.5"/>
+      <rect x="141" y="170" width="25" height="25" rx="12.5"/>
+    </g>
+
+    <!-- Body only. Rock / bob THIS group; pivot 120 194. The wheels stay
+         planted underneath, so a tilt reads as suspension travel.
+         The held object must move WITH the hands. Put it in #payload
+         below and it inherits every transform on this group for free. -->
+    <g id="chassis__pickup">
+      <animateTransform attributeName="transform" type="translate"
+                        values="0 0; 0 -2.5; 0 0" dur="2.6s" repeatCount="indefinite"
+                        calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <!-- cargo lid (top face, foreshortened) -->
+      <path fill="#EEF3F9" d="M92 86 L148 86 Q158 86 162.8 94.8 L178.2 123.2
+                              Q183 132 173 132 L67 132 Q57 132 61.8 123.2
+                              L77.2 94.8 Q82 86 92 86 Z"/>
+      <path fill="#DCE5EF" stroke-width="4"
+            d="M99 95 L141 95 Q149 95 152.6 101.6 L165 121
+               Q169 126 161 126 L79 126 Q71 126 75 121 L87.4 101.6 Q91 95 99 95 Z"/>
+
+      <!-- parcel emblem on the lid -->
+      <g stroke-width="3.5">
+        <path fill="#F2A65A" d="M106 103 L134 103 L137 119 L103 119 Z"/>
+        <path fill="#C9762F" stroke="none" d="M116.6 103 L123.4 103 L124.6 119 L115.4 119 Z"/>
+      </g>
+
+      <!-- front face -->
+      <path fill="#EEF3F9"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+      <path fill="url(#bodyShade__pickup)" stroke="none"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+
+      <!-- headlight strips -->
+      <g fill="#FFD166" stroke-width="3.5">
+        <rect x="71" y="174" width="17" height="8" rx="4"/>
+        <rect x="152" y="174" width="17" height="8" rx="4"/>
+      </g>
+
+      <!-- visor + face -->
+      <rect x="74" y="139" width="92" height="35" rx="15" fill="url(#visorGlass__pickup)"/>
+
+      <g fill="#5CF2DF" stroke="none">
+        <!-- left eye -->
+        <ellipse cx="101" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- right eye -->
+        <ellipse cx="139" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- catchlights -->
+        <g fill="#FFFFFF" opacity=".9">
+          <circle cx="97.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="135.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+        </g>
+        <!-- smile -->
+        <path fill="none" stroke="#5CF2DF" stroke-width="3.5" d="M110 167 Q120 172.5 130 167"/>
+      </g>
+      <!-- glass gleam -->
+      <path fill="#FFFFFF" opacity=".15" stroke="none" d="M88 141 L99 141 L84 172 L77 168 Z"/>
+
+
+      <!-- lidar puck -->
+      <path fill="#3E5468" d="M106 84 L106 88 A14 6.5 0 0 0 134 88 L134 84 Z"/>
+      <ellipse cx="120" cy="84" rx="14" ry="6.5" fill="#5A7288"/>
+      <ellipse cx="120" cy="84" rx="5" ry="2.4" fill="#5CF2DF" stroke="none" opacity=".9"/>
+      <!-- antenna + delivery pennant -->
+      <g>
+        <animateTransform attributeName="transform" type="rotate"
+                          values="-2 152 90; 2.5 152 90; -2 152 90" dur="3.1s"
+                          repeatCount="indefinite" calcMode="spline"
+                          keySplines=".45 0 .55 1;.45 0 .55 1"/>
+        <path fill="none" stroke-width="4.5" d="M152 92 Q160 66 168 44"/>
+        <path fill="#FF8A3D" stroke-width="4"
+              d="M168 44 L194 51 L167 60 Z"/>
+        <circle cx="168" cy="42" r="4.5" fill="#FFD166" stroke-width="4"/>
+      </g>
+
+      <!-- PAYLOAD SLOT. Empty by design - drop the held object in here and
+           it is already centred, already gripped, and already inherits the
+           chassis bob/rock. Drawn before the arms on purpose: the claws
+           close over the front of it. Local origin 0,0 = the grip centre,
+           so a crate is just <rect x="-27" y="-27" width="54" height="54"/>. -->
+      <g id="payload__pickup" transform="translate(120.0,195.4)" opacity="1"><rect x="-17" y="-17" width="34" height="34" rx="5" fill="#F2A65A" stroke="#1B2838" stroke-width="4" stroke-linejoin="round"/>
+        <!-- the object: sits in the cell in front until the claws close, then rides up into the two-handed grip -->
+        <animateTransform attributeName="transform" type="translate"
+           values="120.0 195.4;120.0 195.4;120.0 195.4;120.0 195.4;120.0 96.0"
+           keyTimes="0;0.05;0.46;0.58;1" begin="pickup__pickup.begin" dur="1.15s"
+           fill="freeze" calcMode="spline" keySplines="0 0 1 1;.4 0 .25 1;0 0 1 1;.35 0 .2 1"/>
+      </g>
+
+      <!-- ================== ARM RIG ==================
+           Nested joints, so a pose is 3 angles per arm and the segment
+           lengths can never drift. Interpolating hand POSITIONS instead
+           would collapse the arm to ~70% length at the midpoint.
+
+             lengths   upper 32.5   forearm 29   finger 13 at +/-33deg
+             pose      shoulder   elbow   wrist
+             idle       169.4     -34.4   -45
+             hold       261.1      66.3    37.5
+
+           The right arm is the SAME rig under scale(-1,1), so both arms
+           take identical angle numbers - never flip signs.
+
+           PLAYBACK. One animation per joint plus the payload slot,
+           5 keyframes each. The first carries id="pickup__pickup"; everything
+           else is slaved to begin="pickup__pickup.begin", so ONE call runs it:
+
+               svg.getElementById('pickup').beginElement();
+
+           begin="0s" self-demos on load; change to begin="indefinite"
+           for game control.
+
+           GRAB POINT: 120.0, 195.4  (claws 31.3 apart). #payload sits
+           there until the claws close, then rides up to 120,96 - the
+           same slot the HOLDING sprite uses.
+
+           POSE TABLE (left arm; right arm is the same rig under
+           scale(-1,1) and takes these same numbers):
+             pose     shoulder    elbow    wrist
+             idle        169.4    -34.4    -45.0
+             idle        169.4    -34.4    -45.0
+             grab         72.5    -52.3     27.8
+             hold-still     72.5    -52.3     27.8
+             hold        -98.9     66.4     37.5
+           -->
+      <g stroke-linecap="round" stroke-linejoin="round">
+
+        <g id="arm-l__pickup" transform="translate(58,144)">
+          <g class="j-sh" transform="rotate(169.4)">
+            <animateTransform id="pickup__pickup" attributeName="transform" type="rotate"
+               values="169.4;169.4;72.5;72.5;-98.9"
+               keyTimes="0;0.05;0.46;0.58;1"
+               begin="0s" dur="1.15s" fill="freeze"
+               calcMode="spline" keySplines="0 0 1 1;.4 0 .25 1;0 0 1 1;.35 0 .2 1"/>
+            <path d="M0 0 L32.5 0" stroke="#1B2838" stroke-width="16"/>
+            <path d="M0 0 L32.5 0" stroke="#EEF3F9" stroke-width="9.5"/>
+            <g transform="translate(32.5,0)">
+              <g class="j-el" transform="rotate(-34.4)">
+                <animateTransform attributeName="transform" type="rotate"
+                   values="-34.4;-34.4;-52.3;-52.3;66.4"
+                   keyTimes="0;0.05;0.46;0.58;1"
+                   begin="pickup__pickup.begin" dur="1.15s" fill="freeze"
+                   calcMode="spline" keySplines="0 0 1 1;.4 0 .25 1;0 0 1 1;.35 0 .2 1"/>
+                <path d="M0 0 L29 0" stroke="#1B2838" stroke-width="15"/>
+                <path d="M0 0 L29 0" stroke="#EEF3F9" stroke-width="9"/>
+                <g transform="translate(29,0)">
+                  <g class="j-wr" transform="rotate(-45.0)">
+                    <animateTransform attributeName="transform" type="rotate"
+                       values="-45.0;-45.0;27.8;27.8;37.5"
+                       keyTimes="0;0.05;0.46;0.58;1"
+                       begin="pickup__pickup.begin" dur="1.15s" fill="freeze"
+                       calcMode="spline" keySplines="0 0 1 1;.4 0 .25 1;0 0 1 1;.35 0 .2 1"/>
+                    <path d="M0 0 L10.9 7.08"  stroke="#1B2838" stroke-width="12"/>
+                    <path d="M0 0 L10.9 -7.08" stroke="#1B2838" stroke-width="12"/>
+                    <path d="M0 0 L10.9 7.08"  stroke="#EEF3F9" stroke-width="6.5"/>
+                    <path d="M0 0 L10.9 -7.08" stroke="#EEF3F9" stroke-width="6.5"/>
+                  </g>
+                  <circle r="6" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+                </g>
+              </g>
+              <circle r="6" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+            </g>
+            <circle r="7" fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+          </g>
+        </g>
+
+        <g id="arm-r__pickup" transform="translate(182,144) scale(-1,1)">
+          <g class="j-sh" transform="rotate(169.4)">
+            <animateTransform attributeName="transform" type="rotate"
+               values="169.4;169.4;72.5;72.5;-98.9"
+               keyTimes="0;0.05;0.46;0.58;1"
+               begin="pickup__pickup.begin" dur="1.15s" fill="freeze"
+               calcMode="spline" keySplines="0 0 1 1;.4 0 .25 1;0 0 1 1;.35 0 .2 1"/>
+            <path d="M0 0 L32.5 0" stroke="#1B2838" stroke-width="16"/>
+            <path d="M0 0 L32.5 0" stroke="#EEF3F9" stroke-width="9.5"/>
+            <g transform="translate(32.5,0)">
+              <g class="j-el" transform="rotate(-34.4)">
+                <animateTransform attributeName="transform" type="rotate"
+                   values="-34.4;-34.4;-52.3;-52.3;66.4"
+                   keyTimes="0;0.05;0.46;0.58;1"
+                   begin="pickup__pickup.begin" dur="1.15s" fill="freeze"
+                   calcMode="spline" keySplines="0 0 1 1;.4 0 .25 1;0 0 1 1;.35 0 .2 1"/>
+                <path d="M0 0 L29 0" stroke="#1B2838" stroke-width="15"/>
+                <path d="M0 0 L29 0" stroke="#EEF3F9" stroke-width="9"/>
+                <g transform="translate(29,0)">
+                  <g class="j-wr" transform="rotate(-45.0)">
+                    <animateTransform attributeName="transform" type="rotate"
+                       values="-45.0;-45.0;27.8;27.8;37.5"
+                       keyTimes="0;0.05;0.46;0.58;1"
+                       begin="pickup__pickup.begin" dur="1.15s" fill="freeze"
+                       calcMode="spline" keySplines="0 0 1 1;.4 0 .25 1;0 0 1 1;.35 0 .2 1"/>
+                    <path d="M0 0 L10.9 7.08"  stroke="#1B2838" stroke-width="12"/>
+                    <path d="M0 0 L10.9 -7.08" stroke="#1B2838" stroke-width="12"/>
+                    <path d="M0 0 L10.9 7.08"  stroke="#EEF3F9" stroke-width="6.5"/>
+                    <path d="M0 0 L10.9 -7.08" stroke="#EEF3F9" stroke-width="6.5"/>
+                  </g>
+                  <circle r="6" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+                </g>
+              </g>
+              <circle r="6" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+            </g>
+            <circle r="7" fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+          </g>
+        </g>
+      </g>
+
+
+    </g>
+  </g>
+</svg>
+</template>
+<template id="tpl-putdown"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 0 300 240" width="300" height="240"
+     role="img" aria-label="Cartoon delivery robot, three-quarter top-down, animated idle to holding">
+
+  <!-- ============================================================
+       CARTOON DELIVERY ROBOT / STATE: PICKUP  -  3/4 top-down view
+       ONE-SHOT, 1.1s. IDLE -> reach down to FRONT-CENTRE -> grab ->
+       lift into HOLDING, then freezes there.
+
+       "Front-centre" is the grid cell directly below the robot. Both
+       hands converge on the centre line, so the grab point is exactly
+       x=120 by symmetry.
+
+       Statically (no SMIL) it renders the IDLE pose.
+       Camera sits above and in front, ~55deg. You see the cargo lid
+       (foreshortened) and the front face. Symmetric, so it mirrors
+       cleanly for left/right facing sprites.
+       Origin: casters plant on y=195, sprite centred on x=120.
+       viewBox is widened to -30..270 (still centred on 120) purely to give
+       the arms room; the robot's own coordinates never moved.
+       ============================================================ -->
+
+  <defs>
+    <linearGradient id="bodyShade__putdown" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"    stop-color="#FFFFFF" stop-opacity=".55"/>
+      <stop offset=".45"  stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset=".82"  stop-color="#8FA3BA" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#8FA3BA" stop-opacity=".45"/>
+    </linearGradient>
+    <linearGradient id="visorGlass__putdown" x1="0" y1="0" x2=".4" y2="1">
+      <stop offset="0" stop-color="#33475C"/>
+      <stop offset="1" stop-color="#1B2838"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#1B2838" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- ground shadow: static, the robot never leaves the ground -->
+    <ellipse id="shadow__putdown" cx="120" cy="200" rx="62" ry="12" fill="#1B2838" opacity=".20" stroke="none">
+      <animate attributeName="rx" values="62;60;62" dur="2.6s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <animate attributeName="opacity" values=".20;.18;.20" dur="2.6s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+    </ellipse>
+
+    <!-- Casters. NEVER transformed: they are the contact patch. Bottom edge
+         sits on y=195, same as the shadow's centre line. Drawn before the
+         chassis so the body hides their top half. -->
+    <g id="wheels__putdown" fill="#2C3B4B">
+      <rect x="74"  y="170" width="25" height="25" rx="12.5"/>
+      <rect x="141" y="170" width="25" height="25" rx="12.5"/>
+    </g>
+
+    <!-- Body only. Rock / bob THIS group; pivot 120 194. The wheels stay
+         planted underneath, so a tilt reads as suspension travel.
+         The held object must move WITH the hands. Put it in #payload
+         below and it inherits every transform on this group for free. -->
+    <g id="chassis__putdown">
+      <animateTransform attributeName="transform" type="translate"
+                        values="0 0; 0 -2.5; 0 0" dur="2.6s" repeatCount="indefinite"
+                        calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <!-- cargo lid (top face, foreshortened) -->
+      <path fill="#EEF3F9" d="M92 86 L148 86 Q158 86 162.8 94.8 L178.2 123.2
+                              Q183 132 173 132 L67 132 Q57 132 61.8 123.2
+                              L77.2 94.8 Q82 86 92 86 Z"/>
+      <path fill="#DCE5EF" stroke-width="4"
+            d="M99 95 L141 95 Q149 95 152.6 101.6 L165 121
+               Q169 126 161 126 L79 126 Q71 126 75 121 L87.4 101.6 Q91 95 99 95 Z"/>
+
+      <!-- parcel emblem on the lid -->
+      <g stroke-width="3.5">
+        <path fill="#F2A65A" d="M106 103 L134 103 L137 119 L103 119 Z"/>
+        <path fill="#C9762F" stroke="none" d="M116.6 103 L123.4 103 L124.6 119 L115.4 119 Z"/>
+      </g>
+
+      <!-- front face -->
+      <path fill="#EEF3F9"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+      <path fill="url(#bodyShade__putdown)" stroke="none"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+
+      <!-- headlight strips -->
+      <g fill="#FFD166" stroke-width="3.5">
+        <rect x="71" y="174" width="17" height="8" rx="4"/>
+        <rect x="152" y="174" width="17" height="8" rx="4"/>
+      </g>
+
+      <!-- visor + face -->
+      <rect x="74" y="139" width="92" height="35" rx="15" fill="url(#visorGlass__putdown)"/>
+
+      <g fill="#5CF2DF" stroke="none">
+        <!-- left eye -->
+        <ellipse cx="101" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- right eye -->
+        <ellipse cx="139" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- catchlights -->
+        <g fill="#FFFFFF" opacity=".9">
+          <circle cx="97.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="135.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+        </g>
+        <!-- smile -->
+        <path fill="none" stroke="#5CF2DF" stroke-width="3.5" d="M110 167 Q120 172.5 130 167"/>
+      </g>
+      <!-- glass gleam -->
+      <path fill="#FFFFFF" opacity=".15" stroke="none" d="M88 141 L99 141 L84 172 L77 168 Z"/>
+
+
+      <!-- lidar puck -->
+      <path fill="#3E5468" d="M106 84 L106 88 A14 6.5 0 0 0 134 88 L134 84 Z"/>
+      <ellipse cx="120" cy="84" rx="14" ry="6.5" fill="#5A7288"/>
+      <ellipse cx="120" cy="84" rx="5" ry="2.4" fill="#5CF2DF" stroke="none" opacity=".9"/>
+      <!-- antenna + delivery pennant -->
+      <g>
+        <animateTransform attributeName="transform" type="rotate"
+                          values="-2 152 90; 2.5 152 90; -2 152 90" dur="3.1s"
+                          repeatCount="indefinite" calcMode="spline"
+                          keySplines=".45 0 .55 1;.45 0 .55 1"/>
+        <path fill="none" stroke-width="4.5" d="M152 92 Q160 66 168 44"/>
+        <path fill="#FF8A3D" stroke-width="4"
+              d="M168 44 L194 51 L167 60 Z"/>
+        <circle cx="168" cy="42" r="4.5" fill="#FFD166" stroke-width="4"/>
+      </g>
+
+      <!-- PAYLOAD SLOT. Empty by design - drop the held object in here and
+           it is already centred, already gripped, and already inherits the
+           chassis bob/rock. Drawn before the arms on purpose: the claws
+           close over the front of it. Local origin 0,0 = the grip centre,
+           so a crate is just <rect x="-27" y="-27" width="54" height="54"/>. -->
+      <g id="payload__putdown" transform="translate(120.0,195.4)" opacity="1"><rect x="-17" y="-17" width="34" height="34" rx="5" fill="#F2A65A" stroke="#1B2838" stroke-width="4" stroke-linejoin="round"/>
+        <!-- the object: sits in the cell in front until the claws close, then rides up into the two-handed grip -->
+        <animateTransform attributeName="transform" type="translate"
+           values="120.0 96.0;120.0 195.4;120.0 195.4;120.0 195.4;120.0 195.4"
+           keyTimes="0;0.42;0.54;0.95;1" begin="pickup__putdown.begin" dur="1.15s"
+           fill="freeze" calcMode="spline" keySplines="0.8 0 0.65 1;0 0 1 1;0.75 0 0.6 1;0 0 1 1"/>
+      </g>
+
+      <!-- ================== ARM RIG ==================
+           Nested joints, so a pose is 3 angles per arm and the segment
+           lengths can never drift. Interpolating hand POSITIONS instead
+           would collapse the arm to ~70% length at the midpoint.
+
+             lengths   upper 32.5   forearm 29   finger 13 at +/-33deg
+             pose      shoulder   elbow   wrist
+             idle       169.4     -34.4   -45
+             hold       261.1      66.3    37.5
+
+           The right arm is the SAME rig under scale(-1,1), so both arms
+           take identical angle numbers - never flip signs.
+
+           PLAYBACK. One animation per joint plus the payload slot,
+           5 keyframes each. The first carries id="pickup__putdown"; everything
+           else is slaved to begin="pickup__putdown.begin", so ONE call runs it:
+
+               svg.getElementById('pickup').beginElement();
+
+           begin="0s" self-demos on load; change to begin="indefinite"
+           for game control.
+
+           GRAB POINT: 120.0, 195.4  (claws 31.3 apart). #payload sits
+           there until the claws close, then rides up to 120,96 - the
+           same slot the HOLDING sprite uses.
+
+           POSE TABLE (left arm; right arm is the same rig under
+           scale(-1,1) and takes these same numbers):
+             pose     shoulder    elbow    wrist
+             idle        169.4    -34.4    -45.0
+             idle        169.4    -34.4    -45.0
+             grab         72.5    -52.3     27.8
+             hold-still     72.5    -52.3     27.8
+             hold        -98.9     66.4     37.5
+           -->
+      <g stroke-linecap="round" stroke-linejoin="round">
+
+        <g id="arm-l__putdown" transform="translate(58,144)">
+          <g class="j-sh" transform="rotate(-98.9)">
+            <animateTransform id="pickup__putdown" attributeName="transform" type="rotate"
+               values="-98.9;72.5;72.5;169.4;169.4"
+               keyTimes="0;0.42;0.54;0.95;1"
+               begin="0s" dur="1.15s" fill="freeze"
+               calcMode="spline" keySplines="0.8 0 0.65 1;0 0 1 1;0.75 0 0.6 1;0 0 1 1"/>
+            <path d="M0 0 L32.5 0" stroke="#1B2838" stroke-width="16"/>
+            <path d="M0 0 L32.5 0" stroke="#EEF3F9" stroke-width="9.5"/>
+            <g transform="translate(32.5,0)">
+              <g class="j-el" transform="rotate(66.4)">
+                <animateTransform attributeName="transform" type="rotate"
+                   values="66.4;-52.3;-52.3;-34.4;-34.4"
+                   keyTimes="0;0.42;0.54;0.95;1"
+                   begin="pickup__putdown.begin" dur="1.15s" fill="freeze"
+                   calcMode="spline" keySplines="0.8 0 0.65 1;0 0 1 1;0.75 0 0.6 1;0 0 1 1"/>
+                <path d="M0 0 L29 0" stroke="#1B2838" stroke-width="15"/>
+                <path d="M0 0 L29 0" stroke="#EEF3F9" stroke-width="9"/>
+                <g transform="translate(29,0)">
+                  <g class="j-wr" transform="rotate(37.5)">
+                    <animateTransform attributeName="transform" type="rotate"
+                       values="37.5;27.8;27.8;-45.0;-45.0"
+                       keyTimes="0;0.42;0.54;0.95;1"
+                       begin="pickup__putdown.begin" dur="1.15s" fill="freeze"
+                       calcMode="spline" keySplines="0.8 0 0.65 1;0 0 1 1;0.75 0 0.6 1;0 0 1 1"/>
+                    <path d="M0 0 L10.9 7.08"  stroke="#1B2838" stroke-width="12"/>
+                    <path d="M0 0 L10.9 -7.08" stroke="#1B2838" stroke-width="12"/>
+                    <path d="M0 0 L10.9 7.08"  stroke="#EEF3F9" stroke-width="6.5"/>
+                    <path d="M0 0 L10.9 -7.08" stroke="#EEF3F9" stroke-width="6.5"/>
+                  </g>
+                  <circle r="6" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+                </g>
+              </g>
+              <circle r="6" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+            </g>
+            <circle r="7" fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+          </g>
+        </g>
+
+        <g id="arm-r__putdown" transform="translate(182,144) scale(-1,1)">
+          <g class="j-sh" transform="rotate(-98.9)">
+            <animateTransform attributeName="transform" type="rotate"
+               values="-98.9;72.5;72.5;169.4;169.4"
+               keyTimes="0;0.42;0.54;0.95;1"
+               begin="pickup__putdown.begin" dur="1.15s" fill="freeze"
+               calcMode="spline" keySplines="0.8 0 0.65 1;0 0 1 1;0.75 0 0.6 1;0 0 1 1"/>
+            <path d="M0 0 L32.5 0" stroke="#1B2838" stroke-width="16"/>
+            <path d="M0 0 L32.5 0" stroke="#EEF3F9" stroke-width="9.5"/>
+            <g transform="translate(32.5,0)">
+              <g class="j-el" transform="rotate(66.4)">
+                <animateTransform attributeName="transform" type="rotate"
+                   values="66.4;-52.3;-52.3;-34.4;-34.4"
+                   keyTimes="0;0.42;0.54;0.95;1"
+                   begin="pickup__putdown.begin" dur="1.15s" fill="freeze"
+                   calcMode="spline" keySplines="0.8 0 0.65 1;0 0 1 1;0.75 0 0.6 1;0 0 1 1"/>
+                <path d="M0 0 L29 0" stroke="#1B2838" stroke-width="15"/>
+                <path d="M0 0 L29 0" stroke="#EEF3F9" stroke-width="9"/>
+                <g transform="translate(29,0)">
+                  <g class="j-wr" transform="rotate(37.5)">
+                    <animateTransform attributeName="transform" type="rotate"
+                       values="37.5;27.8;27.8;-45.0;-45.0"
+                       keyTimes="0;0.42;0.54;0.95;1"
+                       begin="pickup__putdown.begin" dur="1.15s" fill="freeze"
+                       calcMode="spline" keySplines="0.8 0 0.65 1;0 0 1 1;0.75 0 0.6 1;0 0 1 1"/>
+                    <path d="M0 0 L10.9 7.08"  stroke="#1B2838" stroke-width="12"/>
+                    <path d="M0 0 L10.9 -7.08" stroke="#1B2838" stroke-width="12"/>
+                    <path d="M0 0 L10.9 7.08"  stroke="#EEF3F9" stroke-width="6.5"/>
+                    <path d="M0 0 L10.9 -7.08" stroke="#EEF3F9" stroke-width="6.5"/>
+                  </g>
+                  <circle r="6" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+                </g>
+              </g>
+              <circle r="6" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+            </g>
+            <circle r="7" fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+          </g>
+        </g>
+      </g>
+
+
+    </g>
+  </g>
+</svg>
+</template>
+<template id="tpl-merge"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 0 300 240" width="300" height="240"
+     role="img" aria-label="Cartoon delivery robot, three-quarter top-down, animated idle to holding">
+
+  <!-- ============================================================
+       CARTOON DELIVERY ROBOT / STATE: MERGE  -  3/4 top-down view
+       ONE-SHOT, 2.2s. Starts AND ends on exactly the HOLDING pose.
+
+         hold -> reach -> grab -> lift -> twoup -> wind -> SMASH
+              -> settle -> hold
+
+       The left hand dives to FRONT-CENTRE (the cell below the robot)
+       for a second object while the right keeps hold of the first;
+       both come up, the arms wind apart, then slam together and the
+       robot is left holding a single object.
+
+       Statically (no SMIL) it renders the HOLDING pose.
+       Camera sits above and in front, ~55deg. You see the cargo lid
+       (foreshortened) and the front face. Symmetric, so it mirrors
+       cleanly for left/right facing sprites.
+       Origin: casters plant on y=195, sprite centred on x=120.
+       viewBox is widened to -30..270 (still centred on 120) purely to give
+       the arms room; the robot's own coordinates never moved.
+       ============================================================ -->
+
+  <defs>
+    <linearGradient id="bodyShade__merge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"    stop-color="#FFFFFF" stop-opacity=".55"/>
+      <stop offset=".45"  stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset=".82"  stop-color="#8FA3BA" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#8FA3BA" stop-opacity=".45"/>
+    </linearGradient>
+    <linearGradient id="visorGlass__merge" x1="0" y1="0" x2=".4" y2="1">
+      <stop offset="0" stop-color="#33475C"/>
+      <stop offset="1" stop-color="#1B2838"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#1B2838" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- ground shadow: static, the robot never leaves the ground -->
+    <ellipse id="shadow__merge" cx="120" cy="200" rx="62" ry="12" fill="#1B2838" opacity=".20" stroke="none">
+      <animate attributeName="rx" values="62;60;62" dur="2.6s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <animate attributeName="opacity" values=".20;.18;.20" dur="2.6s" repeatCount="indefinite"
+               calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+    </ellipse>
+
+    <!-- Casters. NEVER transformed: they are the contact patch. Bottom edge
+         sits on y=195, same as the shadow's centre line. Drawn before the
+         chassis so the body hides their top half. -->
+    <g id="wheels__merge" fill="#2C3B4B">
+      <rect x="74"  y="170" width="25" height="25" rx="12.5"/>
+      <rect x="141" y="170" width="25" height="25" rx="12.5"/>
+    </g>
+
+    <!-- Body only. Rock / bob THIS group; pivot 120 194. The wheels stay
+         planted underneath, so a tilt reads as suspension travel.
+         The held object must move WITH the hands. Put it in #payload
+         below and it inherits every transform on this group for free. -->
+    <g id="chassis__merge">
+      <animateTransform attributeName="transform" type="translate"
+                        values="0 0; 0 -2.5; 0 0" dur="2.6s" repeatCount="indefinite"
+                        calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+      <!-- cargo lid (top face, foreshortened) -->
+      <path fill="#EEF3F9" d="M92 86 L148 86 Q158 86 162.8 94.8 L178.2 123.2
+                              Q183 132 173 132 L67 132 Q57 132 61.8 123.2
+                              L77.2 94.8 Q82 86 92 86 Z"/>
+      <path fill="#DCE5EF" stroke-width="4"
+            d="M99 95 L141 95 Q149 95 152.6 101.6 L165 121
+               Q169 126 161 126 L79 126 Q71 126 75 121 L87.4 101.6 Q91 95 99 95 Z"/>
+
+      <!-- parcel emblem on the lid -->
+      <g stroke-width="3.5">
+        <path fill="#F2A65A" d="M106 103 L134 103 L137 119 L103 119 Z"/>
+        <path fill="#C9762F" stroke="none" d="M116.6 103 L123.4 103 L124.6 119 L115.4 119 Z"/>
+      </g>
+
+      <!-- front face -->
+      <path fill="#EEF3F9"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+      <path fill="url(#bodyShade__merge)" stroke="none"
+            d="M57 132 L183 132 L176.5 171 Q174 186 159 186
+               L81 186 Q66 186 63.5 171 Z"/>
+
+      <!-- headlight strips -->
+      <g fill="#FFD166" stroke-width="3.5">
+        <rect x="71" y="174" width="17" height="8" rx="4"/>
+        <rect x="152" y="174" width="17" height="8" rx="4"/>
+      </g>
+
+      <!-- visor + face -->
+      <rect x="74" y="139" width="92" height="35" rx="15" fill="url(#visorGlass__merge)"/>
+
+      <g fill="#5CF2DF" stroke="none">
+        <!-- left eye -->
+        <ellipse cx="101" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- right eye -->
+        <ellipse cx="139" cy="154" rx="9.5" ry="11">
+          <animate attributeName="ry" values="11;11;1;11;11" keyTimes="0;.90;.935;.97;1"
+                   dur="4.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- catchlights -->
+        <g fill="#FFFFFF" opacity=".9">
+          <circle cx="97.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="135.5" cy="150" r="2.6">
+            <animate attributeName="opacity" values=".9;.9;0;.9;.9" keyTimes="0;.90;.935;.97;1"
+                     dur="4.6s" repeatCount="indefinite"/>
+          </circle>
+        </g>
+        <!-- smile -->
+        <path fill="none" stroke="#5CF2DF" stroke-width="3.5" d="M110 167 Q120 172.5 130 167"/>
+      </g>
+      <!-- glass gleam -->
+      <path fill="#FFFFFF" opacity=".15" stroke="none" d="M88 141 L99 141 L84 172 L77 168 Z"/>
+
+
+      <!-- lidar puck -->
+      <path fill="#3E5468" d="M106 84 L106 88 A14 6.5 0 0 0 134 88 L134 84 Z"/>
+      <ellipse cx="120" cy="84" rx="14" ry="6.5" fill="#5A7288"/>
+      <ellipse cx="120" cy="84" rx="5" ry="2.4" fill="#5CF2DF" stroke="none" opacity=".9"/>
+      <!-- antenna + delivery pennant -->
+      <g>
+        <animateTransform attributeName="transform" type="rotate"
+                          values="-2 152 90; 2.5 152 90; -2 152 90" dur="3.1s"
+                          repeatCount="indefinite" calcMode="spline"
+                          keySplines=".45 0 .55 1;.45 0 .55 1"/>
+        <path fill="none" stroke-width="4.5" d="M152 92 Q160 66 168 44"/>
+        <path fill="#FF8A3D" stroke-width="4"
+              d="M168 44 L194 51 L167 60 Z"/>
+        <circle cx="168" cy="42" r="4.5" fill="#FFD166" stroke-width="4"/>
+      </g>
+
+      <!-- PAYLOAD SLOT. Empty by design - drop the held object in here and
+           it is already centred, already gripped, and already inherits the
+           chassis bob/rock. Drawn before the arms on purpose: the claws
+           close over the front of it. Local origin 0,0 = the grip centre,
+           so a crate is just <rect x="-27" y="-27" width="54" height="54"/>. -->
+      <g id="payload-a__merge" transform="translate(120.0,96.0)" opacity="1"><rect x="-17" y="-17" width="34" height="34" rx="5" fill="#F2A65A" stroke="#1B2838" stroke-width="4" stroke-linejoin="round"/>
+        <!-- object A: starts in the two-handed grip, slides into the right claw as the left hand leaves, ends at the collision -->
+        <animateTransform attributeName="transform" type="translate"
+           values="120.0 96.0;120.0 96.0;131.0 100.5;131.0 100.5;160.1 90.0;172.7 81.5;131.0 99.3;152.0 94.3;148.7 97.5"
+           keyTimes="0;0.06;0.3;0.42;0.56;0.68;0.79;0.88;1" begin="merge__merge.begin" dur="2.2s"
+           fill="freeze" calcMode="spline" keySplines="0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;.3 0 .7 1;.8 0 1 1;.1 0 .3 1;.4 0 .2 1"/>
+        <animate attributeName="opacity" values="1;1;1;1;1;1;1;0;0"
+           keyTimes="0;0.06;0.3;0.42;0.56;0.68;0.79;0.88;1" begin="merge__merge.begin" dur="2.2s" fill="freeze"/>
+      </g>
+
+      <g id="payload-b__merge" transform="translate(115.0,188.6)" opacity="1"><circle r="15" fill="#7A5BD6" stroke="#1B2838" stroke-width="4"/>
+        <!-- object B: waits in the cell in front, then rides the left claw up -->
+        <animateTransform attributeName="transform" type="translate"
+           values="115.0 188.6;115.0 188.6;115.0 188.6;115.0 188.6;79.9 90.0;67.3 81.5;109.0 99.3;88.0 94.3;91.3 97.5"
+           keyTimes="0;0.06;0.3;0.42;0.56;0.68;0.79;0.88;1" begin="merge__merge.begin" dur="2.2s"
+           fill="freeze" calcMode="spline" keySplines="0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;.3 0 .7 1;.8 0 1 1;.1 0 .3 1;.4 0 .2 1"/>
+        <animate attributeName="opacity" values="1;1;1;1;1;1;1;0;0"
+           keyTimes="0;0.06;0.3;0.42;0.56;0.68;0.79;0.88;1" begin="merge__merge.begin" dur="2.2s" fill="freeze"/>
+      </g>
+
+      <g id="payload__merge" transform="translate(120.0,96.0)" opacity="0"><path d="M0 -24 L21 -12 L21 12 L0 24 L-21 12 L-21 -12 Z" fill="#5CF2DF" stroke="#1B2838" stroke-width="4.5" stroke-linejoin="round"/>
+        <!-- the merged result, in the same slot the HOLDING sprite uses -->
+        <animate attributeName="opacity" values="0;0;0;0;0;0;0;1;1"
+           keyTimes="0;0.06;0.3;0.42;0.56;0.68;0.79;0.88;1" begin="merge__merge.begin" dur="2.2s" fill="freeze"/>
+      </g>
+
+      <!-- ================== ARM RIG ==================
+           Nested joints, so a pose is 3 angles per arm and the segment
+           lengths can never drift. Interpolating hand POSITIONS instead
+           would collapse the arm to ~70% length at the midpoint.
+
+             lengths   upper 32.5   forearm 29   finger 13 at +/-33deg
+             pose      shoulder   elbow   wrist
+             idle       169.4     -34.4   -45
+             hold       261.1      66.3    37.5
+
+           The right arm is the SAME rig under scale(-1,1), so both arms
+           take identical angle numbers - never flip signs.
+
+           PLAYBACK. One animation per joint, 9 keyframes each. The
+           first carries id="merge__merge"; the other five and all three
+           payload slots are slaved to begin="merge__merge.begin":
+
+               svg.getElementById('merge').beginElement();
+
+           GRAB POINT: 115.0, 188.6  - the left claw alone, angled inboard
+           so the grip lands near the centre line (x=120).
+
+           PAYLOAD SLOTS:
+             #payload-a  object A, already held. Slides into the right
+                         claw as the left hand leaves.
+             #payload-b  object B, waiting in the cell in front.
+             #payload    the merged result at 120,96.
+
+           POSE TABLE (left arm; right arm mirrored, same numbers):
+             pose     shoulder    elbow    wrist
+             hold        -98.9     66.4     37.5
+             hold        -98.9     66.4     37.5
+             reach        55.2    -36.5     19.3
+             grab         55.2    -36.5     19.3
+             twoup      -110.5     62.5     40.0
+             wind       -111.9     38.1     55.0
+             smash       -69.5     41.7     25.0
+             settle     -101.7     62.9     40.0
+             hold        -98.9     66.4     37.5
+           The elbow may cross 0 (arm straightens) but never +/-180,
+           which would fold it flat back through its own shoulder.
+           -->
+      <g stroke-linecap="round" stroke-linejoin="round">
+
+        <g id="arm-l__merge" transform="translate(58,144)">
+          <g class="j-sh" transform="rotate(-98.9)">
+            <animateTransform id="merge__merge" attributeName="transform" type="rotate"
+               values="-98.9;-98.9;55.2;55.2;-110.5;-111.9;-69.5;-101.7;-98.9"
+               keyTimes="0;0.06;0.3;0.42;0.56;0.68;0.79;0.88;1"
+               begin="0s" dur="2.2s" fill="freeze"
+               calcMode="spline" keySplines="0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;.3 0 .7 1;.8 0 1 1;.1 0 .3 1;.4 0 .2 1"/>
+            <path d="M0 0 L32.5 0" stroke="#1B2838" stroke-width="16"/>
+            <path d="M0 0 L32.5 0" stroke="#EEF3F9" stroke-width="9.5"/>
+            <g transform="translate(32.5,0)">
+              <g class="j-el" transform="rotate(66.4)">
+                <animateTransform attributeName="transform" type="rotate"
+                   values="66.4;66.4;-36.5;-36.5;62.5;38.1;41.7;62.9;66.4"
+                   keyTimes="0;0.06;0.3;0.42;0.56;0.68;0.79;0.88;1"
+                   begin="merge__merge.begin" dur="2.2s" fill="freeze"
+                   calcMode="spline" keySplines="0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;.3 0 .7 1;.8 0 1 1;.1 0 .3 1;.4 0 .2 1"/>
+                <path d="M0 0 L29 0" stroke="#1B2838" stroke-width="15"/>
+                <path d="M0 0 L29 0" stroke="#EEF3F9" stroke-width="9"/>
+                <g transform="translate(29,0)">
+                  <g class="j-wr" transform="rotate(37.5)">
+                    <animateTransform attributeName="transform" type="rotate"
+                       values="37.5;37.5;19.3;19.3;40.0;55.0;25.0;40.0;37.5"
+                       keyTimes="0;0.06;0.3;0.42;0.56;0.68;0.79;0.88;1"
+                       begin="merge__merge.begin" dur="2.2s" fill="freeze"
+                       calcMode="spline" keySplines="0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;.3 0 .7 1;.8 0 1 1;.1 0 .3 1;.4 0 .2 1"/>
+                    <path d="M0 0 L10.9 7.08"  stroke="#1B2838" stroke-width="12"/>
+                    <path d="M0 0 L10.9 -7.08" stroke="#1B2838" stroke-width="12"/>
+                    <path d="M0 0 L10.9 7.08"  stroke="#EEF3F9" stroke-width="6.5"/>
+                    <path d="M0 0 L10.9 -7.08" stroke="#EEF3F9" stroke-width="6.5"/>
+                  </g>
+                  <circle r="6" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+                </g>
+              </g>
+              <circle r="6" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+            </g>
+            <circle r="7" fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+          </g>
+        </g>
+
+        <g id="arm-r__merge" transform="translate(182,144) scale(-1,1)">
+          <g class="j-sh" transform="rotate(-98.9)">
+            <animateTransform attributeName="transform" type="rotate"
+               values="-98.9;-98.9;-69.5;-69.5;-110.5;-111.9;-69.5;-101.7;-98.9"
+               keyTimes="0;0.06;0.3;0.42;0.56;0.68;0.79;0.88;1"
+               begin="merge__merge.begin" dur="2.2s" fill="freeze"
+               calcMode="spline" keySplines="0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;.3 0 .7 1;.8 0 1 1;.1 0 .3 1;.4 0 .2 1"/>
+            <path d="M0 0 L32.5 0" stroke="#1B2838" stroke-width="16"/>
+            <path d="M0 0 L32.5 0" stroke="#EEF3F9" stroke-width="9.5"/>
+            <g transform="translate(32.5,0)">
+              <g class="j-el" transform="rotate(66.4)">
+                <animateTransform attributeName="transform" type="rotate"
+                   values="66.4;66.4;41.7;41.7;62.5;38.1;41.7;62.9;66.4"
+                   keyTimes="0;0.06;0.3;0.42;0.56;0.68;0.79;0.88;1"
+                   begin="merge__merge.begin" dur="2.2s" fill="freeze"
+                   calcMode="spline" keySplines="0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;.3 0 .7 1;.8 0 1 1;.1 0 .3 1;.4 0 .2 1"/>
+                <path d="M0 0 L29 0" stroke="#1B2838" stroke-width="15"/>
+                <path d="M0 0 L29 0" stroke="#EEF3F9" stroke-width="9"/>
+                <g transform="translate(29,0)">
+                  <g class="j-wr" transform="rotate(37.5)">
+                    <animateTransform attributeName="transform" type="rotate"
+                       values="37.5;37.5;30.0;30.0;40.0;55.0;25.0;40.0;37.5"
+                       keyTimes="0;0.06;0.3;0.42;0.56;0.68;0.79;0.88;1"
+                       begin="merge__merge.begin" dur="2.2s" fill="freeze"
+                       calcMode="spline" keySplines="0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;.3 0 .7 1;.8 0 1 1;.1 0 .3 1;.4 0 .2 1"/>
+                    <path d="M0 0 L10.9 7.08"  stroke="#1B2838" stroke-width="12"/>
+                    <path d="M0 0 L10.9 -7.08" stroke="#1B2838" stroke-width="12"/>
+                    <path d="M0 0 L10.9 7.08"  stroke="#EEF3F9" stroke-width="6.5"/>
+                    <path d="M0 0 L10.9 -7.08" stroke="#EEF3F9" stroke-width="6.5"/>
+                  </g>
+                  <circle r="6" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+                </g>
+              </g>
+              <circle r="6" fill="#5A7288" stroke="#1B2838" stroke-width="3"/>
+            </g>
+            <circle r="7" fill="#5A7288" stroke="#1B2838" stroke-width="3.2"/>
+          </g>
+        </g>
+      </g>
+
+
+    </g>
+  </g>
+</svg>
+</template>
+<template id="tpl-boss_idle"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" width="220" height="300"
+     role="img" aria-label="Cartoon office boss, full body, idle, hands behind his back">
+
+  <!-- ============================================================
+       BOSS / STATE: IDLE  -  full-body cutscene overlay
+       Same drawing language as the delivery robot: uniform 5px
+       #1B2838 outline, flat fills with a single shade, chunky
+       rounded forms.
+
+       Proportions are deliberately squat so "short" survives the
+       crop: head is 36% of total height and the legs are only 26%,
+       so the legs end up SHORTER THAN THE HEAD. That reads as short
+       without needing anything beside him for scale.
+
+       Palette avoids hue 165-180 entirely - that band is the robot's
+       eye cyan, which the bloom pass keys on. Nothing here should glow.
+
+       ANIMATION
+         #sway   whole body rocks +/-1.5deg about the ANKLES (110,280).
+                 The shoes are drawn outside this group and never move,
+                 so it reads as a weight shift rather than the sprite
+                 tilting - same reason the robot's casters sit outside
+                 its chassis group.
+         #head   counter-rotates 1deg against the sway. A head that
+                 tilts WITH the body reads as a mannequin toppling;
+                 keeping it level is what makes the sway look alive.
+         #brow-r lifts every 6.8s. One brow, not two - two is surprise,
+                 one is contempt. 6.8 rather than 7 so it is exactly 2x
+                 the sway and the pair converts to Lottie without retiming.
+
+       Origin: feet plant on y=286, figure centred on x=110.
+       #mouth-anchor marks where a speech-bubble tail should point.
+       ============================================================ -->
+
+  <defs>
+    <linearGradient id="suitShade__boss_idle" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"   stop-color="#FFFFFF" stop-opacity=".10"/>
+      <stop offset=".45" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="1"   stop-color="#000000" stop-opacity=".18"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#1B2838" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- ground shadow: static, he never leaves the floor -->
+    <ellipse cx="110" cy="288" rx="64" ry="10" fill="#1B2838" opacity=".20" stroke="none"/>
+
+    <g id="sway__boss_idle">
+      <animateTransform attributeName="transform" type="rotate"
+                        values="-1.5 110 280; 1.5 110 280; -1.5 110 280"
+                        dur="3.4s" repeatCount="indefinite"
+                        calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+
+      <!-- trousers: stubby, barely longer than the head is tall -->
+      <path fill="#333B49" d="M76 224 L104 224 L102 268 L80 268 Z"/>
+      <path fill="#333B49" d="M144 224 L116 224 L118 268 L140 268 Z"/>
+
+      <!-- neck: almost none. The head sits down between raised shoulders. -->
+      <path fill="#DBA478" d="M97 130 L123 130 L123 156 L97 156 Z"/>
+
+      <!-- TORSO AND ARMS ARE ONE SILHOUETTE.
+           Sleeves drawn as separate outlined strokes behind a boxy jacket
+           read as two objects parked behind a crate, not as arms. With the
+           hands hidden there is no reason for an arm to carry its own
+           outline at all: the upper arms are simply bumps on the body's
+           profile. So this is a single closed path, and the only thing
+           dividing sleeve from jacket is a thin interior seam.
+           Profile down the left: collar -> shoulder -> out to the elbow at
+           x=41 (the widest point) -> back in to the torso side at x=55. -->
+      <path fill="#454E60"
+            d="M74 148 Q60 151 54 166 Q42 186 41 203 Q41 218 54 223 L55 226
+               Q55 232 68 232 L152 232 Q165 232 165 226 L166 223
+               Q179 218 179 203 Q178 186 166 166 Q160 151 146 148 Z"/>
+
+      <!-- Jacket panel. Fill and seam are SEPARATE on purpose.
+           The fill is a closed path whose top and bottom sit exactly on the
+           silhouette, drawn with NO stroke - so those shared edges never
+           double up into a heavier outline. The seam is then just the two
+           side edges as open stroked lines, at 3.4px against the 5px outer
+           edge: an interior fold, not a border.
+           (This was a clip-path originally. Same result, but clipping has no
+           clean Lottie equivalent, and the explicit version is simpler.) -->
+      <path fill="#3A4252" stroke="none"
+            d="M74 148 Q56 156 55 180 L55 226 Q55 232 68 232 L152 232
+               Q165 232 165 226 L165 180 Q164 156 146 148 Z"/>
+      <g fill="none" stroke-width="3.4">
+        <path d="M74 148 Q56 156 55 180 L55 226"/>
+        <path d="M146 148 Q164 156 165 180 L165 226"/>
+      </g>
+
+      <path fill="url(#suitShade__boss_idle)" stroke="none"
+            d="M74 148 Q60 151 54 166 Q42 186 41 203 Q41 218 54 223 L55 226
+               Q55 232 68 232 L152 232 Q165 232 165 226 L166 223
+               Q179 218 179 203 Q178 186 166 166 Q160 151 146 148 Z"/>
+
+      <!-- lapel edges, so the chest is not one undifferentiated slab -->
+      <g fill="none" stroke-width="3.2" opacity=".45">
+        <path d="M86 150 Q78 170 80 196"/>
+        <path d="M134 150 Q142 170 140 196"/>
+      </g>
+
+      <!-- shirt V + collar points -->
+      <path fill="#EEF3F9" d="M92 147 L110 200 L128 147 Z"/>
+      <path fill="#EEF3F9" stroke-width="4" d="M92 147 L110 172 L99 147 Z"/>
+      <path fill="#EEF3F9" stroke-width="4" d="M128 147 L110 172 L121 147 Z"/>
+
+      <!-- tie: the one warm note, opposite the robot's cyan on the wheel -->
+      <path fill="#C0453A" stroke-width="4" d="M102 150 L118 150 L119 161 L101 161 Z"/>
+      <path fill="#D6503F" stroke-width="4"
+            d="M104 161 L116 161 L120 196 L110 208 L100 196 Z"/>
+
+      <g id="head__boss_idle">
+        <!-- counter-rotation, in phase with the sway and opposite in sign,
+             so his head stays roughly level while the body shifts -->
+        <animateTransform attributeName="transform" type="rotate"
+                          values="1 110 148; -1 110 148; 1 110 148"
+                          dur="3.4s" repeatCount="indefinite"
+                          calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+
+        <!-- ears (behind the head so its edge overlaps them) -->
+        <path fill="#DBA478" d="M76 100 Q66 98 66 109 Q66 120 76 118 Z"/>
+        <path fill="#DBA478" d="M144 100 Q154 98 154 109 Q154 120 144 118 Z"/>
+
+        <!-- head: domed on top, square along the jaw -->
+        <path fill="#F0C094" d="M74 96 Q74 58 110 58 Q146 58 146 96 L146 124
+                                Q146 142 128 142 L92 142 Q74 142 74 124 Z"/>
+        <!-- bald highlight -->
+        <path fill="#FFFFFF" opacity=".22" stroke="none"
+              d="M88 80 Q96 66 112 64 Q99 71 93 85 Z"/>
+
+        <!-- brows: angled DOWN toward the nose. This single detail does most
+             of the "jerk" work - flip them and he becomes worried instead. -->
+        <g stroke="#2E3542" stroke-width="7">
+          <path d="M79 84 L102 92"/>
+          <!-- Raised by rotating about a pivot BELOW and OUTSIDE the brow
+               (150,100) rather than about its own end. That lifts the inner
+               end ~8 units and the outer only ~2, so the brow arches and
+               flattens at once, which is what a real raise looks like.
+               Rotating about an endpoint just see-saws it. -->
+          <g id="brow-r__boss_idle">
+            <animateTransform attributeName="transform" type="rotate"
+                              values="0 150 100; 0 150 100; 15 150 100;
+                                      15 150 100; 0 150 100; 0 150 100"
+                              keyTimes="0;.55;.62;.78;.85;1"
+                              dur="6.8s" repeatCount="indefinite"
+                              calcMode="spline"
+                              keySplines="0 0 1 1;.3 0 .2 1;0 0 1 1;.3 0 .2 1;0 0 1 1"/>
+            <path d="M141 84 L118 92"/>
+          </g>
+        </g>
+
+        <!-- glasses: rectangular, not round. Round would read friendly. -->
+        <g fill="#EEF3F9" fill-opacity=".22" stroke-width="4">
+          <rect x="78" y="91" width="27" height="20" rx="5"/>
+          <rect x="115" y="91" width="27" height="20" rx="5"/>
+        </g>
+        <g fill="none" stroke-width="4">
+          <path d="M105 99 L115 99"/>
+          <path d="M78 97 L68 101"/>
+          <path d="M142 97 L152 101"/>
+        </g>
+        <!-- small, hard eyes -->
+        <g fill="#1B2838" stroke="none">
+          <ellipse cx="92" cy="101" rx="4" ry="5"/>
+          <ellipse cx="128" cy="101" rx="4" ry="5"/>
+          <circle cx="90.4" cy="99" r="1.4" fill="#FFFFFF"/>
+          <circle cx="126.4" cy="99" r="1.4" fill="#FFFFFF"/>
+        </g>
+
+        <!-- nose -->
+        <path fill="none" stroke="#DBA478" stroke-width="3.5" d="M106 112 Q110 120 116 113"/>
+
+        <!-- mustache: thick chevron, the silhouette's second-best landmark -->
+        <path fill="#2E3542" stroke-width="4"
+              d="M82 124 Q88 114 102 119 Q110 122 118 119 Q132 114 138 124
+                 Q134 133 120 130 Q110 128 100 130 Q86 133 82 124 Z"/>
+
+        <!-- mouth: a small frown under the mustache -->
+        <path fill="none" stroke-width="3.5" d="M103 139 Q110 134 117 139"/>
+
+        <!-- Speech-bubble anchor. Empty by design, and inside #head so it
+             tracks the sway - point the tail here and it stays correct. -->
+        <g id="mouth-anchor__boss_idle" transform="translate(110,137)"></g>
+      </g>
+    </g>
+
+    <!-- shoes: OUTSIDE the sway group, so his feet stay planted. Drawn last
+         so they cover the trouser hems. Wide and flat - big feet read as
+         short. -->
+    <path fill="#212A35" d="M78 260 L108 260 L108 280 Q108 286 100 286 L62 286
+                            Q54 286 54 279 Q55 268 68 263 Z"/>
+    <path fill="#212A35" d="M142 260 L112 260 L112 280 Q112 286 120 286 L158 286
+                            Q166 286 166 279 Q165 268 152 263 Z"/>
+
+  </g>
+</svg>
+</template>
+<template id="tpl-boss_talking"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" width="220" height="300"
+     role="img" aria-label="Cartoon office boss, full body, talking, hands behind his back">
+
+  <!-- ============================================================
+       BOSS / STATE: TALKING  -  full-body cutscene overlay
+       Same drawing language as the delivery robot: uniform 5px
+       #1B2838 outline, flat fills with a single shade, chunky
+       rounded forms.
+
+       Proportions are deliberately squat so "short" survives the
+       crop: head is 36% of total height and the legs are only 26%,
+       so the legs end up SHORTER THAN THE HEAD. That reads as short
+       without needing anything beside him for scale.
+
+       Palette avoids hue 165-180 entirely - that band is the robot's
+       eye cyan, which the bloom pass keys on. Nothing here should glow.
+
+       ANIMATION
+         #sway   whole body rocks +/-1.5deg about the ANKLES (110,280).
+                 The shoes are drawn outside this group and never move,
+                 so it reads as a weight shift rather than the sprite
+                 tilting - same reason the robot's casters sit outside
+                 its chassis group.
+         #head   counter-rotates 1deg against the sway. A head that
+                 tilts WITH the body reads as a mannequin toppling;
+                 keeping it level is what makes the sway look alive.
+         #brow-r lifts every 6.8s. One brow, not two - two is
+                 surprise, one is contempt.
+         #mustache twitches, and #mouth opens beneath it. Every cycle
+                 is a whole number of frames at 60fps dividing the 408
+                 frame loop, so this and boss-idle convert to the SAME
+                 comp length and stay in phase when swapped.
+
+       Identical to boss-idle.svg apart from the mustache and mouth, and
+       GENERATED from it - so the two cannot drift apart. 6.8 rather than 7 so it is exactly 2x
+                 the sway and the pair converts to Lottie without retiming.
+
+       Origin: feet plant on y=286, figure centred on x=110.
+       #mouth-anchor marks where a speech-bubble tail should point.
+       ============================================================ -->
+
+  <defs>
+    <linearGradient id="suitShade__boss_talking" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"   stop-color="#FFFFFF" stop-opacity=".10"/>
+      <stop offset=".45" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="1"   stop-color="#000000" stop-opacity=".18"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#1B2838" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- ground shadow: static, he never leaves the floor -->
+    <ellipse cx="110" cy="288" rx="64" ry="10" fill="#1B2838" opacity=".20" stroke="none"/>
+
+    <g id="sway__boss_talking">
+      <animateTransform attributeName="transform" type="rotate"
+                        values="-1.5 110 280; 1.5 110 280; -1.5 110 280"
+                        dur="3.4s" repeatCount="indefinite"
+                        calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+
+      <!-- trousers: stubby, barely longer than the head is tall -->
+      <path fill="#333B49" d="M76 224 L104 224 L102 268 L80 268 Z"/>
+      <path fill="#333B49" d="M144 224 L116 224 L118 268 L140 268 Z"/>
+
+      <!-- neck: almost none. The head sits down between raised shoulders. -->
+      <path fill="#DBA478" d="M97 130 L123 130 L123 156 L97 156 Z"/>
+
+      <!-- TORSO AND ARMS ARE ONE SILHOUETTE.
+           Sleeves drawn as separate outlined strokes behind a boxy jacket
+           read as two objects parked behind a crate, not as arms. With the
+           hands hidden there is no reason for an arm to carry its own
+           outline at all: the upper arms are simply bumps on the body's
+           profile. So this is a single closed path, and the only thing
+           dividing sleeve from jacket is a thin interior seam.
+           Profile down the left: collar -> shoulder -> out to the elbow at
+           x=41 (the widest point) -> back in to the torso side at x=55. -->
+      <path fill="#454E60"
+            d="M74 148 Q60 151 54 166 Q42 186 41 203 Q41 218 54 223 L55 226
+               Q55 232 68 232 L152 232 Q165 232 165 226 L166 223
+               Q179 218 179 203 Q178 186 166 166 Q160 151 146 148 Z"/>
+
+      <!-- Jacket panel. Fill and seam are SEPARATE on purpose.
+           The fill is a closed path whose top and bottom sit exactly on the
+           silhouette, drawn with NO stroke - so those shared edges never
+           double up into a heavier outline. The seam is then just the two
+           side edges as open stroked lines, at 3.4px against the 5px outer
+           edge: an interior fold, not a border.
+           (This was a clip-path originally. Same result, but clipping has no
+           clean Lottie equivalent, and the explicit version is simpler.) -->
+      <path fill="#3A4252" stroke="none"
+            d="M74 148 Q56 156 55 180 L55 226 Q55 232 68 232 L152 232
+               Q165 232 165 226 L165 180 Q164 156 146 148 Z"/>
+      <g fill="none" stroke-width="3.4">
+        <path d="M74 148 Q56 156 55 180 L55 226"/>
+        <path d="M146 148 Q164 156 165 180 L165 226"/>
+      </g>
+
+      <path fill="url(#suitShade__boss_talking)" stroke="none"
+            d="M74 148 Q60 151 54 166 Q42 186 41 203 Q41 218 54 223 L55 226
+               Q55 232 68 232 L152 232 Q165 232 165 226 L166 223
+               Q179 218 179 203 Q178 186 166 166 Q160 151 146 148 Z"/>
+
+      <!-- lapel edges, so the chest is not one undifferentiated slab -->
+      <g fill="none" stroke-width="3.2" opacity=".45">
+        <path d="M86 150 Q78 170 80 196"/>
+        <path d="M134 150 Q142 170 140 196"/>
+      </g>
+
+      <!-- shirt V + collar points -->
+      <path fill="#EEF3F9" d="M92 147 L110 200 L128 147 Z"/>
+      <path fill="#EEF3F9" stroke-width="4" d="M92 147 L110 172 L99 147 Z"/>
+      <path fill="#EEF3F9" stroke-width="4" d="M128 147 L110 172 L121 147 Z"/>
+
+      <!-- tie: the one warm note, opposite the robot's cyan on the wheel -->
+      <path fill="#C0453A" stroke-width="4" d="M102 150 L118 150 L119 161 L101 161 Z"/>
+      <path fill="#D6503F" stroke-width="4"
+            d="M104 161 L116 161 L120 196 L110 208 L100 196 Z"/>
+
+      <g id="head__boss_talking">
+        <!-- counter-rotation, in phase with the sway and opposite in sign,
+             so his head stays roughly level while the body shifts -->
+        <animateTransform attributeName="transform" type="rotate"
+                          values="1 110 148; -1 110 148; 1 110 148"
+                          dur="3.4s" repeatCount="indefinite"
+                          calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+
+        <!-- ears (behind the head so its edge overlaps them) -->
+        <path fill="#DBA478" d="M76 100 Q66 98 66 109 Q66 120 76 118 Z"/>
+        <path fill="#DBA478" d="M144 100 Q154 98 154 109 Q154 120 144 118 Z"/>
+
+        <!-- head: domed on top, square along the jaw -->
+        <path fill="#F0C094" d="M74 96 Q74 58 110 58 Q146 58 146 96 L146 124
+                                Q146 142 128 142 L92 142 Q74 142 74 124 Z"/>
+        <!-- bald highlight -->
+        <path fill="#FFFFFF" opacity=".22" stroke="none"
+              d="M88 80 Q96 66 112 64 Q99 71 93 85 Z"/>
+
+        <!-- brows: angled DOWN toward the nose. This single detail does most
+             of the "jerk" work - flip them and he becomes worried instead. -->
+        <g stroke="#2E3542" stroke-width="7">
+          <path d="M79 84 L102 92"/>
+          <!-- Raised by rotating about a pivot BELOW and OUTSIDE the brow
+               (150,100) rather than about its own end. That lifts the inner
+               end ~8 units and the outer only ~2, so the brow arches and
+               flattens at once, which is what a real raise looks like.
+               Rotating about an endpoint just see-saws it. -->
+          <g id="brow-r__boss_talking">
+            <animateTransform attributeName="transform" type="rotate"
+                              values="0 150 100; 0 150 100; 15 150 100;
+                                      15 150 100; 0 150 100; 0 150 100"
+                              keyTimes="0;.55;.62;.78;.85;1"
+                              dur="6.8s" repeatCount="indefinite"
+                              calcMode="spline"
+                              keySplines="0 0 1 1;.3 0 .2 1;0 0 1 1;.3 0 .2 1;0 0 1 1"/>
+            <path d="M141 84 L118 92"/>
+          </g>
+        </g>
+
+        <!-- glasses: rectangular, not round. Round would read friendly. -->
+        <g fill="#EEF3F9" fill-opacity=".22" stroke-width="4">
+          <rect x="78" y="91" width="27" height="20" rx="5"/>
+          <rect x="115" y="91" width="27" height="20" rx="5"/>
+        </g>
+        <g fill="none" stroke-width="4">
+          <path d="M105 99 L115 99"/>
+          <path d="M78 97 L68 101"/>
+          <path d="M142 97 L152 101"/>
+        </g>
+        <!-- small, hard eyes -->
+        <g fill="#1B2838" stroke="none">
+          <ellipse cx="92" cy="101" rx="4" ry="5"/>
+          <ellipse cx="128" cy="101" rx="4" ry="5"/>
+          <circle cx="90.4" cy="99" r="1.4" fill="#FFFFFF"/>
+          <circle cx="126.4" cy="99" r="1.4" fill="#FFFFFF"/>
+        </g>
+
+        <!-- nose -->
+        <path fill="none" stroke="#DBA478" stroke-width="3.5" d="M106 112 Q110 120 116 113"/>
+
+        <!-- MOUTH: opens and shuts under the mustache. Drawn BEFORE the
+             mustache so the mustache overhangs it, the way a real one does -
+             which is also why no mouth SHAPES are needed. Nobody can see
+             enough of it to tell. -->
+        <ellipse id="mouth__boss_talking" cx="110" cy="137" rx="9" ry="1.2"
+                 fill="#1B2838" stroke="none">
+          <animate attributeName="ry"
+                   values="1.2;3.8;1.4;3.2;1.2;3.8;1.6;2.8;1.2"
+                   keyTimes="0;.12;.24;.37;.5;.63;.75;.88;1"
+                   dur=".5667s" repeatCount="indefinite"/>
+        </ellipse>
+
+        <!-- MUSTACHE: this is the talking.
+             Two nested transforms at DIFFERENT rates - a vertical bob at
+             .68s and a waggle at .85s. They beat against each other, so
+             the twitch never settles into an obvious loop.
+             The bob is mostly NEGATIVE - the mustache lifts as the mouth
+             opens beneath it. Bobbing it down instead moves it with the
+             jaw, which closes the gap and swallows the mouth entirely.
+             A single transform at a single rate reads as a metronome, which
+             is the giveaway that kills cheap lip sync. -->
+        <g id="mustache__boss_talking">
+          <animateTransform attributeName="transform" type="translate"
+                            values="0 0;0 -2.2;0 0.8;0 -2.8;0 0;0 -1.8;0 1;0 -2.4;0 0"
+                            keyTimes="0;.12;.24;.37;.5;.63;.75;.88;1"
+                            dur=".5667s" repeatCount="indefinite"/>
+          <g>
+            <animateTransform attributeName="transform" type="rotate"
+                              values="0 110 124;-5 110 124;3 110 124;-2.5 110 124;5 110 124;-4 110 124;2 110 124;-5 110 124;0 110 124"
+                              keyTimes="0;.12;.25;.37;.5;.62;.75;.87;1"
+                              dur=".85s" repeatCount="indefinite"/>
+            <path fill="#2E3542" stroke-width="4"
+                  d="M82 124 Q88 114 102 119 Q110 122 118 119 Q132 114 138 124
+                     Q134 133 120 130 Q110 128 100 130 Q86 133 82 124 Z"/>
+          </g>
+        </g>
+
+        <!-- Speech-bubble anchor. Empty by design, and inside #head so it
+             tracks the sway - point the tail here and it stays correct. -->
+        <g id="mouth-anchor__boss_talking" transform="translate(110,137)"></g>
+      </g>
+    </g>
+
+    <!-- shoes: OUTSIDE the sway group, so his feet stay planted. Drawn last
+         so they cover the trouser hems. Wide and flat - big feet read as
+         short. -->
+    <path fill="#212A35" d="M78 260 L108 260 L108 280 Q108 286 100 286 L62 286
+                            Q54 286 54 279 Q55 268 68 263 Z"/>
+    <path fill="#212A35" d="M142 260 L112 260 L112 280 Q112 286 120 286 L158 286
+                            Q166 286 166 279 Q165 268 152 263 Z"/>
+
+  </g>
+</svg>
+</template>
+
+<script>
+const CARDS = [{"name": "idle", "key": "idle", "blurb": "at rest, arms down", "dur": 18.2, "loops": true, "vw": 300.0, "vh": 240.0, "trig": ""}, {"name": "walking", "key": "walking", "blurb": "rolling, exaggerated", "dur": 4.8, "loops": true, "vw": 300.0, "vh": 240.0, "trig": ""}, {"name": "holding", "key": "holding", "blurb": "at rest, carrying", "dur": 18.2, "loops": true, "vw": 300.0, "vh": 240.0, "trig": ""}, {"name": "walking-holding", "key": "walking_holding", "blurb": "rolling, carrying", "dur": 4.8, "loops": true, "vw": 300.0, "vh": 240.0, "trig": ""}, {"name": "pickup", "key": "pickup", "blurb": "arms close in, grab, lift", "dur": 1.15, "loops": false, "vw": 300.0, "vh": 240.0, "trig": "pickup__pickup"}, {"name": "putdown", "key": "putdown", "blurb": "the same animation, reversed", "dur": 1.15, "loops": false, "vw": 300.0, "vh": 240.0, "trig": "pickup__putdown"}, {"name": "merge", "key": "merge", "blurb": "two objects -> one", "dur": 2.2, "loops": false, "vw": 300.0, "vh": 240.0, "trig": "merge__merge"}, {"name": "boss idle", "key": "boss_idle", "blurb": "sway + occasional brow", "dur": 6.8, "loops": true, "vw": 220.0, "vh": 300.0, "trig": ""}, {"name": "boss talking", "key": "boss_talking", "blurb": "mustache does the talking", "dur": 6.8, "loops": true, "vw": 220.0, "vh": 300.0, "trig": ""}];
+const grid = document.getElementById('grid');
+let paused = false, timers = [];
+
+for (const c of CARDS) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.innerHTML =
+    `<div class="head"><span class="nm">${c.name}</span>
+       <span class="tag">${c.dur.toFixed(2)}s</span>
+       <span class="tag ${c.loops ? '' : 'shot'}">${c.loops ? 'loop' : 'one-shot'}</span>
+       <span class="sp"></span></div>
+     <div class="body"><div class="stage"></div><div class="blurb">${c.blurb}</div></div>`;
+  const stage = el.querySelector('.stage');
+  stage.appendChild(document.getElementById('tpl-' + c.key).content.cloneNode(true));
+  c.svg = stage.querySelector('svg');
+  c.stage = stage;
+  if (c.trig) {
+    const b = document.createElement('button');
+    b.textContent = 'replay';
+    b.onclick = () => fire(c);
+    el.querySelector('.head').appendChild(b);
+  }
+  grid.appendChild(el);
+}
+
+function fire(c) {
+  const a = c.svg.querySelector('#' + CSS.escape(c.trig));
+  if (a && a.beginElement) { try { a.beginElement(); } catch (e) {} }
+}
+
+// The sprites no longer share an aspect - robot 300x240 landscape, boss
+// 220x300 portrait. Setting a width and deriving height from a fixed ratio
+// (which is what this did when everything was a robot) squashes the boss and
+// makes his card twice as tall as the rest. Scale each to FIT a common box
+// instead.
+function resize() {
+  const w = +document.getElementById('size').value;
+  document.getElementById('sizeval').textContent = w + 'px';
+  const boxW = w, boxH = Math.round(w * 0.85);
+  for (const c of CARDS) {
+    const k = Math.min(boxW / c.vw, boxH / c.vh);
+    c.stage.style.width = boxW + 'px';
+    c.stage.style.height = boxH + 'px';
+    c.svg.removeAttribute('width'); c.svg.removeAttribute('height');
+    c.svg.style.width = Math.round(c.vw * k) + 'px';
+    c.svg.style.height = Math.round(c.vh * k) + 'px';
+  }
+}
+
+function schedule() {
+  timers.forEach(clearInterval); timers = [];
+  for (const c of CARDS) if (c.trig)
+    timers.push(setInterval(() => { if (!paused) fire(c); }, (c.dur + 0.9) * 1000));
+}
+
+document.querySelectorAll('[data-bg]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-bg]').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.className = 'bg-' + b.dataset.bg;
+});
+document.getElementById('size').oninput = resize;
+document.getElementById('pause').onclick = e => {
+  paused = !paused;
+  e.target.textContent = paused ? 'play' : 'pause';
+  e.target.classList.toggle('on', paused);
+  for (const c of CARDS) {
+    try { paused ? c.svg.pauseAnimations() : c.svg.unpauseAnimations(); } catch (e) {}
+  }
+};
+
+resize();
+schedule();
+CARDS.filter(c => c.trig).forEach(fire);
+</script>
+</body>
+</html>

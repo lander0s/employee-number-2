@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" width="220" height="300"
+     role="img" aria-label="Cartoon office boss, full body, idle, hands behind his back">
+
+  <!-- ============================================================
+       BOSS / STATE: IDLE  -  full-body cutscene overlay
+       Same drawing language as the delivery robot: uniform 5px
+       #1B2838 outline, flat fills with a single shade, chunky
+       rounded forms.
+
+       Proportions are deliberately squat so "short" survives the
+       crop: head is 36% of total height and the legs are only 26%,
+       so the legs end up SHORTER THAN THE HEAD. That reads as short
+       without needing anything beside him for scale.
+
+       Palette avoids hue 165-180 entirely - that band is the robot's
+       eye cyan, which the bloom pass keys on. Nothing here should glow.
+
+       ANIMATION
+         #sway   whole body rocks +/-1.5deg about the ANKLES (110,280).
+                 The shoes are drawn outside this group and never move,
+                 so it reads as a weight shift rather than the sprite
+                 tilting - same reason the robot's casters sit outside
+                 its chassis group.
+         #head   counter-rotates 1deg against the sway. A head that
+                 tilts WITH the body reads as a mannequin toppling;
+                 keeping it level is what makes the sway look alive.
+         #brow-r lifts every 6.8s. One brow, not two - two is surprise,
+                 one is contempt. 6.8 rather than 7 so it is exactly 2x
+                 the sway and the pair converts to Lottie without retiming.
+
+       Origin: feet plant on y=286, figure centred on x=110.
+       #mouth-anchor marks where a speech-bubble tail should point.
+       ============================================================ -->
+
+  <defs>
+    <linearGradient id="suitShade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"   stop-color="#FFFFFF" stop-opacity=".10"/>
+      <stop offset=".45" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="1"   stop-color="#000000" stop-opacity=".18"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#1B2838" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- ground shadow: static, he never leaves the floor -->
+    <ellipse cx="110" cy="288" rx="64" ry="10" fill="#1B2838" opacity=".20" stroke="none"/>
+
+    <g id="sway">
+      <animateTransform attributeName="transform" type="rotate"
+                        values="-1.5 110 280; 1.5 110 280; -1.5 110 280"
+                        dur="3.4s" repeatCount="indefinite"
+                        calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+
+      <!-- trousers: stubby, barely longer than the head is tall -->
+      <path fill="#333B49" d="M76 224 L104 224 L102 268 L80 268 Z"/>
+      <path fill="#333B49" d="M144 224 L116 224 L118 268 L140 268 Z"/>
+
+      <!-- neck: almost none. The head sits down between raised shoulders. -->
+      <path fill="#DBA478" d="M97 130 L123 130 L123 156 L97 156 Z"/>
+
+      <!-- TORSO AND ARMS ARE ONE SILHOUETTE.
+           Sleeves drawn as separate outlined strokes behind a boxy jacket
+           read as two objects parked behind a crate, not as arms. With the
+           hands hidden there is no reason for an arm to carry its own
+           outline at all: the upper arms are simply bumps on the body's
+           profile. So this is a single closed path, and the only thing
+           dividing sleeve from jacket is a thin interior seam.
+           Profile down the left: collar -> shoulder -> out to the elbow at
+           x=41 (the widest point) -> back in to the torso side at x=55. -->
+      <path fill="#454E60"
+            d="M74 148 Q60 151 54 166 Q42 186 41 203 Q41 218 54 223 L55 226
+               Q55 232 68 232 L152 232 Q165 232 165 226 L166 223
+               Q179 218 179 203 Q178 186 166 166 Q160 151 146 148 Z"/>
+
+      <!-- Jacket panel. Fill and seam are SEPARATE on purpose.
+           The fill is a closed path whose top and bottom sit exactly on the
+           silhouette, drawn with NO stroke - so those shared edges never
+           double up into a heavier outline. The seam is then just the two
+           side edges as open stroked lines, at 3.4px against the 5px outer
+           edge: an interior fold, not a border.
+           (This was a clip-path originally. Same result, but clipping has no
+           clean Lottie equivalent, and the explicit version is simpler.) -->
+      <path fill="#3A4252" stroke="none"
+            d="M74 148 Q56 156 55 180 L55 226 Q55 232 68 232 L152 232
+               Q165 232 165 226 L165 180 Q164 156 146 148 Z"/>
+      <g fill="none" stroke-width="3.4">
+        <path d="M74 148 Q56 156 55 180 L55 226"/>
+        <path d="M146 148 Q164 156 165 180 L165 226"/>
+      </g>
+
+      <path fill="url(#suitShade)" stroke="none"
+            d="M74 148 Q60 151 54 166 Q42 186 41 203 Q41 218 54 223 L55 226
+               Q55 232 68 232 L152 232 Q165 232 165 226 L166 223
+               Q179 218 179 203 Q178 186 166 166 Q160 151 146 148 Z"/>
+
+      <!-- lapel edges, so the chest is not one undifferentiated slab -->
+      <g fill="none" stroke-width="3.2" opacity=".45">
+        <path d="M86 150 Q78 170 80 196"/>
+        <path d="M134 150 Q142 170 140 196"/>
+      </g>
+
+      <!-- shirt V + collar points -->
+      <path fill="#EEF3F9" d="M92 147 L110 200 L128 147 Z"/>
+      <path fill="#EEF3F9" stroke-width="4" d="M92 147 L110 172 L99 147 Z"/>
+      <path fill="#EEF3F9" stroke-width="4" d="M128 147 L110 172 L121 147 Z"/>
+
+      <!-- tie: the one warm note, opposite the robot's cyan on the wheel -->
+      <path fill="#C0453A" stroke-width="4" d="M102 150 L118 150 L119 161 L101 161 Z"/>
+      <path fill="#D6503F" stroke-width="4"
+            d="M104 161 L116 161 L120 196 L110 208 L100 196 Z"/>
+
+      <g id="head">
+        <!-- counter-rotation, in phase with the sway and opposite in sign,
+             so his head stays roughly level while the body shifts -->
+        <animateTransform attributeName="transform" type="rotate"
+                          values="1 110 148; -1 110 148; 1 110 148"
+                          dur="3.4s" repeatCount="indefinite"
+                          calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
+
+        <!-- ears (behind the head so its edge overlaps them) -->
+        <path fill="#DBA478" d="M76 100 Q66 98 66 109 Q66 120 76 118 Z"/>
+        <path fill="#DBA478" d="M144 100 Q154 98 154 109 Q154 120 144 118 Z"/>
+
+        <!-- head: domed on top, square along the jaw -->
+        <path fill="#F0C094" d="M74 96 Q74 58 110 58 Q146 58 146 96 L146 124
+                                Q146 142 128 142 L92 142 Q74 142 74 124 Z"/>
+        <!-- bald highlight -->
+        <path fill="#FFFFFF" opacity=".22" stroke="none"
+              d="M88 80 Q96 66 112 64 Q99 71 93 85 Z"/>
+
+        <!-- brows: angled DOWN toward the nose. This single detail does most
+             of the "jerk" work - flip them and he becomes worried instead. -->
+        <g stroke="#2E3542" stroke-width="7">
+          <path d="M79 84 L102 92"/>
+          <!-- Raised by rotating about a pivot BELOW and OUTSIDE the brow
+               (150,100) rather than about its own end. That lifts the inner
+               end ~8 units and the outer only ~2, so the brow arches and
+               flattens at once, which is what a real raise looks like.
+               Rotating about an endpoint just see-saws it. -->
+          <g id="brow-r">
+            <animateTransform attributeName="transform" type="rotate"
+                              values="0 150 100; 0 150 100; 15 150 100;
+                                      15 150 100; 0 150 100; 0 150 100"
+                              keyTimes="0;.55;.62;.78;.85;1"
+                              dur="6.8s" repeatCount="indefinite"
+                              calcMode="spline"
+                              keySplines="0 0 1 1;.3 0 .2 1;0 0 1 1;.3 0 .2 1;0 0 1 1"/>
+            <path d="M141 84 L118 92"/>
+          </g>
+        </g>
+
+        <!-- glasses: rectangular, not round. Round would read friendly. -->
+        <g fill="#EEF3F9" fill-opacity=".22" stroke-width="4">
+          <rect x="78" y="91" width="27" height="20" rx="5"/>
+          <rect x="115" y="91" width="27" height="20" rx="5"/>
+        </g>
+        <g fill="none" stroke-width="4">
+          <path d="M105 99 L115 99"/>
+          <path d="M78 97 L68 101"/>
+          <path d="M142 97 L152 101"/>
+        </g>
+        <!-- small, hard eyes -->
+        <g fill="#1B2838" stroke="none">
+          <ellipse cx="92" cy="101" rx="4" ry="5"/>
+          <ellipse cx="128" cy="101" rx="4" ry="5"/>
+          <circle cx="90.4" cy="99" r="1.4" fill="#FFFFFF"/>
+          <circle cx="126.4" cy="99" r="1.4" fill="#FFFFFF"/>
+        </g>
+
+        <!-- nose -->
+        <path fill="none" stroke="#DBA478" stroke-width="3.5" d="M106 112 Q110 120 116 113"/>
+
+        <!-- mustache: thick chevron, the silhouette's second-best landmark -->
+        <path fill="#2E3542" stroke-width="4"
+              d="M82 124 Q88 114 102 119 Q110 122 118 119 Q132 114 138 124
+                 Q134 133 120 130 Q110 128 100 130 Q86 133 82 124 Z"/>
+
+        <!-- mouth: a small frown under the mustache -->
+        <path fill="none" stroke-width="3.5" d="M103 139 Q110 134 117 139"/>
+
+        <!-- Speech-bubble anchor. Empty by design, and inside #head so it
+             tracks the sway - point the tail here and it stays correct. -->
+        <g id="mouth-anchor" transform="translate(110,137)"></g>
+      </g>
+    </g>
+
+    <!-- shoes: OUTSIDE the sway group, so his feet stay planted. Drawn last
+         so they cover the trouser hems. Wide and flat - big feet read as
+         short. -->
+    <path fill="#212A35" d="M78 260 L108 260 L108 280 Q108 286 100 286 L62 286
+                            Q54 286 54 279 Q55 268 68 263 Z"/>
+    <path fill="#212A35" d="M142 260 L112 260 L112 280 Q112 286 120 286 L158 286
+                            Q166 286 166 279 Q165 268 152 263 Z"/>
+
+  </g>
+</svg>
