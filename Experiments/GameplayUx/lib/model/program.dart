@@ -1,0 +1,500 @@
+/// The program document: a tree of nodes, flattened for display.
+///
+/// A tree rather than a flat row list, because every interesting editor
+/// operation is a subtree operation. Dragging a `REPEAT` has to carry its body;
+/// deleting one has to offer to keep its contents. Both are trivial on a tree
+/// and fiddly on a flat list with span bookkeeping.
+library;
+
+import 'commands.dart';
+
+int _nextId = 1;
+String _newId() => 'n${_nextId++}';
+
+/// Which cyclable segment of a row is being addressed.
+enum ArgSlot { subject, comparator, object }
+
+/// One cyclable word in a row, in reading order.
+class ArgChip {
+  const ArgChip(this.slot, this.text);
+
+  final ArgSlot slot;
+  final String text;
+}
+
+/// One instruction, or one block with its body.
+class Node {
+  Node({
+    required this.commandId,
+    String? id,
+    this.palletArg = 1,
+    this.typeArg = 'BLUE',
+    this.weightArg = 'ZERO',
+    this.subject = 'TYPE',
+    this.comparator = 'IS',
+    List<Node>? children,
+  }) : id = id ?? _newId(),
+       children = children ?? (specFor(commandId).isBlock ? <Node>[] : null);
+
+  final String id;
+  final String commandId;
+
+  int palletArg;
+  String typeArg;
+  String weightArg;
+
+  /// Condition segments. Unused when argKind is not `condition`.
+  String subject;
+  String comparator;
+
+  /// Body of a block. Null for plain commands.
+  List<Node>? children;
+
+  CommandSpec get spec => specFor(commandId);
+  bool get isBlock => spec.isBlock;
+
+  ObjectKind get objectKind => objectKindFor(subject, comparator);
+
+  Node copy() => Node(
+    commandId: commandId,
+    palletArg: palletArg,
+    typeArg: typeArg,
+    weightArg: weightArg,
+    subject: subject,
+    comparator: comparator,
+    children: children?.map((c) => c.copy()).toList(),
+  );
+
+  /// Deep copy that preserves ids - used for undo snapshots, where identity has
+  /// to survive so the caret and any in-flight drag still refer to real nodes.
+  Node cloneKeepingIds() => Node(
+    id: id,
+    commandId: commandId,
+    palletArg: palletArg,
+    typeArg: typeArg,
+    weightArg: weightArg,
+    subject: subject,
+    comparator: comparator,
+    children: children?.map((c) => c.cloneKeepingIds()).toList(),
+  );
+
+  String get _objectText => switch (objectKind) {
+    ObjectKind.packageType => typeArg,
+    ObjectKind.weightState => weightArg,
+    ObjectKind.pallet => 'PALLET $palletArg',
+  };
+
+  /// The cyclable words this row carries, in reading order.
+  List<ArgChip> get chips => switch (spec.argKind) {
+    ArgKind.none => const [],
+    ArgKind.pallet => [ArgChip(ArgSlot.object, 'PALLET $palletArg')],
+    ArgKind.condition => [
+      ArgChip(ArgSlot.subject, subject),
+      ArgChip(ArgSlot.comparator, comparator),
+      ArgChip(ArgSlot.object, _objectText),
+    ],
+  };
+
+  /// The whole row as one line of text. For traces and tests.
+  String get text => [spec.label, ...chips.map((c) => c.text)].join(' ');
+}
+
+/// Which slot a row occupies. Closers are rendered but are not commands: they
+/// are free for SIZE purposes (see level-04-briefing 5.1).
+enum RowKind { command, blockHeader, blockCloser }
+
+/// A flattened row, ready to render.
+class DisplayRow {
+  DisplayRow({required this.node, required this.kind, required this.depth});
+
+  final Node node;
+  final RowKind kind;
+  final int depth;
+
+  bool get isCloser => kind == RowKind.blockCloser;
+  bool get isDraggable =>
+      kind == RowKind.command || kind == RowKind.blockHeader;
+}
+
+/// An unambiguous insertion point: a specific index in a specific child list.
+///
+/// Deriving the parent from a flat row index is ambiguous at block boundaries
+/// (is "after the last child" inside the block or after it?), so slots are
+/// generated explicitly during flattening instead.
+class Slot {
+  const Slot(this.parentId, this.index, this.depth);
+
+  /// Null parent means the program root.
+  final String? parentId;
+
+  final int index;
+  final int depth;
+
+  @override
+  bool operator ==(Object other) =>
+      other is Slot && other.parentId == parentId && other.index == index;
+
+  @override
+  int get hashCode => Object.hash(parentId, index);
+}
+
+class ProgramDocument {
+  ProgramDocument();
+
+  List<Node> root = <Node>[];
+
+  /// Where the next tray insertion lands. Defaults to the end of the program.
+  Slot caret = const Slot(null, 0, 0);
+
+  final List<_Snapshot> _undo = [];
+  final List<_Snapshot> _redo = [];
+
+  int lastUsedPallet = 1;
+
+  // ---------------------------------------------------------------- flattening
+
+  List<DisplayRow> flatten() {
+    final rows = <DisplayRow>[];
+
+    void walk(List<Node> nodes, int depth) {
+      for (final node in nodes) {
+        if (node.isBlock) {
+          rows.add(
+            DisplayRow(node: node, kind: RowKind.blockHeader, depth: depth),
+          );
+          walk(node.children!, depth + 1);
+          rows.add(
+            DisplayRow(node: node, kind: RowKind.blockCloser, depth: depth),
+          );
+        } else {
+          rows.add(DisplayRow(node: node, kind: RowKind.command, depth: depth));
+        }
+      }
+    }
+
+    walk(root, 0);
+    return rows;
+  }
+
+  /// Interleaved rows and drop slots, in render order.
+  ///
+  /// Every child list contributes a slot before each of its children and one
+  /// after the last, so every legal insertion point - including empty block
+  /// bodies - is reachable.
+  List<Object> flattenWithSlots() {
+    final out = <Object>[];
+
+    void walk(List<Node> nodes, String? parentId, int depth) {
+      for (var i = 0; i < nodes.length; i++) {
+        out.add(Slot(parentId, i, depth));
+        final node = nodes[i];
+        if (node.isBlock) {
+          out.add(
+            DisplayRow(node: node, kind: RowKind.blockHeader, depth: depth),
+          );
+          walk(node.children!, node.id, depth + 1);
+          out.add(
+            DisplayRow(node: node, kind: RowKind.blockCloser, depth: depth),
+          );
+        } else {
+          out.add(DisplayRow(node: node, kind: RowKind.command, depth: depth));
+        }
+      }
+      out.add(Slot(parentId, nodes.length, depth));
+    }
+
+    walk(root, null, 0);
+    return out;
+  }
+
+  /// SIZE: command rows and block headers cost 1; closers are free.
+  int get size {
+    var n = 0;
+    void walk(List<Node> nodes) {
+      for (final node in nodes) {
+        n++;
+        if (node.children != null) walk(node.children!);
+      }
+    }
+
+    walk(root);
+    return n;
+  }
+
+  int get rowCount => flatten().length;
+
+  int get maxDepth {
+    var deepest = 0;
+    void walk(List<Node> nodes, int depth) {
+      for (final node in nodes) {
+        if (depth > deepest) deepest = depth;
+        if (node.children != null) walk(node.children!, depth + 1);
+      }
+    }
+
+    walk(root, 1);
+    return deepest;
+  }
+
+  // ------------------------------------------------------------------ lookups
+
+  List<Node> _listFor(String? parentId) {
+    if (parentId == null) return root;
+    final parent = _find(root, parentId);
+    return parent?.children ?? root;
+  }
+
+  Node? _find(List<Node> nodes, String id) {
+    for (final node in nodes) {
+      if (node.id == id) return node;
+      if (node.children != null) {
+        final hit = _find(node.children!, id);
+        if (hit != null) return hit;
+      }
+    }
+    return null;
+  }
+
+  Node? nodeById(String id) => _find(root, id);
+
+  /// True when [ancestorId] is [descendantId], or contains it. Used to reject
+  /// dropping a block inside its own body.
+  bool contains(String ancestorId, String descendantId) {
+    if (ancestorId == descendantId) return true;
+    final ancestor = nodeById(ancestorId);
+    if (ancestor == null) return false;
+    return _find(ancestor.children ?? const [], descendantId) != null;
+  }
+
+  /// The list holding [id], plus its index in that list.
+  ({List<Node> list, int index})? _locate(String id) {
+    ({List<Node> list, int index})? search(List<Node> nodes) {
+      for (var i = 0; i < nodes.length; i++) {
+        if (nodes[i].id == id) return (list: nodes, index: i);
+        if (nodes[i].children != null) {
+          final hit = search(nodes[i].children!);
+          if (hit != null) return hit;
+        }
+      }
+      return null;
+    }
+
+    return search(root);
+  }
+
+  // ------------------------------------------------------------------- editing
+
+  void insert(String commandId) {
+    _push();
+    final spec = specFor(commandId);
+    final node = Node(
+      commandId: commandId,
+      palletArg: spec.argKind == ArgKind.pallet ? lastUsedPallet : 1,
+    );
+    final list = _listFor(caret.parentId);
+    final index = caret.index.clamp(0, list.length);
+    list.insert(index, node);
+
+    // Caret advances past the insertion. For a block, it drops inside the new
+    // body - which is where the player is going next in every real program.
+    caret = node.isBlock
+        ? Slot(node.id, 0, caret.depth + 1)
+        : Slot(caret.parentId, index + 1, caret.depth);
+  }
+
+  void insertAt(String commandId, Slot slot) {
+    caret = slot;
+    insert(commandId);
+  }
+
+  /// Deletes [id]. When it is a block, [keepContents] splices its body into the
+  /// block's place instead of deleting it with the block.
+  void delete(String id, {bool keepContents = false}) {
+    _push();
+    final at = _locate(id);
+    if (at == null) return;
+    final node = at.list[at.index];
+    at.list.removeAt(at.index);
+    if (keepContents && node.isBlock) {
+      at.list.insertAll(at.index, node.children!);
+    }
+    caret = const Slot(null, 0, 0);
+    _normaliseCaret();
+  }
+
+  void duplicate(String id) {
+    _push();
+    final at = _locate(id);
+    if (at == null) return;
+    at.list.insert(at.index + 1, at.list[at.index].copy());
+  }
+
+  /// Moves [id] into [slot]. Rejected when the slot is inside the moved node.
+  bool move(String id, Slot slot) {
+    if (slot.parentId != null && contains(id, slot.parentId!)) return false;
+    _push();
+    final at = _locate(id);
+    if (at == null) return false;
+
+    final target = _listFor(slot.parentId);
+    var index = slot.index;
+
+    // Removing first would shift the target index when both are in the same
+    // list, so compensate before splicing.
+    if (identical(target, at.list) && at.index < index) index -= 1;
+
+    final node = at.list.removeAt(at.index);
+    target.insert(index.clamp(0, target.length), node);
+    return true;
+  }
+
+  /// Advances one segment of a row's argument to its next value, wrapping.
+  ///
+  /// One gesture for every argument, and for every segment of a condition.
+  void cycleArg(String id, [ArgSlot slot = ArgSlot.object]) {
+    final node = nodeById(id);
+    if (node == null || node.spec.argKind == ArgKind.none) return;
+
+    // Checks first, then _push: bailing out after pushing would leave an undo
+    // entry for an edit that never happened.
+    _push();
+
+    switch (slot) {
+      case ArgSlot.subject:
+        _cycleSubject(node);
+      case ArgSlot.comparator:
+        _cycleComparator(node);
+      case ArgSlot.object:
+        _cycleObject(node);
+    }
+  }
+
+  void _cycleSubject(Node node) {
+    if (node.spec.argKind != ArgKind.condition) return;
+    final before = node.objectKind;
+    final i = conditionSubjects.indexOf(node.subject);
+    node.subject = conditionSubjects[(i + 1) % conditionSubjects.length];
+
+    // Comparators differ per subject, so one that is no longer legal has to be
+    // pulled back before it can be read as valid.
+    final allowed = comparatorsFor(node.subject);
+    if (!allowed.contains(node.comparator)) node.comparator = allowed.first;
+
+    _resetObjectIfKindChanged(node, before);
+  }
+
+  void _cycleComparator(Node node) {
+    if (node.spec.argKind != ArgKind.condition) return;
+    final before = node.objectKind;
+    final allowed = comparatorsFor(node.subject);
+    final i = allowed.indexOf(node.comparator);
+    node.comparator = allowed[(i + 1) % allowed.length];
+    _resetObjectIfKindChanged(node, before);
+  }
+
+  /// Only reset when the object slot changed *kind*. Cycling `IS` to `IS NOT`
+  /// keeps the value, which is what the player expects.
+  void _resetObjectIfKindChanged(Node node, ObjectKind before) {
+    if (node.objectKind == before) return;
+    switch (node.objectKind) {
+      case ObjectKind.packageType:
+        node.typeArg = packageTypes.first;
+      case ObjectKind.weightState:
+        node.weightArg = weightStates.first;
+      case ObjectKind.pallet:
+        node.palletArg = lastUsedPallet;
+    }
+  }
+
+  void _cycleObject(Node node) {
+    if (node.spec.argKind == ArgKind.pallet) {
+      node.palletArg = (node.palletArg + 1) % palletCount;
+      lastUsedPallet = node.palletArg;
+      return;
+    }
+    switch (node.objectKind) {
+      case ObjectKind.packageType:
+        final i = packageTypes.indexOf(node.typeArg);
+        node.typeArg = packageTypes[(i + 1) % packageTypes.length];
+      case ObjectKind.weightState:
+        final i = weightStates.indexOf(node.weightArg);
+        node.weightArg = weightStates[(i + 1) % weightStates.length];
+      case ObjectKind.pallet:
+        node.palletArg = (node.palletArg + 1) % palletCount;
+        lastUsedPallet = node.palletArg;
+    }
+  }
+
+  void setCaret(Slot slot) => caret = slot;
+
+  /// Caret target may have been removed by an edit; fall back to the end.
+  void _normaliseCaret() {
+    if (caret.parentId != null && nodeById(caret.parentId!) == null) {
+      caret = Slot(null, root.length, 0);
+    }
+  }
+
+  // ------------------------------------------------------------ undo and redo
+
+  bool get canUndo => _undo.isNotEmpty;
+  bool get canRedo => _redo.isNotEmpty;
+
+  void _push() {
+    _undo.add(_snapshot());
+    _redo.clear();
+    if (_undo.length > 200) _undo.removeAt(0);
+  }
+
+  _Snapshot _snapshot() =>
+      _Snapshot(root.map((n) => n.cloneKeepingIds()).toList(), caret);
+
+  void undo() {
+    if (_undo.isEmpty) return;
+    _redo.add(_snapshot());
+    final s = _undo.removeLast();
+    root = s.root;
+    caret = s.caret;
+    _normaliseCaret();
+  }
+
+  void redo() {
+    if (_redo.isEmpty) return;
+    _undo.add(_snapshot());
+    final s = _redo.removeLast();
+    root = s.root;
+    caret = s.caret;
+    _normaliseCaret();
+  }
+
+  void clear() {
+    _push();
+    root = <Node>[];
+    caret = const Slot(null, 0, 0);
+  }
+
+  /// Level 4's reference solution, for checking the editor against a program
+  /// we already know how we want to read.
+  void loadSample() {
+    _push();
+    final ifNode = Node(
+      commandId: 'ifCond',
+      children: [Node(commandId: 'ship')],
+    );
+    root = <Node>[
+      Node(
+        commandId: 'repeat',
+        children: [
+          Node(commandId: 'take'),
+          ifNode,
+        ],
+      ),
+    ];
+    caret = Slot(ifNode.id, 1, 2);
+  }
+}
+
+class _Snapshot {
+  _Snapshot(this.root, this.caret);
+  final List<Node> root;
+  final Slot caret;
+}
