@@ -20,7 +20,7 @@ robot is not your tool. It's your successor. Every program you write is a traini
 
 ## 2. High concept
 
-You are a remote fulfillment operator for **OMNICART**, a logistics megacorp that has
+You are a remote fulfillment operator for **AmaCorp**, a logistics megacorp that has
 discovered it is cheaper to let humans work from bed than to keep them in a warehouse. You
 never see the warehouse. You see your robot, your program, and your boss's face on a video
 call.
@@ -80,14 +80,26 @@ skim dialogue should still feel it.
 
 ## 4. Fiction and cast
 
-### The company: OMNICART
+### The company: AmaCorp
 A "customer-obsessed" fulfillment company with a smiling arrow logo, a mission statement
-that changes every act, and a mandatory-optional wellness program. Never named as a real
-company; the parody is of the genre of corporate voice, not of one firm. All copy passes a
-simple test: *would this be funny on a poster in a break room nobody uses?*
+that changes every act, and a mandatory-optional wellness program. All copy passes a simple
+test: *would this be funny on a poster in a break room nobody uses?*
 
-Alternate names to hold onto if OMNICART clears trademark badly: **CARTWRIGHT**,
-**VERTEX FULFILLMENT**, **SMILEBOX**.
+The name is deliberately transparent — players get the joke in one beat, which is what a
+parody name is for. Two consequences to hold in mind while writing:
+
+- **The satire targets the corporate voice, not a specific firm.** AmaCorp says things no
+  real company would put in writing, and the writing should stay in that register:
+  recognizable genre, invented specifics. Never reference a real company's actual products,
+  executives, incidents, or internal program names.
+- **Keep the trade dress our own.** The name can nod; the logo, wordmark, typeface, box tape,
+  and color palette must not. The smiling arrow is a genre cliché, drawn our way. Get the
+  name and mark through a trademark review before the store listing is written, not after —
+  a rename is trivial now and expensive at launch.
+
+Fallback names if review comes back unfavorable: **CARTWRIGHT**, **VERTEX FULFILLMENT**,
+**SMILEBOX**. Keep the company name a single localizable string in code so a late swap is a
+one-line change (§13.3).
 
 ### YOU — Operator, badge on the HUD
 Never seen, never voiced, never named. The player's presence is the phone itself. Your only
@@ -180,7 +192,7 @@ numbers immediately: **learn the control flow first, then the math.**
 |---|---|---|---|
 | `TAKE` | take from intake | Grab next package from INTAKE. If intake is empty, the shift ends. | walk to chute, catch box |
 | `SHIP` | ship it | Put held package into OUTBOUND. Hands must be full. | walk to belt, toss box |
-| `STACK ON [n]` | stack on pallet n | Write held package onto pallet n. Robot keeps holding it (a scan/duplicate — diegetically, OMNICART's inventory system "records" it). Overwrites pallet n. | slam onto pallet, scanner flash |
+| `STACK ON [n]` | stack on pallet n | Write held package onto pallet n. Robot keeps holding it (a scan/duplicate — diegetically, AmaCorp's inventory system "records" it). Overwrites pallet n. | slam onto pallet, scanner flash |
 | `PICK FROM [n]` | pick from pallet n | Receive a copy of pallet n's package. Pallet n must not be empty. | lift from pallet, fabricator hum |
 | `MERGE WITH [n]` | merge with pallet n | held.weight += pallet[n].weight. **The merge animation.** | the two-things-become-one animation |
 | `STRIP BY [n]` | strip by pallet n | held.weight −= pallet[n].weight. Can go negative. | reverse merge, pieces fly off |
@@ -359,7 +371,7 @@ beat before each instruction gets shorter.
 nesting depth 4+
 Puzzles: variable-length sequences, division by repeated stripping, a real sort,
 sequence-processing set pieces.
-*Story:* the call UI degrades — pre-recorded, then captioned, then a "COMPOSED WITH OMNICART
+*Story:* the call UI degrades — pre-recorded, then captioned, then a "COMPOSED WITH AMACORP
 ASSIST" watermark on Brent's messages. One level's brief arrives with no call at all, just
 text. UNIT-02 starts moving a frame before the highlight lands.
 
@@ -368,7 +380,7 @@ Puzzles are framed as "documentation": each level asks you to write a program th
 a procedure rather than performs one. The last real puzzle is a program that writes a
 program — the robot loading instructions onto pallets and executing them.
 *Story:* Brent doesn't call. The task briefs come from UNIT-02, in Brent's phrasing, using
-Brent's nickname for you. The final screen is the OMNICART roster: `UNIT-02 · OPERATOR ·
+Brent's nickname for you. The final screen is the AmaCorp roster: `UNIT-02 · OPERATOR ·
 EMPLOYEE #1` above `YOU · TRAINING DATA · EMPLOYEE #2`.
 
 **OVERTIME (~15 optional levels)**, unlocked per act — pure optimization and brutal
@@ -457,7 +469,7 @@ Optional and non-punitive:
 - **Hints**, free and unlimited, delivered as three escalating tiers per level (a nudge, a
   strategy, a worked partial). Framed as calls to "the operator who had this job before you."
 - Cosmetic **robot paint jobs**, earned only by play. Never sold.
-- Diegetic in-fiction "ads" for OMNICART products appear as gags between acts. They are
+- Diegetic in-fiction "ads" for AmaCorp products appear as gags between acts. They are
   content, not monetization, and they never interrupt a run.
 
 Pricing target: premium mobile puzzle tier, one price globally adjusted, no discounting for
@@ -542,6 +554,10 @@ down now so they aren't discovered in Milestone 3.
   to app documents via `path_provider`, debounced ~300ms and flushed on
   `AppLifecycleState.paused`. Not `shared_preferences` — this is a structured document.
   The app can die at any moment and lose nothing. Optional cloud sync later.
+- **The company name is one string.** `AmaCorp` lives in a single localizable entry and is
+  interpolated everywhere it appears — briefings, memos, watermarks, the roster screen. No
+  hardcoded occurrences, no baked-in text in art assets or Rive artboards. This makes the
+  rename in §4 a one-line change if trademark review asks for it.
 - **Localization:** ARB files with `flutter gen-l10n` from day one. All program text is
   composed from short tokens, never sentences — commands are `TAKE`/`SHIP`-length precisely
   so they survive translation into German. Reserve 40% width overflow on every row.
