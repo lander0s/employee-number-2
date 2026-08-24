@@ -24,7 +24,7 @@ class ProgramRow extends StatelessWidget {
     required this.onDuplicate,
     required this.onCycleArg,
     this.dragging = false,
-    this.ghost = false,
+    this.interactive = true,
   });
 
   final DisplayRow row;
@@ -36,8 +36,9 @@ class ProgramRow extends StatelessWidget {
   /// True while this row is the source of an active drag.
   final bool dragging;
 
-  /// True when rendered inside a drag feedback stack (no gestures, no gutter).
-  final bool ghost;
+  /// False for the drag ghost and for every row while a program is running: the
+  /// row renders identically but answers no gestures.
+  final bool interactive;
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +89,9 @@ class ProgramRow extends StatelessWidget {
                         for (final chip in node.chips)
                           _ArgWord(
                             text: chip.text,
-                            onTap: ghost ? () {} : () => onCycleArg(chip.slot),
+                            onTap: interactive
+                                ? () => onCycleArg(chip.slot)
+                                : () {},
                           ),
                     ],
                   ),
@@ -100,7 +103,7 @@ class ProgramRow extends StatelessWidget {
       ),
     );
 
-    if (ghost) return content;
+    if (!interactive) return content;
 
     // A closer is not independently addressable: it belongs to its header.
     // Tapping one only parks the caret after the block.

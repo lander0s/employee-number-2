@@ -15,10 +15,20 @@ import 'program_row.dart';
 import 'wireframe.dart';
 
 class ProgramPane extends StatefulWidget {
-  const ProgramPane({super.key, required this.doc, required this.onChanged});
+  const ProgramPane({
+    super.key,
+    required this.doc,
+    required this.onChanged,
+    required this.running,
+  });
 
   final ProgramDocument doc;
   final VoidCallback onChanged;
+
+  /// While running, the program is read-only: no caret, no drop slots, no
+  /// gestures. A program that cannot be edited should not keep offering the
+  /// affordances of editing.
+  final bool running;
 
   @override
   State<ProgramPane> createState() => ProgramPaneState();
@@ -80,7 +90,7 @@ class ProgramPaneState extends State<ProgramPane> {
 
   @override
   Widget build(BuildContext context) {
-    final items = doc.flattenWithSlots();
+    final items = widget.running ? doc.flatten() : doc.flattenWithSlots();
     final dragging = _draggingId != null;
 
     return Container(
@@ -130,6 +140,7 @@ class ProgramPaneState extends State<ProgramPane> {
   Widget _buildRow(DisplayRow row) {
     final rowWidget = ProgramRow(
       row: row,
+      interactive: !widget.running,
       dragging: _draggingId == row.node.id,
       onTap: () => _mutate(() => doc.setCaret(_caretForRow(row))),
       onDelete: () => _confirmDelete(row),
@@ -137,7 +148,7 @@ class ProgramPaneState extends State<ProgramPane> {
       onCycleArg: (slot) => _mutate(() => doc.cycleArg(row.node.id, slot)),
     );
 
-    if (!row.isDraggable) return rowWidget;
+    if (!row.isDraggable || widget.running) return rowWidget;
 
     return LongPressDraggable<String>(
       data: row.node.id,
@@ -450,11 +461,11 @@ class _DragFeedback extends StatelessWidget {
               for (final r in rows.take(8))
                 ProgramRow(
                   row: r,
-                  ghost: true,
                   onTap: () {},
                   onDelete: () {},
                   onDuplicate: () {},
                   onCycleArg: (_) {},
+                  interactive: false,
                 ),
               if (rows.length > 8)
                 Container(

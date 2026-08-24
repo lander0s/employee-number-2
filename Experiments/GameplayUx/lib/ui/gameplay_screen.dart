@@ -133,18 +133,25 @@ class _GameplayScreenState extends State<GameplayScreen> {
                         onDoubleTap: _toggleSnap,
                       ),
                       Expanded(
-                        child: ProgramPane(doc: _doc, onChanged: _refresh),
+                        child: ProgramPane(
+                          doc: _doc,
+                          onChanged: _refresh,
+                          running: _running,
+                        ),
                       ),
                     ],
                   );
                 },
               ),
             ),
-            Chrome(
-              child: CommandTray(
-                onInsert: (id) => setState(() => _doc.insert(id)),
+            // The tray is hidden while running: nothing can be inserted, and
+            // the program pane gets the space back to watch the program in.
+            if (!_running)
+              Chrome(
+                child: CommandTray(
+                  onInsert: (id) => setState(() => _doc.insert(id)),
+                ),
               ),
-            ),
           ],
         ),
       ),

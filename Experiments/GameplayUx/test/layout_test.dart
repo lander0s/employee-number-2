@@ -805,4 +805,80 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('running', () {
+    Future<void> start(WidgetTester tester) async {
+      await tester.tap(find.byType(RunButton));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> boot(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('hides the tray and the caret, and brings both back', (
+      tester,
+    ) async {
+      await boot(tester);
+      expect(find.byType(CommandTray), findsOneWidget);
+      expect(find.text('INSERT HERE'), findsOneWidget);
+
+      await start(tester);
+      expect(find.byType(CommandTray), findsNothing);
+      expect(find.text('INSERT HERE'), findsNothing);
+
+      await start(tester); // STOP
+      expect(find.byType(CommandTray), findsOneWidget);
+      expect(find.text('INSERT HERE'), findsOneWidget);
+    });
+
+    testWidgets('the program is still readable while running', (tester) async {
+      await boot(tester);
+      await start(tester);
+
+      expect(inProgram('REPEAT'), findsOneWidget);
+      expect(inProgram('IF'), findsOneWidget);
+      expect(inProgram('BLUE'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('an argument cannot be cycled while running', (tester) async {
+      await boot(tester);
+      await start(tester);
+
+      // The words still render, so they still look like part of the sentence -
+      // they just do not answer a tap.
+      await tester.tap(inProgram('IS'));
+      await tester.pumpAndSettle();
+      expect(inProgram('IS'), findsOneWidget);
+      expect(inProgram('IS NOT'), findsNothing);
+    });
+
+    testWidgets('a row cannot be swipe-deleted while running', (tester) async {
+      await boot(tester);
+      await start(tester);
+
+      await tester.drag(inProgram('TAKE'), const Offset(-400, 0));
+      await tester.pumpAndSettle();
+
+      expect(inProgram('TAKE'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the program pane grows into the space the tray leaves', (
+      tester,
+    ) async {
+      await boot(tester);
+      final editing = tester.getRect(find.byType(ProgramPane)).height;
+
+      await start(tester);
+      final running = tester.getRect(find.byType(ProgramPane)).height;
+
+      expect(running, greaterThan(editing));
+    });
+  });
 }

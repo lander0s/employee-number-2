@@ -33,7 +33,7 @@ size, set in [`windows/runner/main.cpp`](windows/runner/main.cpp). It stays
 resizable on purpose, so the divider can be tested at other aspect ratios.
 
 ```
-flutter test      # 77 tests: block editing, layout/text-scale, divider, caret, conditions
+flutter test      # 82 tests: block editing, layout/text-scale, divider, caret, conditions
 flutter analyze   # clean
 ```
 
@@ -59,6 +59,20 @@ second target that is dead most of the time.
 
 It does **not** execute anything. Tapping it flips the state so both labels can be
 felt.
+
+**While running, the program is read-only.** The tray and the caret are hidden,
+and the rows answer no gestures — no cycling an argument, no swipe to delete or
+duplicate, no drag to reorder. Hiding the tray while leaving swipe-delete live
+would have been the worst of both: the screen says "you cannot edit this" and the
+gestures disagree. The rows render identically, so the program stays perfectly
+readable; it just stops being a thing you can touch. The program pane grows into
+the space the tray leaves, which is space you want while watching a program.
+
+Implementation note: running builds `flatten()` instead of `flattenWithSlots()`,
+so the caret and every drop gap disappear together rather than being individually
+suppressed. `ProgramRow`'s old `ghost` flag became `interactive`, since a drag
+ghost and a running program are the same thing — a row that renders but does not
+respond.
 
 A deliberate consequence: **the divider can hide the floor completely, and then
 there is no way to start a program.** That is intended — dragging the floor away
@@ -88,7 +102,7 @@ go too.
 | Tap `ELSE` on an `IF` header | add / remove the else branch |
 | Drag the divider grip | free positioning, snaps when released near a snap state |
 | Double-tap the divider | toggle between the two snap states |
-| Tap `RUN` / `STOP` (top-right of the floor) | flips the run state (fake) |
+| Tap `RUN` / `STOP` (top-right of the floor) | flips the run state (fake); the tray, caret and all editing gestures go away while running |
 | `SAMPLE` / `CLEAR` (in the floor placeholder) | load level 4's reference solution / empty |
 | `[i]` on the task card | re-open the brief |
 
