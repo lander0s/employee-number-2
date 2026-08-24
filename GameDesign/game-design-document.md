@@ -70,6 +70,17 @@ lies.** The simulation is deterministic, single-stepped, inspectable, and never 
 randomness or hidden state. All difficulty comes from the puzzle, never from ambiguity about
 what a command does.
 
+One clarification, because it looks like an exception and isn't: **the day's shipment is
+randomly chosen, but the machine is not random** (§8.5). Which batch arrives is picked before
+the program runs and is fully visible on the floor from the moment the editor opens. Given
+that batch and that program, execution is bit-identical every time. Randomness selects the
+*question*; it never touches the *answer*.
+
+### P4b — A solution is a rule, not a recipe
+The player's job is to write a procedure that works for *any* shipment the level can send,
+not to transcribe the one on screen. This is the difference between a programming game and a
+sequence-memorization game, and the level format enforces it structurally (§8.5).
+
 ### P5 — The story is told by the interface
 The reveal that you're training your replacement is not delivered by a cutscene. It's
 delivered by UI drift: your badge number, the wording of your task briefings, who is on the
@@ -190,10 +201,10 @@ numbers immediately: **learn the control flow first, then the math.**
 
 | Command | Reads as | Semantics | Robot performs |
 |---|---|---|---|
-| `TAKE` | take from intake | Grab next package from INTAKE. If intake is empty, the shift ends. | walk to chute, catch box |
-| `SHIP` | ship it | Put held package into OUTBOUND. Hands must be full. | walk to belt, toss box |
+| `TAKE` | take from intake | Grab next package from INTAKE. **Claws full → the held package is discarded** (see below). If intake is empty, the shift ends. | walk to chute, catch box |
+| `SHIP` | ship it | Put held package into OUTBOUND. Claws must be full. | walk to belt, toss box |
 | `STACK ON [n]` | stack on pallet n | Write held package onto pallet n. Robot keeps holding it (a scan/duplicate — diegetically, AmaCorp's inventory system "records" it). Overwrites pallet n. | slam onto pallet, scanner flash |
-| `PICK FROM [n]` | pick from pallet n | Receive a copy of pallet n's package. Pallet n must not be empty. | lift from pallet, fabricator hum |
+| `PICK FROM [n]` | pick from pallet n | Receive a copy of pallet n's package. **Claws full → the held package is discarded.** Pallet n must not be empty. | lift from pallet, fabricator hum |
 | `MERGE WITH [n]` | merge with pallet n | held.weight += pallet[n].weight. **The merge animation.** | the two-things-become-one animation |
 | `STRIP BY [n]` | strip by pallet n | held.weight −= pallet[n].weight. Can go negative. | reverse merge, pieces fly off |
 | `PAD [n]` / `TRIM [n]` | add / remove padding | pallet[n].weight ±1, then pick it up. | quick tape-gun gag animation |
@@ -202,8 +213,33 @@ numbers immediately: **learn the control flow first, then the math.**
 | `IF <cond> … ELSE … END` | branch | Structured conditional, indented, always closed. | — |
 | `CLOCK OUT` | clock out | Terminate the program successfully, here. | robot waves, screen dims |
 
-**Conditions:** `INTAKE IS EMPTY` · `HANDS ARE EMPTY` · `TYPE IS <type>` · `TYPE MATCHES
-PALLET [n]` · `WEIGHT IS ZERO` · `WEIGHT IS NEGATIVE` · `WEIGHT UNDER PALLET [n]`
+**Conditions:** `TYPE IS <type>` · `TYPE MATCHES PALLET [n]` · `WEIGHT IS ZERO` ·
+`WEIGHT IS NEGATIVE` · `WEIGHT UNDER PALLET [n]`
+
+**Every condition inspects the package in UNIT-02's claws.** Nothing inspects the world. This
+is a hard rule, and it is the reason there is no `IF INTAKE IS EMPTY` — see §6.6.
+
+**The discard rule.** UNIT-02 holds exactly one thing. Any command that puts something new
+in its claws while they are already full — `TAKE` and `PICK FROM` — **discards what it was
+holding.** No error, no failure, one step. UNIT-02 tosses the old package over its shoulder
+into a recycling bin without breaking stride, and the animation should be *slightly* too
+casual about it.
+
+This is load-bearing, not a convenience:
+
+- It is the **only way to throw a package away**, which makes every "ignore everything else"
+  level possible. Act 1 level 4 ships blues and discards the rest; without this rule that
+  level needs an extra `DISCARD` command taking up tray space and a tutorial beat.
+- It keeps the claws a genuine single register — no hidden second slot, nothing off-screen.
+- It is silent and cheap, so it becomes a real optimization tool later: discarding is faster
+  than routing a package you don't need.
+
+The cost is that a misplaced `TAKE` destroys a package quietly rather than announcing itself,
+which will produce bugs whose symptom (a missing item in outbound) is far from the cause. Two
+mitigations, both required: the discard is **visually loud** — bin clang, a distinct sound
+(§11), the box tumbling out of frame — and the shift-end failure message names the count
+mismatch explicitly (§6.5), so the player knows something went in the bin even if they don't
+yet know where.
 
 Conditions are introduced one per level, and each one's first appearance gets a short
 diegetic explanation from Brent rather than a tutorial popup.
@@ -235,8 +271,69 @@ word "error":
 - *"UNIT-02 tried to ship, but its claws were empty."*
 - *"Pallet 3 is empty. There was nothing to pick up."*
 - *"Shipped a BLUE. Brent asked for GREEN."* (with the expected/actual boxes drawn)
+- *"The shift ended with 2 packages still on intake."*
+- *"UNIT-02 shipped 4 packages. Brent asked for 6."* — the standard symptom of an accidental
+  discard (§6.3). Where the VM can prove a discard happened, add a second line: *"2 packages
+  went in the recycling."* and let the player tap it to jump to the step that did it.
 - *"This program has run 2,000 steps. UNIT-02 will keep doing this forever unless you stop
   it."* (infinite-loop guard, framed as a labor complaint)
+
+And the one that isn't a failure at all — the **QUALITY ASSURANCE** card, shown when a program
+passes the displayed shipment but fails another in the set (§8.5).
+
+### 6.6 There is no way to ask whether the intake is empty
+
+**Termination is implicit and unconditional: `TAKE` on an empty intake ends the shift.** The
+player never writes a loop guard, and there is no `IF INTAKE IS EMPTY`. This is the genre
+standard and it is one of the best decisions in it. Four reasons it stays that way:
+
+1. **It removes a second way to do the same thing.** Loop exit is already handled — by `TAKE`
+   itself, for free, in every program. An explicit emptiness test adds a redundant path to the
+   same outcome, and redundant paths are how a puzzle game's solution space turns to mush. The
+   player should be choosing *what to do with a package*, never *how to notice the day is over*.
+2. **It preserves the category rule.** Every other condition inspects the package in the claws
+   (§6.3). `INTAKE IS EMPTY` inspects the world, which makes it a second *kind* of question and
+   one more concept to teach — in a game whose whole thesis is a small, physical command set.
+3. **It keeps the tray short.** Portrait tray space is the scarcest resource in the interface
+   (P1, P2). Dropping this condition keeps all of Act 1 on a **five-command, non-scrolling
+   tray**, which is worth more than any puzzle the condition would enable.
+4. **It eliminates fake par tension.** With the condition available, some levels get two
+   solutions — one shorter, one that saves the final wasted walk to the chute — that differ only
+   in whether the player wrote the guard. That's not an interesting `SIZE`/`SPEED` tradeoff, it's
+   an artifact of a redundant command, and it makes pars *look* deep while teaching nothing.
+
+#### The puzzle this appears to cost us, and the better answer
+Removing the condition seems to make one whole class of puzzle impossible: **anything that must
+act after the batch is exhausted** — "ship the total weight of the batch," "ship the heaviest
+package you saw." Programs can't reach that moment, because the `TAKE` that discovers the empty
+intake ends the shift on the spot.
+
+The answer is not to add the condition back. It is to move the signal **in-band**:
+
+> **The MANIFEST package.** Levels that need an end-of-batch moment send one down the chute as
+> the last item — a clipboard, an unmistakable silhouette, its own type. The player detects it
+> with `IF TYPE IS MANIFEST`, which is a *held-package* condition like every other, and does the
+> end-of-batch work in that branch.
+
+This is better than the thing it replaces on every axis. It's diegetic — a real batch does end
+with paperwork. It's inspectable — the terminator is a physical object the player can watch
+arrive, not an invisible state change. It reuses a condition the player already knows instead of
+teaching a new one. And it turns "the end" into a puzzle element the designer can *place*: the
+manifest can arrive early, arrive twice, or carry a weight that means something.
+
+Introduce the manifest in **Act 2**, alongside weights, where the first "act at the end" puzzle
+actually needs it.
+
+#### Knock-on decisions
+- **`CLOCK OUT` survives**, but loses its Act 1 job. Its remaining use is conditional early
+  exit — *"stop the moment you see a RED"* — which needs a held-package condition to trigger it.
+  Move it out of the Act 1 core commands and introduce it where a puzzle demands it (late Act 1
+  at the earliest, paired with such a level).
+- **`HANDS ARE EMPTY` needs the same audit** and is not obviously safe. Claw state is *usually*
+  statically known from the program text, which would make the condition dead weight — but it
+  becomes genuinely dynamic after an `IF` whose branches differ in whether they shipped. That's
+  real, but it may always be restructurable. Left in for now; **decide before Act 2 is
+  authored**, and cut it if no level needs it, on exactly the reasoning above.
 
 ---
 
@@ -338,6 +435,9 @@ lives in the top 15% of the screen except the Task Card, which is display-only.
 
 ### 8.2 Par goals, optional and non-blocking
 Each level shows `SIZE` (instruction count) and `SPEED` (steps executed) with par values.
+`SIZE` is shipment-independent. **`SPEED` is measured against the level's designated
+`parShipment`** (§8.5), never against whichever batch happens to be on screen — otherwise the
+number would move between attempts and mean nothing.
 Meeting par is never required to progress, and pars stay hidden until first clear so nobody
 optimizes before understanding. Meeting both awards a cosmetic **Efficiency Sticker** on the
 level card — and, in fiction, a slightly ominous congratulatory memo.
@@ -348,15 +448,18 @@ the UI: *"There are two ways to be a good employee."*
 ### 8.3 Act structure and content plan
 
 **ACT 1 — ONBOARDING (8 levels, free)** · *Types only. No math.*
-`TAKE`, `SHIP`, `REPEAT`, `CLOCK OUT`, `IF TYPE IS`, `IF INTAKE IS EMPTY`
+`TAKE`, `SHIP`, `REPEAT`, `IF TYPE IS` / `ELSE` — a **five-command tray that never scrolls**
+(§6.6). `CLOCK OUT` arrives late in the act, only once a puzzle needs a conditional early exit.
 Brent is delighted you're here. HR has sent a welcome video. Sample beats: ship everything;
-ship everything forever; ship only the blues; ship two greens per blue.
+ship everything forever; ship blues twice; ship only the blues (the discard level).
 *Story:* Brent introduces UNIT-02 as "Employee #2." Nobody thinks about it.
 
 **ACT 2 — YOU'RE CRUSHING IT (10 levels)** · *Pallets and weights arrive.*
-`STACK ON`, `PICK FROM`, `MERGE WITH`, `WEIGHT IS ZERO`, `TYPE MATCHES PALLET`
+`STACK ON`, `PICK FROM`, `MERGE WITH`, `WEIGHT IS ZERO`, `TYPE MATCHES PALLET`, and the
+**MANIFEST** package as an in-band end-of-batch marker (§6.6)
 The merge animation debuts as a full-screen moment. Puzzles: totals, duplication, swapping
-two pallets, "ship the heavier one."
+two pallets, "ship the heavier one," and the first "ship the batch total when the manifest
+arrives."
 *Story:* a Performance dashboard appears. Brent mentions the metrics are "for you, mostly."
 
 **ACT 3 — Q3 EFFICIENCY INITIATIVE (10 levels)** · *Comparison and real algorithms.*
@@ -392,6 +495,86 @@ is one instruction long, you choose it, and UNIT-02 performs it. The options are
 non-mechanical (wave, clock out, hold the door). Then the app returns you to a home screen
 that now reads `EMPLOYEE #2` and lets you keep playing Overtime forever. The joke completes
 itself.
+
+### 8.5 Shipment sets — a level is a set of inputs, not an input
+
+**A level does not define one shipment. It defines a set of possible shipments, and one is
+picked at random when the level opens.** This is the structural rule that makes the game a
+programming game: if the intake sequence were fixed, the optimal strategy for a large class
+of levels would be to read the boxes off the screen and transcribe a hardcoded sequence, with
+no rule, no loop, and no thinking. That solution has to be *impossible*, not merely
+discouraged.
+
+#### The verification model
+Passing the batch on screen is not passing the level.
+
+1. The player runs their program. It executes visibly against the **displayed shipment**.
+2. If it fails, normal failure handling (§6.5). Nothing else happens.
+3. If it succeeds, the VM immediately runs the same program against **every other shipment in
+   the set, headless**. This is free — the VM is pure Dart and finishes the whole set in
+   milliseconds (§13.2).
+4. **All pass →** shift complete.
+5. **Any fail →** the level does *not* clear. The first failing shipment becomes the new
+   displayed shipment, and the player watches their program break on it.
+
+Step 5 is where the design does its teaching, and it gets a diegetic frame rather than a
+scold — a **QUALITY ASSURANCE** card:
+
+> *"Nice work. Quick thing — we sent the unit a different batch to be safe. Take a look."*
+
+That is exactly the kind of surprise audit AmaCorp would run, it is honest about what
+happened, and it reframes "your solution was too specific" as a fact about the world rather
+than a verdict on the player. The player never has to guess *why* they didn't clear: they are
+watching the counterexample.
+
+#### Shipments are hand-authored, never procedurally generated
+Each level's set is a small, deliberate list — typically **3 to 6 shipments** — written by a
+designer to include the shapes that break naive solutions:
+
+- the **typical** case (the one tuned for the level's teaching moment)
+- a **degenerate** case: empty intake, or a single package
+- a **maximum-length** case, to catch programs that only loop a fixed number of times
+- an **adversarial** case aimed at the specific wrong idea this level invites — all packages
+  the same when the player expects a mix, the target item first, the target item last, no
+  matching item at all
+
+Procedural generation is rejected: it produces bland middles and misses exactly the edges
+that matter, and it would make CI non-deterministic. Authored sets are also *readable*, which
+means a designer can look at a level file and see what it proves.
+
+#### Shipments may only vary along axes the player can already handle
+This is the constraint that keeps the rule from becoming cruelty, and it drives the act
+structure in §8.3:
+
+| Player has | Shipments may vary in |
+|---|---|
+| `TAKE` / `SHIP` only | **nothing** — length must be fixed |
+| `REPEAT` | length — the loop exits on its own when `TAKE` finds the chute empty (§6.6) |
+| `IF TYPE IS` | type composition and order |
+| weights (Act 2+) | weight values |
+| indirect addressing (Act 4+) | pallet contents and layout |
+
+**A level whose shipments vary along an axis the player has no command to inspect is a broken
+level**, and the CI verifier should flag it: if the reference solution passes the set but no
+program using only the level's `allowedCommands` could distinguish the shipments, the set is
+wrong.
+
+Direct consequence: **Level 1 has exactly one possible shipment.** With only `TAKE` and `SHIP`
+in the tray, and no loop, a variable-length intake is unsolvable. This is correct, not an
+exception grudgingly carved out — variation begins in level 2, which is precisely what
+`REPEAT` is for, and the set sizes grow from there. Early Act 1 levels have 1–2 shipments;
+by Act 3 a level typically has 4–6.
+
+#### Randomness rules
+- The shipment is chosen when the level **opens**, before the editor is interactive, and is
+  fully visible on the floor. It never changes mid-attempt.
+- Re-entering a level rerolls it. Retrying after a failure **keeps the same shipment** — the
+  player is debugging, and moving the target mid-debug is hostile.
+- The chosen shipment's identity is saved with the mid-level state (§13.3), so backgrounding
+  the app cannot reroll the batch under a half-written program.
+- A player who has cleared the level can cycle shipments manually from the level card. Useful
+  for par-hunting, and it makes the whole system legible in retrospect.
+- The VM itself receives a shipment as an argument and contains no RNG (P4).
 
 ---
 
@@ -514,15 +697,36 @@ view is a *subscriber* to a step log, never the authority.
   presentation concern applied to an already-finished log.
 - Enables: instant-speed runs, step-backward debugging (replay the log to index *n*), par
   verification, automated solvability tests, and offline level validation.
-- **Every level ships with a reference solution and a set of adversarial programs, executed
-  in CI** via `dart test` with no Flutter and no device. A level that can't be auto-verified
-  doesn't ship.
-- **Level format:** declarative JSON — intake sequence, pallet initial state, allowed
-  commands, the goal predicate, pars, and briefing text. Levels are data; designers never
-  touch code. Deserialized into immutable Dart models (`freezed`) so a malformed level fails
-  loudly at load, not mid-run.
-- **Goal predicate:** a small expression language over the outbound sequence, so goals are
-  data too and readable in the level file.
+- **Level format:** declarative JSON — **a set of possible shipments** (§8.5), pallet initial
+  state, allowed commands, the goal predicate, pars, and briefing text. Levels are data;
+  designers never touch code. Deserialized into immutable Dart models (`freezed`) so a
+  malformed level fails loudly at load, not mid-run.
+- **A shipment is an argument, not level state.** `run(program, shipment)` is the VM's whole
+  surface. The VM holds no RNG and no notion of "the current level" — shipment selection lives
+  in the app layer, which is what keeps §8.5's randomness compatible with P4's determinism.
+- **Goal predicate:** a small expression language over the outbound sequence, evaluated per
+  shipment. Because shipments vary, most goals are *derived* rather than literal — `outbound
+  == shipment.filter(type == BLUE)` rather than a hardcoded list. A level whose goal can only
+  be written as a literal sequence is a level with one shipment, and that should be a
+  deliberate choice (as in level 1), not an accident.
+
+#### Verification in CI
+Every level ships with a reference solution and a set of adversarial programs, all executed
+headless via `dart test` — no Flutter, no device. **The cross product is the test:** every
+program × every shipment in the set, with an expected verdict for each cell. A level that
+can't be auto-verified doesn't ship. Three checks beyond pass/fail:
+
+1. **The reference solution passes every shipment.** If it doesn't, the level is broken.
+2. **A hardcoded transcription of any single shipment fails at least one other shipment** —
+   auto-generated by the verifier, not hand-written. This is the check that proves §8.5
+   actually bites. It is expected to be vacuous for level 1 and must be *declared* vacuous
+   there (`"singleShipment": true`), never silently skipped.
+3. **The shipment set is distinguishable using only `allowedCommands`.** Catches the broken
+   level described in §8.5 — variation along an axis the player cannot inspect.
+
+Set sizes are small (3–6 shipments, a handful of adversarial programs), so the full suite for
+all ~60 levels stays a sub-second unit-test run. Protect that: it is what makes level design
+iterable.
 
 ### 13.3 Flutter-specific implementation notes
 
@@ -550,7 +754,8 @@ down now so they aren't discovered in Milestone 3.
   leverage test in the project.
 - **Rendering:** Impeller on both platforms. Precache Rive artboards and package sprites at
   level load, behind the call scene, so the first run never stutters.
-- **Save:** local-first, full mid-level state (program + caret + undo stack) written as JSON
+- **Save:** local-first, full mid-level state (program + caret + undo stack + **the chosen
+  shipment's id**, so backgrounding can't reroll the batch under a half-written program) as JSON
   to app documents via `path_provider`, debounced ~300ms and flushed on
   `AppLifecycleState.paused`. Not `shared_preferences` — this is a structured document.
   The app can die at any moment and lose nothing. Optional cloud sync later.
@@ -587,6 +792,12 @@ Flame floor pane embedded under a Flutter editor pane, Rive characters in both p
 the golden-test harness running. **Build the block-aware drag-reorder in this milestone, not
 later**; it is the riskiest interaction and the one Flutter gives us least for free.
 
+The slice also has to include **shipment sets and the QUALITY ASSURANCE flow** (§8.5). Levels
+2 and 3 both carry multi-shipment sets, so the slice will produce real players writing real
+hardcoded solutions and meeting the QA card — which is the earliest possible read on whether
+that moment teaches or demoralises. Do not defer it; it is cheap to build and expensive to
+discover late.
+
 **Slice success criteria, tested on real people, on a phone, one-handed, standing up:**
 1. Five of five new players write and run a correct program for level 1 with no help.
 2. No player rotates the phone or reaches for a second hand.
@@ -615,6 +826,8 @@ If 1 or 5 fails, the interface is wrong and the level list waits.
 | Scope creep into a level editor or level sharing | Explicitly post-launch. Not in this document's scope. |
 | **Flutter is off the beaten path for games** — thinner ecosystem for scene work, fewer people to ask, and animation jank is the classic failure mode | The game-shaped surface is deliberately tiny: one shallow scene, one walking character, no physics. Flame + Rive cover it, and §13.3 pins the two known jank sources (list rebuilds during runs, uncached artboards) as build-time rules. Milestone 1 proves the floor pane at 60fps on the cheapest target device *before* any content is built. |
 | Block-aware drag-reorder is not something Flutter provides | Hand-rolled in Milestone 1, ahead of all content, and treated as a first-class deliverable rather than a polish task (§14) |
+| Hand-authored shipment sets multiply level-design work by 3–6× | Real cost, accepted — it's what makes solutions rules instead of transcriptions (P4b). Bounded by the axis table in §8.5, which keeps early sets tiny, and by the CI verifier catching bad sets in a sub-second test run instead of in playtest |
+| The QUALITY ASSURANCE card reads as "gotcha" and players feel cheated | It's diegetic, it's honest, and it shows the counterexample running rather than describing it. Validated in the Milestone 1 slice (§14), where levels 2–3 will generate real hardcoded attempts. If it demoralises, the fix is warmer framing and a nudge toward the axis that varied — never removing the check |
 
 ---
 
