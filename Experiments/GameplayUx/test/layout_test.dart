@@ -12,6 +12,7 @@ import 'package:gameplay_ux/ui/floor_pane.dart';
 import 'package:gameplay_ux/ui/program_pane.dart';
 import 'package:gameplay_ux/ui/tray.dart';
 import 'package:gameplay_ux/model/commands.dart';
+import 'package:gameplay_ux/model/program.dart';
 import 'package:gameplay_ux/ui/wireframe.dart';
 
 /// MaterialApp installs its own MediaQuery from the view, so an outer one is
@@ -54,10 +55,61 @@ Finder labelled(String label) => find.byWidgetPredicate(
 
 /// Every spacer between siblings. They are the only way to insert, so tests
 /// address them directly.
-Finder spacers() => find.byType(DragTarget<String>);
+Finder spacers() => find.byType(DragTarget<DragPayload>);
 
-Future<void> openSpacer(WidgetTester tester, int index) async {
-  await tester.tap(spacers().at(index));
+/// The spacer that owns everything below the program: the last one at the root,
+/// grown to fill the pane so that a drop past the end always lands.
+Finder tailSpacer() => find.byKey(const ValueKey('program-tail'));
+
+/// The spacers laid out between rows. Excludes the tail, whose whole point is to
+/// be as tall as the space it has.
+List<Element> innerSpacers() => spacers().evaluate().toList()..removeLast();
+
+/// A tray command, by its tray label.
+Finder trayCommand(String label) =>
+    find.descendant(of: find.byType(CommandTray), matching: find.text(label));
+
+/// Scrolls the tray until [label] is on screen. The tray holds nine commands and
+/// a phone shows about four.
+Future<void> revealInTray(WidgetTester tester, String label) async {
+  await tester.dragUntilVisible(
+    trayCommand(label),
+    find.descendant(
+      of: find.byType(CommandTray),
+      matching: find.byType(Scrollable),
+    ),
+    const Offset(-120, 0),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Picks a command up out of the tray and holds it over a spacer, without
+/// letting go. The caller decides whether to drop or abandon it.
+Future<TestGesture> holdOverSpacer(
+  WidgetTester tester,
+  String label,
+  int index,
+) async {
+  final gesture = await tester.startGesture(
+    tester.getCenter(trayCommand(label)),
+  );
+  await tester.pump(const Duration(milliseconds: 40));
+  // Two moves: the first starts the drag, the second lands it on the target.
+  await gesture.moveBy(const Offset(0, -30));
+  await tester.pump();
+  await gesture.moveTo(tester.getCenter(spacers().at(index)));
+  await tester.pump();
+  return gesture;
+}
+
+/// The whole gesture: pick up, hold over a spacer, drop.
+Future<void> dragIntoSpacer(
+  WidgetTester tester,
+  String label,
+  int index,
+) async {
+  final gesture = await holdOverSpacer(tester, label, index);
+  await gesture.up();
   await tester.pumpAndSettle();
 }
 
@@ -144,9 +196,10 @@ void main() {
 
       await tester.pumpWidget(harness(textScale: scale));
       await tester.pumpAndSettle();
-      await openSpacer(tester, 0);
 
-      final label = find.text('INSERT HERE');
+      final gesture = await holdOverSpacer(tester, 'TAKE', 0);
+
+      final label = find.text('DROP HERE');
       final labelRect = tester.getRect(label);
       final gap = tester.getRect(rowContainerFor(label));
 
@@ -154,6 +207,9 @@ void main() {
       expect(gap.height, greaterThanOrEqualTo(labelRect.height));
       expect(gap.top, lessThanOrEqualTo(labelRect.top));
       expect(gap.bottom, greaterThanOrEqualTo(labelRect.bottom));
+
+      await gesture.up();
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
   }
@@ -332,32 +388,17 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    Future<void> tapTray(WidgetTester tester, String label) async {
-      await tester.tap(
-        find.descendant(
-          of: find.byType(CommandTray),
-          matching: find.text(label),
-        ),
-      );
-      await tester.pumpAndSettle();
-    }
-
-    testWidgets('the program starts with every gap closed', (tester) async {
-      await boot(tester);
-
-      // Nothing is half-open when a level loads: the program reads as a program.
-      expect(find.text('INSERT HERE'), findsNothing);
-      expect(spacers(), findsWidgets);
-    });
-
-    testWidgets('a closed spacer is as thick as the container left arm', (
+    testWidgets('nothing is expanded until something is being dragged', (
       tester,
     ) async {
       await boot(tester);
 
-      // One structural unit for the whole program: the bracket arms and the gaps
-      // between siblings are the same weight.
-      for (final e in spacers().evaluate()) {
+      // An expanded gap means "the thing in your hand lands here". With an empty
+      // hand it means nothing, so it should not exist.
+      expect(find.text('DROP HERE'), findsNothing);
+      expect(spacers(), findsWidgets);
+
+      for (final e in innerSpacers()) {
         expect(
           tester.getRect(find.byWidget(e.widget)).height,
           closeTo(W.indentPerDepth, 0.5),
@@ -365,95 +406,138 @@ void main() {
       }
     });
 
-    testWidgets('tapping a spacer opens it, and only it', (tester) async {
+    testWidgets('tapping a spacer does nothing at all', (tester) async {
       await boot(tester);
-      await openSpacer(tester, 0);
-      expect(find.text('INSERT HERE'), findsOneWidget);
 
-      // Opening a second closes the first: at most one gap is ever open.
-      await openSpacer(tester, 2);
-      expect(find.text('INSERT HERE'), findsOneWidget);
+      await tester.tap(spacers().at(0));
+      await tester.pumpAndSettle();
+
+      expect(find.text('DROP HERE'), findsNothing);
+      expect(inProgram('SHIP'), findsOneWidget); // nothing inserted
     });
 
-    testWidgets('an open gap is the size of the row about to land in it', (
+    testWidgets('the spacer under the finger expands, and only it', (
       tester,
     ) async {
       await boot(tester);
-      await openSpacer(tester, 0);
+      final gesture = await holdOverSpacer(tester, 'TAKE', 0);
 
-      final gap = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
-      final row = tester.getRect(rowContainerFor(inProgram('TAKE')));
+      expect(find.text('DROP HERE'), findsOneWidget);
 
-      expect(gap.height, closeTo(row.height, 1));
+      await gesture.up();
+      await tester.pumpAndSettle();
     });
 
-    testWidgets('an insertion lands in the open gap', (tester) async {
+    testWidgets('an expanded spacer is the size of the row it will hold', (
+      tester,
+    ) async {
+      await boot(tester);
+      final gesture = await holdOverSpacer(tester, 'TAKE', 0);
+
+      final gap = tester.getRect(rowContainerFor(find.text('DROP HERE')));
+      final row = tester.getRect(rowContainerFor(inProgram('TAKE').first));
+      expect(gap.height, closeTo(row.height, 1));
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('everything closes again once the drag ends', (tester) async {
+      await boot(tester);
+      await dragIntoSpacer(tester, 'SHIP', 0);
+
+      expect(find.text('DROP HERE'), findsNothing);
+      for (final e in innerSpacers()) {
+        expect(
+          tester.getRect(find.byWidget(e.widget)).height,
+          closeTo(W.indentPerDepth, 0.5),
+        );
+      }
+    });
+  });
+
+  group('dropping a command', () {
+    Future<void> boot(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('lands exactly where it was dropped', (tester) async {
       await boot(tester);
 
-      // The first spacer sits above REPEAT, at the root.
-      await openSpacer(tester, 0);
-      await tapTray(tester, 'SHIP');
+      // Spacer 0 is the first one at the root, above REPEAT.
+      await dragIntoSpacer(tester, 'SHIP', 0);
 
       final ship = tester.getRect(rowContainerFor(inProgram('SHIP').first));
       final repeat = tester.getRect(rowContainerFor(inProgram('REPEAT')));
       expect(
         ship.top,
         lessThan(repeat.top),
-        reason: 'it should have landed in the gap that was open',
+        reason: 'dropped above REPEAT, so it belongs above REPEAT',
       );
     });
 
-    testWidgets('with no gap open an insertion goes to the end', (
+    testWidgets('lands inside a block when dropped inside one', (tester) async {
+      await boot(tester);
+
+      // Spacer 3 is inside the IF body, above SHIP.
+      await dragIntoSpacer(tester, 'TAKE', 3);
+
+      final dropped = tester.getRect(rowContainerFor(inProgram('TAKE').last));
+      final ship = tester.getRect(rowContainerFor(inProgram('SHIP')));
+      expect(dropped.left, ship.left, reason: 'same indent means same body');
+    });
+
+    testWidgets('a drop that misses every spacer does nothing', (tester) async {
+      await boot(tester);
+      final before = inProgram('TAKE').evaluate().length;
+
+      // Let go over the middle of a row, which is not a drop target.
+      final gesture = await tester.startGesture(
+        tester.getCenter(trayCommand('TAKE')),
+      );
+      await tester.pump(const Duration(milliseconds: 40));
+      await gesture.moveBy(const Offset(0, -30));
+      await tester.pump();
+      await gesture.moveTo(tester.getCenter(inProgram('REPEAT')));
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(inProgram('TAKE').evaluate().length, before);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a block dropped in carries its own empty body', (
       tester,
     ) async {
       await boot(tester);
-      expect(find.text('INSERT HERE'), findsNothing);
+      await dragIntoSpacer(tester, 'REPEAT', 0);
 
-      await tapTray(tester, 'SHIP');
-
-      // The end of the program is the only place a player can mean when nothing
-      // is open.
-      final ship = tester.getRect(rowContainerFor(inProgram('SHIP').last));
-      final repeat = tester.getRect(rowContainerFor(inProgram('REPEAT')));
-      expect(ship.top, greaterThan(repeat.top));
+      // Two REPEAT blocks now, and the new one brought a body with it.
+      expect(inProgram('REPEAT'), findsNWidgets(2));
+      expect(tester.takeException(), isNull);
     });
   });
 
   group('arguments', () {
-    Finder trayButton(String label) => find.descendant(
-      of: find.byType(CommandTray),
-      matching: find.text(label),
-    );
-
-    /// The tray scrolls horizontally, so later commands are off-screen.
-    Future<void> tapInTray(WidgetTester tester, String label) async {
-      await tester.dragUntilVisible(
-        trayButton(label),
-        find.descendant(
-          of: find.byType(CommandTray),
-          matching: find.byType(Scrollable),
-        ),
-        const Offset(-120, 0),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(trayButton(label));
+    Future<void> boot(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
     }
 
     testWidgets('a pallet argument cycles on tap, like a type does', (
       tester,
     ) async {
-      tester.view.physicalSize = const Size(393, 852);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(harness(textScale: 1.0));
-      await tester.pumpAndSettle();
-
-      // Clear first: the sample program has no pallet command in it.
-      await tester.tap(find.text('CLEAR'));
-      await tester.pumpAndSettle();
-      await tapInTray(tester, 'PICK FROM');
+      await boot(tester);
+      await revealInTray(tester, 'PICK FROM');
+      await dragIntoSpacer(tester, 'PICK FROM', 0);
 
       expect(inProgram('PALLET 1'), findsOneWidget);
 
@@ -464,12 +548,7 @@ void main() {
     });
 
     testWidgets('the type argument still cycles on tap', (tester) async {
-      tester.view.physicalSize = const Size(393, 852);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(harness(textScale: 1.0));
-      await tester.pumpAndSettle();
+      await boot(tester);
 
       expect(inProgram('BLUE'), findsOneWidget);
       await tester.tap(inProgram('BLUE'));
@@ -480,16 +559,9 @@ void main() {
     testWidgets('a row carries one argument control, not a stepper', (
       tester,
     ) async {
-      tester.view.physicalSize = const Size(393, 852);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(harness(textScale: 1.0));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('CLEAR'));
-      await tester.pumpAndSettle();
-      await tapInTray(tester, 'MERGE');
+      await boot(tester);
+      await revealInTray(tester, 'MERGE');
+      await dragIntoSpacer(tester, 'MERGE', 0);
 
       // The old -/+ stepper put three tap targets on one row. Regression guard
       // against it coming back.
@@ -756,9 +828,7 @@ void main() {
       expect(fadeOpacity(tester, 'left'), 1);
     });
 
-    testWidgets('does not swallow taps on the button underneath', (
-      tester,
-    ) async {
+    testWidgets('does not swallow a drag started under it', (tester) async {
       tester.view.physicalSize = const Size(393, 852);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -766,20 +836,11 @@ void main() {
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('CLEAR'));
-      await tester.pumpAndSettle();
-
-      // Tap the last command in the tray, which sits under the right-hand fade
-      // after scrolling to the end.
-      await tester.fling(trayScrollable(), const Offset(-2000, 0), 4000);
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.descendant(
-          of: find.byType(CommandTray),
-          matching: find.text('CLOCK OUT'),
-        ),
-      );
-      await tester.pumpAndSettle();
+      // The last command in the tray sits under the right-hand fade until the
+      // tray is scrolled. The fade must not eat the gesture that picks it up -
+      // it would make the very command the fade is advertising unreachable.
+      await revealInTray(tester, 'CLOCK OUT');
+      await dragIntoSpacer(tester, 'CLOCK OUT', 0);
 
       expect(inProgram('CLOCK OUT'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -800,21 +861,22 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('hides the tray and the caret, and brings both back', (
+    testWidgets('hides the tray and every spacer, and brings them back', (
       tester,
     ) async {
       await boot(tester);
-      await openSpacer(tester, 0);
       expect(find.byType(CommandTray), findsOneWidget);
-      expect(find.text('INSERT HERE'), findsOneWidget);
+      expect(spacers(), findsWidgets);
 
       await start(tester);
+      // Nothing to drag from, and nowhere to drop: a program that cannot be
+      // edited should offer no drop targets at all.
       expect(find.byType(CommandTray), findsNothing);
-      expect(find.text('INSERT HERE'), findsNothing);
+      expect(spacers(), findsNothing);
 
       await start(tester); // STOP
       expect(find.byType(CommandTray), findsOneWidget);
-      expect(find.text('INSERT HERE'), findsOneWidget);
+      expect(spacers(), findsWidgets);
     });
 
     testWidgets('the program is still readable while running', (tester) async {
@@ -895,8 +957,7 @@ void main() {
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
 
-      double tallestSpacer() => spacers()
-          .evaluate()
+      double tallestSpacer() => innerSpacers()
           .map((e) => tester.getRect(find.byWidget(e.widget)).height)
           .fold<double>(0, (a, b) => a > b ? a : b);
 
@@ -1073,15 +1134,13 @@ void main() {
     });
   });
 
-  group('tapping outside a spacer', () {
+  group('a row is only a row', () {
     Future<void> boot(WidgetTester tester) async {
       tester.view.physicalSize = const Size(393, 852);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
-      await openSpacer(tester, 0);
-      expect(find.text('INSERT HERE'), findsOneWidget);
     }
 
     /// Well to the right of any text, but still inside the visible pane.
@@ -1092,51 +1151,31 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('a plain row closes the open gap', (tester) async {
+    testWidgets('tapping a row changes nothing', (tester) async {
       await boot(tester);
+      final before = tester.getRect(rowContainerFor(inProgram('TAKE')));
+
+      // A row used to move an invisible insertion point. Now insertion is a
+      // drop, so a row has nothing to say about it.
       await tapEmptyPartOf(tester, inProgram('TAKE'));
-      expect(find.text('INSERT HERE'), findsNothing);
-    });
-
-    testWidgets('a block header closes the open gap', (tester) async {
-      await boot(tester);
       await tapEmptyPartOf(tester, inProgram('REPEAT'));
-      expect(find.text('INSERT HERE'), findsNothing);
+
+      expect(find.text('DROP HERE'), findsNothing);
+      expect(tester.getRect(rowContainerFor(inProgram('TAKE'))), before);
+      expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the bottom arm of a block opens a gap inside it', (
-      tester,
-    ) async {
+    testWidgets('an argument still answers its own tap', (tester) async {
       await boot(tester);
 
-      // There is no foot bar any more: the body's trailing spacer is the bottom
-      // arm, so the bottom edge of a block inserts at the end of that block
-      // rather than doing nothing useful.
-      final block = tester.getRect(
-        find
-            .ancestor(of: inProgram('REPEAT'), matching: find.byType(Container))
-            .at(1),
-      );
-      final pane = tester.getRect(find.byType(ProgramPane));
-      await tester.tapAt(
-        Offset(pane.right - 30, block.bottom - W.indentPerDepth / 2),
-      );
+      // The one thing on a row that is still tappable.
+      await tester.tap(inProgram('IS'));
       await tester.pumpAndSettle();
-
-      final gap = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
-      final ifRow = tester.getRect(rowContainerFor(inProgram('IF')));
-
-      expect(find.text('INSERT HERE'), findsOneWidget);
-      expect(
-        gap.top,
-        greaterThan(ifRow.top),
-        reason: 'it should open at the end of the block, after the IF',
-      );
-      expect(tester.takeException(), isNull);
+      expect(inProgram('IS NOT'), findsOneWidget);
     });
   });
 
-  group('the empty space below the program', () {
+  group('the tray face', () {
     Future<void> boot(WidgetTester tester) async {
       tester.view.physicalSize = const Size(393, 852);
       tester.view.devicePixelRatio = 1.0;
@@ -1145,68 +1184,163 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('opens the gap at the end of the program', (tester) async {
-      await boot(tester);
+    /// The button box behind a tray label.
+    Rect faceRect(WidgetTester tester, String label) =>
+        tester.getRect(rowContainerFor(trayCommand(label)));
 
-      // The trailing spacer is 18 tall and invisible against the pane, so
-      // reaching the end of the program used to mean hitting an edge.
-      final pane = tester.getRect(find.byType(ProgramPane));
-      await tester.tapAt(Offset(pane.center.dx, pane.bottom - 40));
-      await tester.pumpAndSettle();
-
-      expect(find.text('INSERT HERE'), findsOneWidget);
-
-      final gap = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
-      final repeat = tester.getRect(rowContainerFor(inProgram('REPEAT')));
-      expect(gap.top, greaterThan(repeat.bottom));
-
-      // At the root, not tucked inside the block.
-      expect(gap.left, lessThan(repeat.left + W.indentPerDepth));
-    });
-
-    testWidgets('an insertion then lands at the end', (tester) async {
-      await boot(tester);
-
-      final pane = tester.getRect(find.byType(ProgramPane));
-      await tester.tapAt(Offset(pane.center.dx, pane.bottom - 40));
-      await tester.pumpAndSettle();
-
-      await tester.tap(
-        find.descendant(
-          of: find.byType(CommandTray),
-          matching: find.text('SHIP'),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final ship = tester.getRect(rowContainerFor(inProgram('SHIP').last));
-      final repeat = tester.getRect(rowContainerFor(inProgram('REPEAT')));
-      expect(ship.top, greaterThan(repeat.bottom));
-    });
-
-    testWidgets('a block arm opens that block, not the end of the program', (
+    testWidgets('every command is the same kind of object in the tray', (
       tester,
     ) async {
       await boot(tester);
 
-      // The left arm belongs to its own block. Falling through to the pane here
-      // would jump the insertion point to the end of the whole program, which is
-      // nowhere near where the finger landed.
-      final ship = tester.getRect(rowContainerFor(inProgram('SHIP')));
-      await tester.tapAt(
-        Offset(ship.left - W.indentPerDepth / 2, ship.center.dy),
-      );
-      await tester.pumpAndSettle();
-
-      final gap = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
-      final ifRow = tester.getRect(rowContainerFor(inProgram('IF')));
-
-      expect(gap.top, greaterThan(ifRow.top));
+      // A `┐` block hint and an `_` argument slot used to mark REPEAT, IF and
+      // the pallet commands out as different sorts of thing while they were
+      // still on the shelf. Being a container is something a command becomes
+      // once it is in the program.
       expect(
-        gap.left,
-        greaterThan(ifRow.left),
-        reason: 'the gap should be inside the IF, at its indent',
+        find.descendant(
+          of: find.byType(CommandTray),
+          matching: find.textContaining('┐'),
+        ),
+        findsNothing,
       );
+      expect(
+        find.descendant(
+          of: find.byType(CommandTray),
+          matching: find.textContaining('_'),
+        ),
+        findsNothing,
+      );
+
+      final take = faceRect(tester, 'TAKE');
+      for (final spec in commandCatalogue) {
+        await revealInTray(tester, spec.trayLabel);
+        final face = faceRect(tester, spec.trayLabel);
+        expect(
+          face.height,
+          closeTo(take.height, 0.5),
+          reason: '${spec.trayLabel} should be the same height as TAKE',
+        );
+      }
+    });
+
+    testWidgets('a block flies out of the tray looking like its button', (
+      tester,
+    ) async {
+      await boot(tester);
+
+      // The reported bug: the drag preview was a real ProgramRow, and a block
+      // header paints no background of its own - the container behind it does -
+      // so REPEAT flew as bare letters and IF as floating chips.
+      final gesture = await tester.startGesture(
+        tester.getCenter(trayCommand('REPEAT')),
+      );
+      await tester.pump(const Duration(milliseconds: 40));
+      await gesture.moveBy(const Offset(0, -60));
+      await tester.pump();
+
+      final lifted = find.descendant(
+        of: find.byWidgetPredicate((w) => w is Opacity && w.opacity == 0.92),
+        matching: find.text('REPEAT'),
+      );
+      expect(lifted, findsOneWidget);
+
+      final box = tester.widget<Container>(
+        find.ancestor(of: lifted, matching: find.byType(Container)).first,
+      );
+      final fill = (box.decoration! as BoxDecoration).color;
+      expect(
+        fill,
+        specFor('repeat').colour,
+        reason: 'the thing in the air is a filled button, not naked letters',
+      );
+
+      final chips = find.descendant(
+        of: find.byWidgetPredicate((w) => w is Opacity && w.opacity == 0.92),
+        matching: find.text('TYPE'),
+      );
+      expect(chips, findsNothing, reason: 'no arguments in flight either');
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+  });
+
+  group('the space below the program', () {
+    Future<void> boot(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+    }
+
+    /// Drops [label] on a point, wherever that point happens to be.
+    Future<void> dropAt(WidgetTester tester, String label, Offset point) async {
+      final gesture = await tester.startGesture(
+        tester.getCenter(trayCommand(label)),
+      );
+      await tester.pump(const Duration(milliseconds: 40));
+      await gesture.moveBy(const Offset(0, -30));
+      await tester.pump();
+      await gesture.moveTo(point);
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('belongs to the end of the program, all of it', (tester) async {
+      await boot(tester);
+
+      // The reported bug: the last spacer was an 18dp strip, so appending meant
+      // finding an invisible edge with a finger that is covered by the row it is
+      // carrying. The empty pane below the program is that spacer now.
+      final pane = tester.getRect(find.byType(ProgramPane));
+      final tail = tester.getRect(tailSpacer());
+      expect(tail.bottom, closeTo(pane.bottom, 1));
+      expect(tail.height, greaterThan(W.rowHeight));
+    });
+
+    testWidgets('a drop far below the last row still appends', (tester) async {
+      await boot(tester);
+      final pane = tester.getRect(find.byType(ProgramPane));
+
+      await dropAt(tester, 'SHIP', Offset(pane.center.dx, pane.bottom - 20));
+
+      final dropped = tester.getRect(rowContainerFor(inProgram('SHIP').last));
+      final block = tester.getRect(rowContainerFor(inProgram('REPEAT')));
+      expect(dropped.top, greaterThan(block.top));
+      expect(
+        dropped.left,
+        closeTo(block.left, 0.5),
+        reason: 'appended at the root, not into the block it was dropped past',
+      );
+    });
+
+    testWidgets('an empty program is one big drop target', (tester) async {
+      await boot(tester);
+      await tester.tap(find.text('CLEAR'));
+      await tester.pumpAndSettle();
+      expect(inProgram('TAKE'), findsNothing);
+
+      // The other reported bug: an empty program drew a hint and nothing else,
+      // so the very first command could not be added at all.
+      expect(find.text('Drag a command up from below.'), findsOneWidget);
+      expect(tailSpacer(), findsOneWidget);
+
+      final pane = tester.getRect(find.byType(ProgramPane));
+      await dropAt(tester, 'TAKE', pane.center);
+
+      expect(inProgram('TAKE'), findsOneWidget);
+      expect(find.text('Drag a command up from below.'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the hint is only there while there is nothing to see', (
+      tester,
+    ) async {
+      await boot(tester);
+      expect(find.text('Drag a command up from below.'), findsNothing);
     });
   });
 }

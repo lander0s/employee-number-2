@@ -11,6 +11,27 @@ import 'commands.dart';
 int _nextId = 1;
 String _newId() => 'n${_nextId++}';
 
+/// What a drag is carrying.
+///
+/// Two intents land on the same targets: a command taken from the tray, and a
+/// node already in the program being moved. Keeping them in one type means a
+/// spacer has exactly one drop handler rather than two overlapping ones.
+sealed class DragPayload {
+  const DragPayload();
+}
+
+/// A command dragged out of the tray, to be inserted.
+class NewCommand extends DragPayload {
+  const NewCommand(this.commandId);
+  final String commandId;
+}
+
+/// A node already in the program, to be moved.
+class MoveNode extends DragPayload {
+  const MoveNode(this.id);
+  final String id;
+}
+
 /// Which cyclable segment of a row is being addressed.
 enum ArgSlot { subject, comparator, object }
 
@@ -142,13 +163,6 @@ class ProgramDocument {
   ProgramDocument();
 
   List<Node> root = <Node>[];
-
-  /// The open gap - the one spacer currently expanded - or null when none is.
-  ///
-  /// Nullable on purpose: "no gap is open" is a real, common state, reached by
-  /// tapping anywhere that is not a spacer. With nothing open, an insertion goes
-  /// to the end of the program, which is the only place a player can mean.
-  Slot? caret;
 
   final List<_Snapshot> _undo = [];
   final List<_Snapshot> _redo = [];
@@ -288,34 +302,24 @@ class ProgramDocument {
 
   // ------------------------------------------------------------------- editing
 
-  void insert(String commandId) {
+  /// Inserts [commandId] at [slot].
+  ///
+  /// Every insertion names its own place. There is no stored insertion point to
+  /// keep in sync, because a drop already knows exactly where it landed.
+  void insertAt(String commandId, Slot slot) {
     _push();
     final spec = specFor(commandId);
     final node = Node(
       commandId: commandId,
       palletArg: spec.argKind == ArgKind.pallet ? lastUsedPallet : 1,
     );
-
-    // No open gap means the end of the program.
-    final at = caret ?? Slot(null, root.length, 0);
-    final list = _listFor(at.parentId);
-    final index = at.index.clamp(0, list.length);
-    list.insert(index, node);
-
-    // The gap moves past what was just placed. For a block it moves *inside* the
-    // new body, which is where the next instruction goes in every real program.
-    caret = node.isBlock
-        ? Slot(node.id, 0, at.depth + 1)
-        : Slot(at.parentId, index + 1, at.depth);
+    final list = _listFor(slot.parentId);
+    list.insert(slot.index.clamp(0, list.length), node);
   }
 
-  void insertAt(String commandId, Slot slot) {
-    caret = slot;
-    insert(commandId);
-  }
-
-  /// Closes the open gap. Tapping anything that is not a spacer does this.
-  void closeGap() => caret = null;
+  /// Appends to the end of the program. Used by tests and the sample loader.
+  void insert(String commandId) =>
+      insertAt(commandId, Slot(null, root.length, 0));
 
   /// Deletes [id]. When it is a block, [keepContents] splices its body into the
   /// block's place instead of deleting it with the block.
@@ -328,7 +332,6 @@ class ProgramDocument {
     if (keepContents && node.isBlock) {
       at.list.insertAll(at.index, node.children!);
     }
-    caret = null;
   }
 
   void duplicate(String id) {
@@ -434,16 +437,6 @@ class ProgramDocument {
     }
   }
 
-  void setCaret(Slot slot) => caret = slot;
-
-  /// A gap whose container was deleted is not a gap any more.
-  void _normaliseCaret() {
-    final at = caret;
-    if (at?.parentId != null && nodeById(at!.parentId!) == null) {
-      caret = null;
-    }
-  }
-
   // ------------------------------------------------------------ undo and redo
 
   bool get canUndo => _undo.isNotEmpty;
@@ -456,30 +449,23 @@ class ProgramDocument {
   }
 
   _Snapshot _snapshot() =>
-      _Snapshot(root.map((n) => n.cloneKeepingIds()).toList(), caret);
+      _Snapshot(root.map((n) => n.cloneKeepingIds()).toList());
 
   void undo() {
     if (_undo.isEmpty) return;
     _redo.add(_snapshot());
-    final s = _undo.removeLast();
-    root = s.root;
-    caret = s.caret;
-    _normaliseCaret();
+    root = _undo.removeLast().root;
   }
 
   void redo() {
     if (_redo.isEmpty) return;
     _undo.add(_snapshot());
-    final s = _redo.removeLast();
-    root = s.root;
-    caret = s.caret;
-    _normaliseCaret();
+    root = _redo.removeLast().root;
   }
 
   void clear() {
     _push();
     root = <Node>[];
-    caret = null;
   }
 
   /// Level 4's reference solution, for checking the editor against a program
@@ -499,14 +485,10 @@ class ProgramDocument {
         ],
       ),
     ];
-    // Starts closed: a level should load as a program, not as a program with
-    // something already half-open in it.
-    caret = null;
   }
 }
 
 class _Snapshot {
-  _Snapshot(this.root, this.caret);
+  _Snapshot(this.root);
   final List<Node> root;
-  final Slot? caret;
 }

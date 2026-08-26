@@ -1,15 +1,18 @@
 /// The program pane: nested block containers, spacers, and block-aware drag
 /// reorder.
 ///
-/// Insertion works through **spacers**, not a caret. Every legal insertion point
-/// is a visible gap between siblings, as thick as the container's left arm. Tap
-/// one and it expands into the shape of the row about to land there; tap
-/// anything else and it closes. There is no invisible position to remember and no
-/// rule about where a command "goes" - the answer is already on screen.
+/// Insertion works by **dragging a command out of the tray and dropping it into
+/// a spacer**. Every legal insertion point is a visible gap between siblings, as
+/// thick as the container's left arm; the one under the finger expands into the
+/// shape of the row about to land there.
 ///
-/// That also means a row is just a row again. Tapping one used to move the
-/// insertion point somewhere else, which is exactly the indirection this
-/// replaces.
+/// Nothing is expanded when nothing is being dragged. An expanded gap only means
+/// "this is where the thing you are holding will go", so it has no meaning
+/// without something in hand - and a drop that is not over a spacer does
+/// nothing.
+///
+/// There is no insertion point stored anywhere. A drop names its own place, so
+/// there is no state to keep in sync and no rule about where a command "goes".
 ///
 /// A block is drawn as a literal container with its body inset, so it reads as a
 /// "C" wrapped around the instructions it owns. There are no connector lines: the
@@ -46,7 +49,7 @@ class ProgramPane extends StatefulWidget {
   final ProgramDocument doc;
   final VoidCallback onChanged;
 
-  /// While running, the program is read-only: no caret, no drop slots, no
+  /// While running, the program is read-only: no spacers, no drop targets, no
   /// gestures. A program that cannot be edited should not keep offering the
   /// affordances of editing.
   final bool running;
@@ -111,59 +114,77 @@ class ProgramPaneState extends State<ProgramPane> {
 
   @override
   Widget build(BuildContext context) {
-    final empty = doc.root.isEmpty && _draggingId == null;
+    return Container(
+      key: _paneKey,
+      color: W.paneProgram,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth + W.programOverhang;
 
-    return GestureDetector(
-      // Everything below the program belongs to the end of the program. The
-      // trailing spacer is 18 tall and invisible against the pane, so reaching
-      // it was a game of hitting an edge; this makes the whole empty area the
-      // same target. Rows and spacers are opaque, so they still win their own
-      // taps - this only catches what nothing else claimed.
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _mutate(() => doc.setCaret(Slot(null, doc.root.length, 0))),
-      child: Container(
-        key: _paneKey,
-        color: W.paneProgram,
-        child: empty
-            ? _EmptyState(
-                slot: const Slot(null, 0, 0),
-                onTapSlot: (slot) => _mutate(() => doc.setCaret(slot)),
-              )
-            : LayoutBuilder(
-                builder: (context, constraints) => SingleChildScrollView(
-                  controller: _scroll,
-                  // Laid out wider than the pane and clipped, so no block ever
-                  // shows its right edge. The inner scroll view exists only to
-                  // give the extra width a legitimate home - it never scrolls, and
-                  // without it Flutter would report the overflow as an error.
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const NeverScrollableScrollPhysics(),
-                    child: SizedBox(
-                      width: constraints.maxWidth + W.programOverhang,
-                      child: _buildList(doc.root, null, 0),
+          return CustomScrollView(
+            controller: _scroll,
+            slivers: [
+              SliverToBoxAdapter(
+                child: _overhang(width, _buildList(doc.root, null, 0)),
+              ),
+              // The last spacer at the root owns everything below the program.
+              // As an 18-tall strip it was an invisible edge you had to hit
+              // exactly, and on an empty program there was nothing to hit at
+              // all - the pane rendered a hint and no drop target whatsoever.
+              //
+              // SliverFillRemaining grows it into the leftover viewport and
+              // shrinks it back to a normal spacer once the program is long
+              // enough to scroll.
+              if (!widget.running)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _overhang(
+                    width,
+                    _buildSlot(
+                      Slot(null, doc.root.length, 0),
+                      null,
+                      key: const ValueKey('program-tail'),
+                      fill: true,
+                      hint: doc.root.isEmpty
+                          ? Text(
+                              'Drag a command up from below.',
+                              style: W.labelDim,
+                            )
+                          : null,
                     ),
                   ),
                 ),
-              ),
+            ],
+          );
+        },
       ),
     );
   }
+
+  /// Laid out wider than the pane and clipped, so no block ever shows its right
+  /// edge. The inner scroll view exists only to give the extra width a
+  /// legitimate home - it never scrolls, and without it Flutter would report the
+  /// overflow as an error.
+  Widget _overhang(double width, Widget child) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    physics: const NeverScrollableScrollPhysics(),
+    child: SizedBox(width: width, child: child),
+  );
 
   /// One child list: a slot before every node and one after the last, so every
   /// legal insertion point - including an empty block body - is reachable.
   ///
   /// [on] is the colour of the block this list sits inside, or null at the root.
-  /// Slots need it: a caret drawn in the dark theme's pale grey is invisible on
-  /// a bright yellow block.
+  /// Spacers need it: an expanded gap drawn in the dark theme pale grey is
+  /// invisible on a bright yellow block.
   Widget _buildList(
     List<Node> nodes,
     String? parentId,
     int depth, {
     Color? on,
   }) {
-    // While running there are no slots at all, so the caret and every drop gap
-    // disappear together rather than being individually suppressed.
+    // While running there are no slots at all, so no drop target exists on a
+    // program that cannot be edited.
     if (widget.running) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -178,7 +199,10 @@ class ProgramPaneState extends State<ProgramPane> {
           _buildSlot(Slot(parentId, i, depth), on),
           _buildNode(nodes[i], depth),
         ],
-        _buildSlot(Slot(parentId, nodes.length, depth), on),
+        // The root's trailing slot is not here: it is the sliver that fills the
+        // rest of the pane, so that dropping below the program always works.
+        if (parentId != null)
+          _buildSlot(Slot(parentId, nodes.length, depth), on),
       ],
     );
   }
@@ -194,73 +218,74 @@ class ProgramPaneState extends State<ProgramPane> {
     final fill = W.blockFill(node.spec.colour, depth);
     final body = _buildList(node.children!, node.id, depth + 1, on: fill);
 
-    return GestureDetector(
-      // The left arm and the corners are part of *this* block, so a tap there
-      // opens this block's trailing gap rather than falling through to the pane
-      // and jumping to the end of the whole program.
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _mutate(
-        () => doc.setCaret(Slot(node.id, node.children!.length, depth + 1)),
+    return Container(
+      // No margin. The spacers on either side are the separation, and a margin
+      // on top of them would be a second spacing system that means nothing.
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(W.blockRadius),
       ),
-      child: Container(
-        // No margin. The spacers on either side are the separation, and a margin
-        // on top of them would be a second spacing system that means nothing.
-        decoration: BoxDecoration(
-          color: fill,
-          borderRadius: BorderRadius.circular(W.blockRadius),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Only the header is draggable, as before: a draggable wrapping the
-            // whole container would fight its own children for the gesture.
-            _draggable(
-              node,
-              _buildRow(
-                DisplayRow(node: node, kind: RowKind.blockHeader, depth: depth),
-              ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Only the header is draggable: a draggable wrapping the whole
+          // container would fight its own children for the gesture.
+          _draggable(
+            node,
+            _buildRow(
+              DisplayRow(node: node, kind: RowKind.blockHeader, depth: depth),
             ),
-            // The body's trailing spacer *is* the bottom arm of the "C": it is
-            // already the same thickness as the left arm, and the left arm runs
-            // down past it, so together they close the bracket. There used to be a
-            // separate foot bar here, which meant 36 of bottom edge where 18 was
-            // wanted - and half of it was dead space that only closed the gap.
-            //
-            // An empty body needs no special minimum either: one spacer is the
-            // body, and it is exactly the right height already.
-            Padding(
-              padding: const EdgeInsets.only(left: W.indentPerDepth, right: 4),
-              child: body,
-            ),
-          ],
-        ),
+          ),
+          // The body's trailing spacer *is* the bottom arm of the "C": it is
+          // already the same thickness as the left arm, and the left arm runs
+          // down past it, so together they close the bracket.
+          //
+          // An empty body needs no special minimum either: one spacer is the
+          // body, and it is exactly the right height already.
+          Padding(
+            padding: const EdgeInsets.only(left: W.indentPerDepth, right: 4),
+            child: body,
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildSlot(Slot slot, Color? on) => _SlotWidget(
+  Widget _buildSlot(
+    Slot slot,
+    Color? on, {
+    Key? key,
+    bool fill = false,
+    Widget? hint,
+  }) => _SlotWidget(
+    key: key,
     slot: slot,
     on: on,
-    caret: doc.caret,
-    dragActive: _draggingId != null,
-    accepts: (id) => _accepts(id, slot),
-    onTap: () => _mutate(() => doc.setCaret(slot)),
-    onAccept: (id) => _mutate(() {
-      doc.move(id, slot);
+    fill: fill,
+    hint: hint,
+    accepts: (payload) => _accepts(payload, slot),
+    onAccept: (payload) => _mutate(() {
+      switch (payload) {
+        case NewCommand(:final commandId):
+          doc.insertAt(commandId, slot);
+        case MoveNode(:final id):
+          doc.move(id, slot);
+      }
     }),
   );
 
-  /// A block may not be dropped into its own body.
-  bool _accepts(String draggedId, Slot slot) {
-    if (slot.parentId == null) return true;
-    return !doc.contains(draggedId, slot.parentId!);
-  }
+  /// A command from the tray fits anywhere. A node already in the program may
+  /// not be dropped into its own body.
+  bool _accepts(DragPayload payload, Slot slot) => switch (payload) {
+    NewCommand() => true,
+    MoveNode(:final id) =>
+      slot.parentId == null || !doc.contains(id, slot.parentId!),
+  };
 
   Widget _buildRow(DisplayRow row) => ProgramRow(
     row: row,
     interactive: !widget.running,
     dragging: _draggingId == row.node.id,
-    onTap: () => _mutate(doc.closeGap),
     onDelete: () => _confirmDelete(row),
     onDuplicate: () => _mutate(() => doc.duplicate(row.node.id)),
     onCycleArg: (slot) => _mutate(() => doc.cycleArg(row.node.id, slot)),
@@ -269,8 +294,8 @@ class ProgramPaneState extends State<ProgramPane> {
   Widget _draggable(Node node, Widget rowWidget) {
     if (widget.running) return rowWidget;
 
-    return LongPressDraggable<String>(
-      data: node.id,
+    return LongPressDraggable<DragPayload>(
+      data: MoveNode(node.id),
       delay: const Duration(milliseconds: 180),
       onDragStarted: () => setState(() => _draggingId = node.id),
       onDragUpdate: (d) => _startAutoScroll(d.globalPosition),
@@ -354,13 +379,13 @@ class ProgramPaneState extends State<ProgramPane> {
 /// during a drag.
 class _SlotWidget extends StatefulWidget {
   const _SlotWidget({
+    super.key,
     required this.slot,
     required this.on,
-    required this.caret,
-    required this.dragActive,
     required this.accepts,
-    required this.onTap,
     required this.onAccept,
+    this.fill = false,
+    this.hint,
   });
 
   final Slot slot;
@@ -368,13 +393,15 @@ class _SlotWidget extends StatefulWidget {
   /// The enclosing block's colour, or null at the root.
   final Color? on;
 
-  /// The open gap, or null when none is.
-  final Slot? caret;
+  final bool Function(DragPayload) accepts;
+  final ValueChanged<DragPayload> onAccept;
 
-  final bool dragActive;
-  final bool Function(String) accepts;
-  final VoidCallback onTap;
-  final ValueChanged<String> onAccept;
+  /// True for the trailing root spacer, which grows to fill the pane. Its drop
+  /// area stays one row tall at the top; the rest is reach.
+  final bool fill;
+
+  /// Shown in place of the drop outline when the program is empty.
+  final Widget? hint;
 
   @override
   State<_SlotWidget> createState() => _SlotWidgetState();
@@ -385,9 +412,7 @@ class _SlotWidgetState extends State<_SlotWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final isOpen = widget.slot == widget.caret;
-
-    return DragTarget<String>(
+    return DragTarget<DragPayload>(
       onWillAcceptWithDetails: (details) {
         final ok = widget.accepts(details.data);
         if (ok) setState(() => _hovering = true);
@@ -399,58 +424,50 @@ class _SlotWidgetState extends State<_SlotWidget> {
         widget.onAccept(details.data);
       },
       builder: (context, candidate, rejected) {
-        final active = _hovering || candidate.isNotEmpty;
+        // Expanded only while something is held over it.
+        final open = _hovering || candidate.isNotEmpty;
 
-        // On a bright block everything here has to be drawn in ink; on the dark
-        // pane it is drawn in the pale theme colours.
-        final onColour = widget.on != null;
-        final markColour = onColour ? W.ink : W.caret;
-        final dropColour = onColour ? W.ink : W.dropTarget;
+        // On a bright block this is drawn in ink; on the dark pane, in the pale
+        // theme colour.
+        final markColour = widget.on != null ? W.ink : W.caret;
 
-        // A spacer is always there and always the same thickness as the
-        // container's left arm, so the program has one structural unit and every
-        // gap in it means the same thing: something can go here.
-        //
-        // Open, it takes the shape of the row about to land in it. It is not a
-        // caret: there is nothing to remember and nothing blinking, just a gap
-        // that is currently wide.
-        final Widget child;
-        final double? fixedHeight;
-        if (active) {
-          child = Container(height: 4, color: dropColour);
-          fixedHeight = null;
-        } else if (isOpen) {
-          child = _OpenGap(colour: markColour);
-          fixedHeight = null;
-        } else {
-          child = const SizedBox.shrink();
-          fixedHeight = W.indentPerDepth;
+        if (widget.fill) {
+          return Container(
+            constraints: const BoxConstraints(minHeight: W.indentPerDepth),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            alignment: Alignment.topLeft,
+            child: open
+                ? SizedBox(
+                    height: W.rowHeight,
+                    child: _OpenGap(colour: markColour),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 8, 0),
+                    child: widget.hint,
+                  ),
+          );
         }
 
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: widget.onTap,
-          child: Container(
-            height: fixedHeight,
-            // Open, it is the size of an instruction row - still a minimum, so
-            // it grows with text scale like one.
-            constraints: fixedHeight == null
-                ? const BoxConstraints(minHeight: W.rowHeight)
-                : null,
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            child: child,
-          ),
+        return Container(
+          height: open ? null : W.indentPerDepth,
+          // Open, it is the size of an instruction row - still a minimum, so it
+          // grows with text scale like one.
+          constraints: open
+              ? const BoxConstraints(minHeight: W.rowHeight)
+              : null,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          child: open ? _OpenGap(colour: markColour) : const SizedBox.shrink(),
         );
       },
     );
   }
 }
 
-/// An expanded spacer: the shape of the instruction about to land in it.
+/// A spacer with something held over it: the shape of the instruction about to
+/// land in it.
 ///
-/// This replaced a blinking caret. The blink was a text-cursor metaphor, and the
-/// whole point of spacers is that the insertion point is a place rather than a
-/// cursor - a gap that is currently wide needs no animation to explain itself.
+/// It only ever appears mid-drag, so it needs no label explaining what it is for
+/// - the thing it is for is under the player's finger.
 class _OpenGap extends StatelessWidget {
   const _OpenGap({required this.colour});
 
@@ -465,7 +482,7 @@ class _OpenGap extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.only(left: W.rowInset - 4, right: 10),
           child: Text(
-            'INSERT HERE',
+            'DROP HERE',
             style: W.row.copyWith(color: colour, fontWeight: FontWeight.w600),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -556,7 +573,6 @@ class _DragFeedback extends StatelessWidget {
     Widget row(RowKind kind) => ProgramRow(
       row: DisplayRow(node: node, kind: kind, depth: depth),
       interactive: false,
-      onTap: () {},
       onDelete: () {},
       onDuplicate: () {},
       onCycleArg: (_) {},
@@ -591,35 +607,6 @@ class _DragFeedback extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.slot, required this.onTapSlot});
-  final Slot slot;
-  final ValueChanged<Slot> onTapSlot;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => onTapSlot(slot),
-      child: Container(
-        alignment: Alignment.topLeft,
-        padding: const EdgeInsets.fromLTRB(44, 18, 18, 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: W.rowHeight,
-              width: 220,
-              child: const _OpenGap(colour: W.caret),
-            ),
-            const SizedBox(height: 14),
-            Text('Tap a command below to add it here.', style: W.labelDim),
-          ],
-        ),
       ),
     );
   }

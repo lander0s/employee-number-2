@@ -1,5 +1,11 @@
-/// The command tray. Tap-to-insert at the caret - never drag-from-palette,
-/// which is a two-hand interaction (game-design-document.md 7.2).
+/// The command tray.
+///
+/// A command is placed by **dragging it out of the tray and dropping it into a
+/// spacer** in the program. This is a deliberate departure from
+/// game-design-document.md 7.2, which chose tap-to-insert precisely to avoid
+/// drag-from-palette, calling it a two-hand interaction. Dragging up from a
+/// bottom tray with one thumb is the thing to judge on a real device - if the
+/// GDD is right, this is where it shows.
 ///
 /// Just the buttons. There was a strip above them carrying a `TRAY` label and the
 /// `SIZE / SPEED` par readout (7.1's mock shows "⊞ TRAY  SIZE 8 / 7"), and both
@@ -21,12 +27,11 @@ library;
 import 'package:flutter/material.dart';
 
 import '../model/commands.dart';
+import '../model/program.dart';
 import 'wireframe.dart';
 
 class CommandTray extends StatefulWidget {
-  const CommandTray({super.key, required this.onInsert});
-
-  final ValueChanged<String> onInsert;
+  const CommandTray({super.key});
 
   @override
   State<CommandTray> createState() => _CommandTrayState();
@@ -94,10 +99,7 @@ class _CommandTrayState extends State<CommandTray> {
                 child: Row(
                   children: [
                     for (final spec in commandCatalogue) ...[
-                      _TrayButton(
-                        spec: spec,
-                        onTap: () => widget.onInsert(spec.id),
-                      ),
+                      _TrayButton(spec: spec),
                       const SizedBox(width: 6),
                     ],
                   ],
@@ -170,49 +172,91 @@ class _EdgeFade extends StatelessWidget {
 }
 
 class _TrayButton extends StatelessWidget {
-  const _TrayButton({required this.spec, required this.onTap});
+  const _TrayButton({required this.spec});
+
   final CommandSpec spec;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final button = _Face(spec: spec);
+
     return Semantics(
       button: true,
       container: true,
       excludeSemantics: true,
-      label: spec.label,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: W.minTarget),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          alignment: Alignment.center,
-          // The same colour the command wears in the program, so the tray reads
-          // as a shelf of the very things you are about to place.
-          decoration: BoxDecoration(
-            color: spec.colour,
-            border: Border.all(color: W.chipEdge(spec.colour)),
-            borderRadius: BorderRadius.circular(W.rowRadius),
-          ),
-          child: Row(
-            children: [
-              Text(
-                spec.trayLabel,
-                style: W.label.copyWith(
-                  color: W.ink,
-                  fontWeight: FontWeight.w800,
-                  fontFamily: W.rowFamily,
-                  fontFamilyFallback: W.rowFallback,
-                ),
-              ),
-              if (spec.takesArg)
-                Text(' _', style: W.label.copyWith(color: W.inkDim)),
-              if (spec.isBlock)
-                Text('  ┐', style: W.label.copyWith(color: W.inkDim)),
-            ],
-          ),
-        ),
+      label: '${spec.label}, drag into the program',
+      child: Draggable<DragPayload>(
+        data: NewCommand(spec.id),
+        // Vertical affinity, or the draggable swallows the horizontal drags that
+        // scroll the tray - and with nine commands on a phone, a tray you cannot
+        // scroll is a tray you cannot use. Up picks a command out; sideways
+        // still moves the shelf.
+        affinity: Axis.vertical,
+        // No long press: the tray exists to be picked from, so a command should
+        // come away on the first movement rather than after a hold.
+        feedback: _Feedback(spec: spec),
+        // The tray keeps its full row of commands while one is in the air - a
+        // gap opening in the shelf would be a second thing moving at once.
+        childWhenDragging: Opacity(opacity: 0.4, child: button),
+        child: button,
       ),
     );
   }
+}
+
+/// The button as it sits in the tray.
+class _Face extends StatelessWidget {
+  const _Face({required this.spec});
+
+  final CommandSpec spec;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(minHeight: W.minTarget),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    alignment: Alignment.center,
+    // The same colour the command wears in the program, so the tray reads as a
+    // shelf of the very things you are about to place.
+    decoration: BoxDecoration(
+      color: spec.colour,
+      border: Border.all(color: W.chipEdge(spec.colour)),
+      borderRadius: BorderRadius.circular(W.rowRadius),
+    ),
+    // Every command wears the same face here, block or not. A `┐` hint and an
+    // `_` argument slot used to make REPEAT and IF look like different kinds of
+    // object while still in the tray; being a container is something a command
+    // becomes once it is in the program, not a property of the thing you pick
+    // up.
+    child: Text(
+      spec.trayLabel,
+      style: W.label.copyWith(
+        color: W.ink,
+        fontWeight: FontWeight.w800,
+        fontFamily: W.rowFamily,
+        fontFamilyFallback: W.rowFallback,
+      ),
+    ),
+  );
+}
+
+/// What follows the finger out of the tray: the button itself, lifted.
+///
+/// It used to be a real `ProgramRow`, so that the drag previewed its own result.
+/// That looked wrong for exactly the commands that need to look most ordinary: a
+/// block header paints no background of its own - the container behind it does -
+/// so REPEAT flew as bare floating letters, and IF carried its condition chips
+/// with nothing behind them. The row is a row once it lands somewhere.
+class _Feedback extends StatelessWidget {
+  const _Feedback({required this.spec});
+
+  final CommandSpec spec;
+
+  @override
+  Widget build(BuildContext context) => Opacity(
+    opacity: 0.92,
+    child: Material(
+      color: Colors.transparent,
+      child: _Face(spec: spec),
+    ),
+  );
 }

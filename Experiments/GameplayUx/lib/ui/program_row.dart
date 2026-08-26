@@ -22,7 +22,6 @@ class ProgramRow extends StatelessWidget {
   const ProgramRow({
     super.key,
     required this.row,
-    required this.onTap,
     required this.onDelete,
     required this.onDuplicate,
     required this.onCycleArg,
@@ -31,7 +30,6 @@ class ProgramRow extends StatelessWidget {
   });
 
   final DisplayRow row;
-  final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onDuplicate;
   final ValueChanged<ArgSlot> onCycleArg;
@@ -111,40 +109,23 @@ class ProgramRow extends StatelessWidget {
 
     if (!interactive) return content;
 
-    // A closer is not independently addressable: it belongs to its header.
-    // Tapping one only parks the caret after the block.
-    if (row.isCloser) {
-      return GestureDetector(
-        // Opaque, or the row would only answer where its glyphs are. A block
-        // header and its END paint no background of their own, and a Container
-        // with no decoration does not absorb hits - so tapping anywhere along
-        // the bottom edge of a block did nothing, which is exactly where you go
-        // to add an instruction after it.
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: content,
-      );
-    }
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Dismissible(
-        key: ValueKey('dismiss-${node.id}-${row.kind}'),
-        // Both actions are handled here and the row is never actually
-        // dismissed, so the list stays the single source of truth.
-        confirmDismiss: (direction) async {
-          if (direction == DismissDirection.endToStart) {
-            onDelete();
-          } else {
-            onDuplicate();
-          }
-          return false;
-        },
-        background: const _SwipeHint(label: 'DUPLICATE', end: false),
-        secondaryBackground: const _SwipeHint(label: 'DELETE', end: true),
-        child: content,
-      ),
+    // Nothing to tap on a row any more: insertion is a drop into a spacer, so a
+    // row's only gestures are the ones that act on the row itself.
+    return Dismissible(
+      key: ValueKey('dismiss-${node.id}-${row.kind}'),
+      // Both actions are handled here and the row is never actually dismissed,
+      // so the tree stays the single source of truth.
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.endToStart) {
+          onDelete();
+        } else {
+          onDuplicate();
+        }
+        return false;
+      },
+      background: const _SwipeHint(label: 'DUPLICATE', end: false),
+      secondaryBackground: const _SwipeHint(label: 'DELETE', end: true),
+      child: content,
     );
   }
 }

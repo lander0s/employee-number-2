@@ -19,10 +19,14 @@ String render(ProgramDocument doc) => doc
 
 void main() {
   group('insertion', () {
-    test('a block is inserted with its closer and the caret lands inside', () {
+    test('a block is inserted with its closer, and a drop lands inside', () {
       final doc = ProgramDocument();
       doc.insert('repeat');
-      doc.insert('take');
+      final repeat = doc.root.first;
+
+      // Every insertion names its own slot: there is no stored position that
+      // quietly advances into the block just created.
+      doc.insertAt('take', Slot(repeat.id, 0, 1));
 
       expect(render(doc), 'REPEAT\n  TAKE\nEND');
     });
@@ -30,15 +34,25 @@ void main() {
     test('nesting a block inside a block', () {
       final doc = ProgramDocument();
       doc.insert('repeat');
-      doc.insert('take');
-      doc.insert('ifCond');
-      doc.insert('ship');
+      final repeat = doc.root.first;
+
+      doc.insertAt('take', Slot(repeat.id, 0, 1));
+      doc.insertAt('ifCond', Slot(repeat.id, 1, 1));
+      doc.insertAt('ship', Slot(repeat.children![1].id, 0, 2));
 
       expect(
         render(doc),
         'REPEAT\n  TAKE\n  IF TYPE IS BLUE\n    SHIP\n  END\nEND',
       );
       expect(doc.maxDepth, 3);
+    });
+
+    test('a drop at the front of a list goes in front', () {
+      final doc = ProgramDocument();
+      doc.insert('take');
+      doc.insertAt('ship', const Slot(null, 0, 0));
+
+      expect(render(doc), 'SHIP\nTAKE');
     });
 
     test('SIZE counts commands and headers but not closers', () {
@@ -75,7 +89,6 @@ void main() {
 
     test('reordering within the same list does not lose the node', () {
       final doc = ProgramDocument();
-      doc.caret = const Slot(null, 0, 0);
       doc.insert('take');
       doc.insert('ship');
       doc.insert('clockOut');
@@ -90,7 +103,6 @@ void main() {
     test('moving into an empty block body works', () {
       final doc = ProgramDocument();
       doc.insert('take');
-      doc.caret = const Slot(null, 1, 0);
       doc.insert('repeat');
       expect(render(doc), 'TAKE\nREPEAT\nEND');
 
@@ -151,7 +163,6 @@ void main() {
       expect(first.palletArg, 3);
       expect(doc.lastUsedPallet, 3);
 
-      doc.caret = const Slot(null, 1, 0);
       doc.insert('pickFrom');
       expect(doc.root[1].palletArg, 3);
     });
