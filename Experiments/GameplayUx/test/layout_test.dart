@@ -442,18 +442,46 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('an expanded spacer is the size of the row it will hold', (
+    testWidgets('an expanded spacer is the row it will hold, margins and all', (
       tester,
     ) async {
       await boot(tester);
       final gesture = await holdOverSpacer(tester, 'TAKE', 0);
 
-      final gap = tester.getRect(rowContainerFor(find.text('DROP HERE')));
+      // The outline is the size of the row itself, less the 2dp it is inset by
+      // on each side...
+      final outline = tester.getRect(find.byType(DottedOutline));
       final row = tester.getRect(rowContainerFor(inProgram('TAKE').first));
-      expect(gap.height, closeTo(row.height, 1));
+      expect(outline.height, closeTo(row.height - 4, 1));
+
+      // ...and the spacer around it carries the gaps that row will have, so the
+      // preview occupies exactly the space the drop will take.
+      final slot = tester.getRect(find.byWidget(innerSpacers()[0].widget));
+      expect(slot.height, closeTo(row.height + W.indentPerDepth * 2, 1));
+      expect(outline.top - slot.top, closeTo(W.indentPerDepth + 2, 1.5));
+      expect(slot.bottom - outline.bottom, closeTo(W.indentPerDepth + 2, 1.5));
 
       await gesture.up();
       await tester.pumpAndSettle();
+    });
+
+    testWidgets('so the rows below it do not move when the drop lands', (
+      tester,
+    ) async {
+      await boot(tester);
+
+      // Spacer 1 is between REPEAT's TAKE and the IF below it.
+      final gesture = await holdOverSpacer(tester, 'SHIP', 1);
+      final previewed = tester.getRect(rowContainerFor(inProgram('IF')));
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getRect(rowContainerFor(inProgram('IF'))).top,
+        closeTo(previewed.top, 1),
+        reason: 'the preview already occupied the space the row now takes',
+      );
     });
 
     testWidgets('everything closes again once the drag ends', (tester) async {
@@ -919,7 +947,7 @@ void main() {
       await boot(tester);
       await start(tester);
 
-      await tester.drag(inProgram('TAKE'), const Offset(-400, 0));
+      await tester.drag(inProgram('TAKE'), const Offset(400, 0));
       await tester.pumpAndSettle();
 
       expect(inProgram('TAKE'), findsOneWidget);
@@ -1221,7 +1249,7 @@ void main() {
       // ordinary spacing between siblings that are not there.
       final heights = gaps(tester);
       expect(heights[0], closeTo(W.indentPerDepth, 0.5));
-      expect(heights[body], closeTo(W.emptyBodyHeight, 0.5));
+      expect(heights[body], closeTo(W.openSlotHeight, 0.5));
     });
 
     testWidgets('reserves a whole row and the gap that follows it', (
@@ -1307,7 +1335,7 @@ void main() {
       // reserved row steps back to the unlightened colour.
       final wide = innerSpacers().indexWhere(
         (e) =>
-            (tester.getRect(find.byWidget(e.widget)).height - W.emptyBodyHeight)
+            (tester.getRect(find.byWidget(e.widget)).height - W.openSlotHeight)
                 .abs() <
             0.5,
       );
@@ -1342,9 +1370,89 @@ void main() {
       // thick gap, however deep it sits.
       final thick = gaps(
         tester,
-      ).where((h) => (h - W.emptyBodyHeight).abs() < 0.5);
+      ).where((h) => (h - W.openSlotHeight).abs() < 0.5);
       expect(thick, hasLength(1));
       expect(inProgram('IF'), findsOneWidget);
+    });
+  });
+
+  group('deleting a row', () {
+    Future<void> boot(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> swipe(WidgetTester tester, Finder row, double dx) async {
+      await tester.drag(row, Offset(dx, 0));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a swipe to the right deletes the row', (tester) async {
+      await boot(tester);
+      await swipe(tester, inProgram('SHIP'), 400);
+
+      expect(inProgram('SHIP'), findsNothing);
+      expect(find.text('UNDO'), findsOneWidget, reason: 'and it is undoable');
+    });
+
+    testWidgets('a swipe to the left does nothing', (tester) async {
+      await boot(tester);
+      await swipe(tester, inProgram('SHIP'), -400);
+
+      // The other direction used to duplicate the row. One row, one gesture.
+      expect(inProgram('SHIP'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('DUPLICATE is not offered anywhere', (tester) async {
+      await boot(tester);
+
+      // Mid-swipe is where the hint shows, so look while the row is moving.
+      final gesture = await tester.startGesture(
+        tester.getCenter(inProgram('SHIP')),
+      );
+      await tester.pump(const Duration(milliseconds: 20));
+      await gesture.moveBy(const Offset(30, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(60, 0));
+      await tester.pump();
+
+      expect(find.text('DUPLICATE'), findsNothing);
+      expect(find.text('DELETE'), findsOneWidget);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a block goes with its contents, without asking', (
+      tester,
+    ) async {
+      await boot(tester);
+      expect(inProgram('TAKE'), findsOneWidget);
+
+      await swipe(tester, inProgram('REPEAT'), 400);
+
+      // No sheet, no choice to make: the whole subtree is gone.
+      expect(find.textContaining('Keep the contents'), findsNothing);
+      expect(inProgram('REPEAT'), findsNothing);
+      expect(inProgram('TAKE'), findsNothing);
+      expect(inProgram('IF'), findsNothing);
+      expect(inProgram('SHIP'), findsNothing);
+    });
+
+    testWidgets('and UNDO brings the whole subtree back', (tester) async {
+      await boot(tester);
+      await swipe(tester, inProgram('REPEAT'), 400);
+
+      await tester.tap(find.text('UNDO'));
+      await tester.pumpAndSettle();
+
+      expect(inProgram('REPEAT'), findsOneWidget);
+      expect(inProgram('TAKE'), findsOneWidget);
+      expect(inProgram('SHIP'), findsOneWidget);
     });
   });
 

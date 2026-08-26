@@ -76,18 +76,8 @@ class Node {
 
   ObjectKind get objectKind => objectKindFor(subject, comparator);
 
-  Node copy() => Node(
-    commandId: commandId,
-    palletArg: palletArg,
-    typeArg: typeArg,
-    weightArg: weightArg,
-    subject: subject,
-    comparator: comparator,
-    children: children?.map((c) => c.copy()).toList(),
-  );
-
   /// Deep copy that preserves ids - used for undo snapshots, where identity has
-  /// to survive so the caret and any in-flight drag still refer to real nodes.
+  /// to survive so an in-flight drag still refers to a real node.
   Node cloneKeepingIds() => Node(
     id: id,
     commandId: commandId,
@@ -332,13 +322,6 @@ class ProgramDocument {
     if (keepContents && node.isBlock) {
       at.list.insertAll(at.index, node.children!);
     }
-  }
-
-  void duplicate(String id) {
-    _push();
-    final at = _locate(id);
-    if (at == null) return;
-    at.list.insert(at.index + 1, at.list[at.index].copy());
   }
 
   /// Moves [id] into [slot]. Rejected when the slot is inside the moved node.

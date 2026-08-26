@@ -308,8 +308,7 @@ class ProgramPaneState extends State<ProgramPane> {
     row: row,
     interactive: !widget.running,
     dragging: _draggingId == row.node.id,
-    onDelete: () => _confirmDelete(row),
-    onDuplicate: () => _mutate(() => doc.duplicate(row.node.id)),
+    onDelete: () => _delete(row),
     onCycleArg: (slot) => _mutate(() => doc.cycleArg(row.node.id, slot)),
   );
 
@@ -335,46 +334,14 @@ class ProgramPaneState extends State<ProgramPane> {
     );
   }
 
-  Future<void> _confirmDelete(DisplayRow row) async {
+  void _delete(DisplayRow row) {
     final node = row.node;
-    final hasBody = node.isBlock && (node.children?.isNotEmpty ?? false);
 
-    if (!hasBody) {
-      _mutate(() => doc.delete(node.id));
-      _toast('Deleted ${node.spec.label}', onUndo: () => _mutate(doc.undo));
-      return;
-    }
-
-    final keep = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: W.chrome,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('DELETE ${node.spec.label}', style: W.label),
-            const SizedBox(height: 4),
-            Text('This block has instructions inside it.', style: W.labelDim),
-            const SizedBox(height: 16),
-            WButton(
-              label: 'Keep the contents',
-              wide: true,
-              onTap: () => Navigator.pop(context, true),
-            ),
-            const SizedBox(height: 8),
-            WButton(
-              label: 'Delete the block and its contents',
-              wide: true,
-              onTap: () => Navigator.pop(context, false),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (keep == null) return;
-    _mutate(() => doc.delete(node.id, keepContents: keep));
+    // A block goes with everything inside it, no questions asked. There used to
+    // be a sheet here offering "keep the contents" instead, which put a decision
+    // in front of someone who had just made a gesture meaning "get rid of this"
+    // - and UNDO already covers the case where they meant something else.
+    _mutate(() => doc.delete(node.id));
     _toast('Deleted ${node.spec.label}', onUndo: () => _mutate(doc.undo));
   }
 
@@ -469,9 +436,14 @@ class _SlotWidgetState extends State<_SlotWidget> {
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             alignment: Alignment.topLeft,
             child: open
-                ? SizedBox(
-                    height: W.rowHeight,
-                    child: _OpenGap(colour: markColour),
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: W.indentPerDepth,
+                    ),
+                    child: SizedBox(
+                      height: W.rowHeight,
+                      child: _OpenGap(colour: markColour),
+                    ),
                   )
                 : Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 8, 0),
@@ -480,14 +452,16 @@ class _SlotWidgetState extends State<_SlotWidget> {
           );
         }
 
-        // An empty body keeps the same height whether or not something is held
-        // over it: the shape that lands there is already reserved. The padding
-        // is the gap a real command would have above and below it - the first
-        // from the spacer under a block header, the second from the spacer that
-        // closes the body - so the ghost sits exactly where the row will sit.
-        if (widget.wide) {
+        // Both of these stand in for a row, so both are the shape of one: a
+        // row's height with the gap a row has above and below it. The open state
+        // is a preview of where the thing in your hand will land, and previewing
+        // it without its margins meant everything shifted the moment it landed.
+        // An empty body is the same shape held permanently.
+        if (open || widget.wide) {
           return Container(
-            constraints: const BoxConstraints(minHeight: W.emptyBodyHeight),
+            // A minimum, not a height: the outline grows with text scale like
+            // the row it is standing in for.
+            constraints: const BoxConstraints(minHeight: W.openSlotHeight),
             padding: const EdgeInsets.fromLTRB(
               4,
               W.indentPerDepth + 2,
@@ -507,14 +481,8 @@ class _SlotWidgetState extends State<_SlotWidget> {
         }
 
         return Container(
-          height: open ? null : W.indentPerDepth,
-          // Open, it is the size of an instruction row - still a minimum, so it
-          // grows with text scale like one.
-          constraints: open
-              ? const BoxConstraints(minHeight: W.rowHeight)
-              : null,
+          height: W.indentPerDepth,
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-          child: open ? _OpenGap(colour: markColour) : const SizedBox.shrink(),
         );
       },
     );
@@ -632,7 +600,6 @@ class _DragFeedback extends StatelessWidget {
       row: DisplayRow(node: node, kind: kind, depth: depth),
       interactive: false,
       onDelete: () {},
-      onDuplicate: () {},
       onCycleArg: (_) {},
     );
 

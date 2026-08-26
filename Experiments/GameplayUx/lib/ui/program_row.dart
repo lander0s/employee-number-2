@@ -23,7 +23,6 @@ class ProgramRow extends StatelessWidget {
     super.key,
     required this.row,
     required this.onDelete,
-    required this.onDuplicate,
     required this.onCycleArg,
     this.dragging = false,
     this.interactive = true,
@@ -31,7 +30,6 @@ class ProgramRow extends StatelessWidget {
 
   final DisplayRow row;
   final VoidCallback onDelete;
-  final VoidCallback onDuplicate;
   final ValueChanged<ArgSlot> onCycleArg;
 
   /// True while this row is the source of an active drag.
@@ -113,18 +111,18 @@ class ProgramRow extends StatelessWidget {
     // row's only gestures are the ones that act on the row itself.
     return Dismissible(
       key: ValueKey('dismiss-${node.id}-${row.kind}'),
-      // Both actions are handled here and the row is never actually dismissed,
-      // so the tree stays the single source of truth.
+      // One gesture, one direction. There used to be a second one - swipe the
+      // other way to duplicate - and two opposite swipes on the same row meant
+      // committing to a direction before knowing which was which. Deleting is
+      // the one thing a row needs to be able to do to itself.
+      direction: DismissDirection.startToEnd,
+      // Handled here and the row is never actually dismissed, so the tree stays
+      // the single source of truth.
       confirmDismiss: (direction) async {
-        if (direction == DismissDirection.endToStart) {
-          onDelete();
-        } else {
-          onDuplicate();
-        }
+        onDelete();
         return false;
       },
-      background: const _SwipeHint(label: 'DUPLICATE', end: false),
-      secondaryBackground: const _SwipeHint(label: 'DELETE', end: true),
+      background: const _SwipeHint(label: 'DELETE'),
       child: content,
     );
   }
@@ -208,21 +206,18 @@ class _ArgWord extends StatelessWidget {
 }
 
 class _SwipeHint extends StatelessWidget {
-  const _SwipeHint({required this.label, required this.end});
+  const _SwipeHint({required this.label});
   final String label;
-  final bool end;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: W.chrome,
-      alignment: end ? Alignment.centerRight : Alignment.centerLeft,
-      // The row runs past the right edge of the screen, so the DELETE hint has
-      // to be pulled back by the overhang or it lands where nobody can see it.
-      padding: EdgeInsets.only(
-        left: 18,
-        right: end ? 18 + W.programOverhang : 18,
-      ),
+      // Revealed on the left, where the row is pulled away from: the right edge
+      // of a row is off-screen behind the overhang, so a hint over there would
+      // land where nobody can see it.
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Text(label, style: W.meta.copyWith(color: W.textDim)),
     );
   }
