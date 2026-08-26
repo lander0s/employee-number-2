@@ -1467,6 +1467,22 @@ void main() {
       });
     }
 
+    testWidgets('the undo offer clears itself after a few seconds', (
+      tester,
+    ) async {
+      await boot(tester);
+      await swipe(tester, inProgram('SHIP'), 400);
+      expect(find.text('UNDO'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+
+      // It used to sit there until UNDO was tapped, which made a courtesy look
+      // like a decision waiting on you.
+      expect(find.text('UNDO'), findsNothing);
+      expect(inProgram('SHIP'), findsNothing, reason: 'and the delete stands');
+    });
+
     testWidgets('the hint is readable in both directions', (tester) async {
       await boot(tester);
       final pane = tester.getRect(find.byType(ProgramPane));

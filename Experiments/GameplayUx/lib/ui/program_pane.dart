@@ -63,12 +63,18 @@ class ProgramPaneState extends State<ProgramPane> {
   final _paneKey = GlobalKey();
   String? _draggingId;
   Timer? _autoScroll;
+  Timer? _toastLife;
+
+  /// How long the undo offer stays up. Long enough to notice and act on, short
+  /// enough that it is gone before it becomes furniture.
+  static const _toastDuration = Duration(seconds: 3);
 
   ProgramDocument get doc => widget.doc;
 
   @override
   void dispose() {
     _autoScroll?.cancel();
+    _toastLife?.cancel();
     _scroll.dispose();
     super.dispose();
   }
@@ -374,12 +380,14 @@ class ProgramPaneState extends State<ProgramPane> {
 
   void _toast(String message, {required VoidCallback onUndo}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(
           backgroundColor: W.chrome,
-          duration: const Duration(seconds: 4),
+          duration: _toastDuration,
           content: Text(message, style: W.labelDim),
           action: SnackBarAction(
             label: 'UNDO',
@@ -388,6 +396,16 @@ class ProgramPaneState extends State<ProgramPane> {
           ),
         ),
       );
+
+    // Timed out here as well as in the SnackBar, because SnackBar's own timer
+    // does not run at all while a screen reader is active - it waits to be
+    // dismissed by hand instead. That left the offer sitting there with UNDO as
+    // the only way to be rid of it, which reads as "you have to decide" for
+    // something that is only ever a courtesy.
+    _toastLife?.cancel();
+    _toastLife = Timer(_toastDuration, () {
+      if (mounted) messenger.hideCurrentSnackBar();
+    });
   }
 }
 
