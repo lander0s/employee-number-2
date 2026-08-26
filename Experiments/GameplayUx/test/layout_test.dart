@@ -995,15 +995,22 @@ void main() {
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
 
-      // The "C": the header is the top arm, END is the bottom arm, and every
-      // instruction in between sits inside that span.
+      // The "C": the header is the top arm, the container's foot is the bottom
+      // arm, and every instruction in between sits inside that span.
       final header = tester.getRect(rowContainerFor(inProgram('REPEAT')));
-      final closers = inProgram('END');
-      final outerEnd = tester.getRect(rowContainerFor(closers.last));
+      final block = tester.getRect(
+        find
+            .ancestor(of: inProgram('REPEAT'), matching: find.byType(Container))
+            .at(1),
+      );
       final take = tester.getRect(rowContainerFor(inProgram('TAKE')));
 
       expect(take.top, greaterThanOrEqualTo(header.bottom));
-      expect(take.bottom, lessThanOrEqualTo(outerEnd.top));
+      expect(take.bottom, lessThanOrEqualTo(block.bottom));
+
+      // The foot is as thick as the left arm, which is what makes the bracket
+      // symmetrical. There is no word in it any more.
+      expect(find.text('END'), findsNothing);
     });
 
     testWidgets('no connector lines are drawn', (tester) async {
@@ -1119,24 +1126,32 @@ void main() {
     ) async {
       await boot(tester);
 
-      // The outer END, i.e. the bottom edge of the REPEAT block. This is where
-      // you go to add an instruction after the block, and it used to answer only
-      // where the word itself was.
-      final outerEnd = inProgram('END').last;
-      await tapEmptyPartOf(tester, outerEnd);
+      // The REPEAT block's foot: a bar as thick as the left arm, with no text
+      // in it at all. This is where you go to add an instruction after the
+      // block, so the whole strip has to answer a tap.
+      Rect blockRect() => tester.getRect(
+        find
+            .ancestor(of: inProgram('REPEAT'), matching: find.byType(Container))
+            .at(1),
+      );
+
+      final pane = tester.getRect(find.byType(ProgramPane));
+      final foot = blockRect().bottom - W.indentPerDepth / 2;
+      await tester.tapAt(Offset(pane.right - 30, foot));
+      await tester.pumpAndSettle();
 
       // Measured after the tap: moving the caret collapses the zero-height slot
       // it came from, so everything below it shifts up.
-      final endRect = tester.getRect(rowContainerFor(inProgram('END').last));
+      final block = blockRect();
       final caret = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
 
       expect(
         caret.top,
-        greaterThanOrEqualTo(endRect.bottom),
+        greaterThanOrEqualTo(block.bottom),
         reason: 'the caret should have moved below the block',
       );
       // And out to the root, not left inside the block body.
-      expect(caret.left, lessThan(endRect.left + W.indentPerDepth));
+      expect(caret.left, lessThan(block.left + W.indentPerDepth));
     });
 
     testWidgets('the empty part of a block header places the caret inside', (

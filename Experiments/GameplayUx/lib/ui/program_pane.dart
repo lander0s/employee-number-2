@@ -204,8 +204,18 @@ class ProgramPaneState extends State<ProgramPane> {
                   )
                 : body,
           ),
-          _buildRow(
-            DisplayRow(node: node, kind: RowKind.blockCloser, depth: depth),
+          _BlockFoot(
+            onTap: () => _mutate(
+              () => doc.setCaret(
+                _caretForRow(
+                  DisplayRow(
+                    node: node,
+                    kind: RowKind.blockCloser,
+                    depth: depth,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -586,11 +596,33 @@ class _DragFeedback extends StatelessWidget {
               ],
             ),
           ),
-          row(RowKind.blockCloser),
+          const _BlockFoot(),
         ],
       ),
     );
   }
+}
+
+/// The bottom arm of a block's "C".
+///
+/// It used to be a row reading `END`. The word was redundant once the block
+/// became a container - the shape already says where it stops - so the foot is
+/// now just a bar as thick as the left arm, which makes the bracket symmetrical.
+///
+/// It stays tappable, because the bottom edge of a block is exactly where you go
+/// to add an instruction *after* it. Short (18) but full width, and opaque, so
+/// the whole strip answers.
+class _BlockFoot extends StatelessWidget {
+  const _BlockFoot({this.onTap});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: onTap,
+    child: const SizedBox(height: W.indentPerDepth),
+  );
 }
 
 class _EmptyState extends StatelessWidget {
