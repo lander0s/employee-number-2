@@ -102,6 +102,20 @@ Future<TestGesture> holdOverSpacer(
   return gesture;
 }
 
+/// Drops [label] on a point, wherever that point happens to be.
+Future<void> dropAt(WidgetTester tester, String label, Offset point) async {
+  final gesture = await tester.startGesture(
+    tester.getCenter(trayCommand(label)),
+  );
+  await tester.pump(const Duration(milliseconds: 40));
+  await gesture.moveBy(const Offset(0, -30));
+  await tester.pump();
+  await gesture.moveTo(point);
+  await tester.pump();
+  await gesture.up();
+  await tester.pumpAndSettle();
+}
+
 /// The whole gesture: pick up, hold over a spacer, drop.
 Future<void> dragIntoSpacer(
   WidgetTester tester,
@@ -1175,6 +1189,71 @@ void main() {
     });
   });
 
+  group('an empty block', () {
+    Future<void> boot(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CLEAR'));
+      await tester.pumpAndSettle();
+    }
+
+    /// Every spacer height except the tail's, in layout order.
+    List<double> gaps(WidgetTester tester) => innerSpacers()
+        .map((e) => tester.getRect(find.byWidget(e.widget)).height)
+        .toList();
+
+    /// Spacer 1 is the body of the only block in the program: spacer 0 is the
+    /// root gap above it.
+    const body = 1;
+
+    testWidgets('its one gap is thicker than a gap between siblings', (
+      tester,
+    ) async {
+      await boot(tester);
+      final pane = tester.getRect(find.byType(ProgramPane));
+      await dropAt(tester, 'REPEAT', pane.center);
+
+      // A block with nothing in it has exactly one slot, and that slot is the
+      // only thing that can say the container is unfinished. At 18dp it read as
+      // ordinary spacing between siblings that are not there.
+      final heights = gaps(tester);
+      expect(heights[0], closeTo(W.indentPerDepth, 0.5));
+      expect(heights[body], closeTo(W.emptyBodyHeight, 0.5));
+    });
+
+    testWidgets('goes back to an ordinary gap once it holds something', (
+      tester,
+    ) async {
+      await boot(tester);
+      final pane = tester.getRect(find.byType(ProgramPane));
+      await dropAt(tester, 'REPEAT', pane.center);
+      await dragIntoSpacer(tester, 'TAKE', body);
+
+      expect(inProgram('TAKE'), findsOneWidget);
+      for (final h in gaps(tester)) {
+        expect(h, closeTo(W.indentPerDepth, 0.5));
+      }
+    });
+
+    testWidgets('a nested empty block gets the same treatment', (tester) async {
+      await boot(tester);
+      final pane = tester.getRect(find.byType(ProgramPane));
+      await dropAt(tester, 'REPEAT', pane.center);
+      await dragIntoSpacer(tester, 'IF', body);
+
+      // The outer block holds the IF now, so only the inner body is empty - one
+      // thick gap, however deep it sits.
+      final thick = gaps(
+        tester,
+      ).where((h) => (h - W.emptyBodyHeight).abs() < 0.5);
+      expect(thick, hasLength(1));
+      expect(inProgram('IF'), findsOneWidget);
+    });
+  });
+
   group('the tray face', () {
     Future<void> boot(WidgetTester tester) async {
       tester.view.physicalSize = const Size(393, 852);
@@ -1272,20 +1351,6 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(harness(textScale: 1.0));
-      await tester.pumpAndSettle();
-    }
-
-    /// Drops [label] on a point, wherever that point happens to be.
-    Future<void> dropAt(WidgetTester tester, String label, Offset point) async {
-      final gesture = await tester.startGesture(
-        tester.getCenter(trayCommand(label)),
-      );
-      await tester.pump(const Duration(milliseconds: 40));
-      await gesture.moveBy(const Offset(0, -30));
-      await tester.pump();
-      await gesture.moveTo(point);
-      await tester.pump();
-      await gesture.up();
       await tester.pumpAndSettle();
     }
 

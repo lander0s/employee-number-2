@@ -202,7 +202,13 @@ class ProgramPaneState extends State<ProgramPane> {
         // The root's trailing slot is not here: it is the sliver that fills the
         // rest of the pane, so that dropping below the program always works.
         if (parentId != null)
-          _buildSlot(Slot(parentId, nodes.length, depth), on),
+          _buildSlot(
+            Slot(parentId, nodes.length, depth),
+            on,
+            // An empty block's body is this one slot and nothing else, so it is
+            // the only thing that can say "something goes in here".
+            wide: nodes.isEmpty,
+          ),
       ],
     );
   }
@@ -256,12 +262,14 @@ class ProgramPaneState extends State<ProgramPane> {
     Color? on, {
     Key? key,
     bool fill = false,
+    bool wide = false,
     Widget? hint,
   }) => _SlotWidget(
     key: key,
     slot: slot,
     on: on,
     fill: fill,
+    wide: wide,
     hint: hint,
     accepts: (payload) => _accepts(payload, slot),
     onAccept: (payload) => _mutate(() {
@@ -385,6 +393,7 @@ class _SlotWidget extends StatefulWidget {
     required this.accepts,
     required this.onAccept,
     this.fill = false,
+    this.wide = false,
     this.hint,
   });
 
@@ -399,6 +408,10 @@ class _SlotWidget extends StatefulWidget {
   /// True for the trailing root spacer, which grows to fill the pane. Its drop
   /// area stays one row tall at the top; the rest is reach.
   final bool fill;
+
+  /// True for the lone spacer in an empty block body, which is drawn thicker so
+  /// the gap reads as a container waiting for something.
+  final bool wide;
 
   /// Shown in place of the drop outline when the program is empty.
   final Widget? hint;
@@ -449,7 +462,9 @@ class _SlotWidgetState extends State<_SlotWidget> {
         }
 
         return Container(
-          height: open ? null : W.indentPerDepth,
+          height: open
+              ? null
+              : (widget.wide ? W.emptyBodyHeight : W.indentPerDepth),
           // Open, it is the size of an instruction row - still a minimum, so it
           // grows with text scale like one.
           constraints: open

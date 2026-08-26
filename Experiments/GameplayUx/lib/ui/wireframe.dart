@@ -68,6 +68,12 @@ abstract final class W {
   static const rowHeight = 60.0;
   static const closerRowHeight = 44.0;
   static const indentPerDepth = 18.0;
+
+  /// The one spacer inside an empty block. A body with nothing in it is drawn
+  /// as a well rather than as an ordinary gap between siblings: the point is
+  /// that the container is unfinished, and an 18dp strip reads as spacing, not
+  /// as a place where something is missing.
+  static const emptyBodyHeight = 44.0;
   static const minTarget = 48.0;
 
   /// Left inset for every row and slot, replacing the old line-number gutter.
