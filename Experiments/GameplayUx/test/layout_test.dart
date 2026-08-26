@@ -484,6 +484,56 @@ void main() {
       );
     });
 
+    testWidgets('an open gap is filled in the shade the row will be', (
+      tester,
+    ) async {
+      await boot(tester);
+
+      // Spacer 1 is inside the REPEAT body, between TAKE and the IF. It used to
+      // be transparent: only the trailing spacer of an empty body carried the
+      // fill, so the same drop previewed a different colour depending on where
+      // in the body it landed.
+      final gesture = await holdOverSpacer(tester, 'SHIP', 1);
+
+      final box = tester.widget<DecoratedBox>(
+        find
+            .descendant(
+              of: find.byWidget(innerSpacers()[1].widget),
+              matching: find.byType(DecoratedBox),
+            )
+            .first,
+      );
+      expect(
+        (box.decoration as BoxDecoration).color,
+        W.blockFill(specFor('repeat').colour, 1),
+        reason: 'the shade a child of this REPEAT wears',
+      );
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a gap at the root has no fill to inherit', (tester) async {
+      await boot(tester);
+
+      // Spacer 0 is above REPEAT, at the root: no container, so no alternation
+      // to continue - the outline sits on the pane itself.
+      final gesture = await holdOverSpacer(tester, 'SHIP', 0);
+
+      final box = tester.widget<DecoratedBox>(
+        find
+            .descendant(
+              of: find.byWidget(innerSpacers()[0].widget),
+              matching: find.byType(DecoratedBox),
+            )
+            .first,
+      );
+      expect((box.decoration as BoxDecoration).color, isNull);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('everything closes again once the drag ends', (tester) async {
       await boot(tester);
       await dragIntoSpacer(tester, 'SHIP', 0);

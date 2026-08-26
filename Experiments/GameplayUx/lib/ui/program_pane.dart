@@ -203,7 +203,7 @@ class ProgramPaneState extends State<ProgramPane> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (var i = 0; i < nodes.length; i++) ...[
-          _buildSlot(Slot(parentId, i, depth), on),
+          _buildSlot(Slot(parentId, i, depth), on, ghost: ghost),
           _buildNode(nodes[i], depth),
         ],
         // The root's trailing slot is not here: it is the sliver that fills the
@@ -212,10 +212,10 @@ class ProgramPaneState extends State<ProgramPane> {
           _buildSlot(
             Slot(parentId, nodes.length, depth),
             on,
+            ghost: ghost,
             // An empty block's body is this one slot and nothing else, so it is
             // the only thing that can say "something goes in here".
             wide: nodes.isEmpty,
-            ghost: ghost,
           ),
       ],
     );
@@ -241,9 +241,10 @@ class ProgramPaneState extends State<ProgramPane> {
       depth + 1,
       on: fill,
       // The shade a child of this block would wear: one step along the same
-      // alternation that keeps an IF inside an IF readable. An empty body paints
-      // its reserved row in it, so the gap reads as a row that is not there
-      // rather than as a hole in the container.
+      // alternation that keeps an IF inside an IF readable. Every slot in the
+      // body paints its reserved row in it - an empty body permanently, the
+      // others while something is held over them - so a drop always previews
+      // the tone the row will actually have.
       ghost: W.blockFill(node.spec.colour, depth + 1),
     );
 
@@ -440,8 +441,9 @@ class _SlotWidget extends StatefulWidget {
   /// the gap reads as a container waiting for something.
   final bool wide;
 
-  /// The fill for the row an empty body is holding space for: the shade a real
-  /// child at this depth would have.
+  /// The fill for the row this slot is holding space for: the shade a real child
+  /// at this depth would have. Null at the root, which has no container and so
+  /// no alternation to continue.
   final Color? ghost;
 
   /// Shown in place of the drop outline when the program is empty.
