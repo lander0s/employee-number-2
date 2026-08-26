@@ -46,32 +46,44 @@ class ProgramRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final node = row.node;
-    final height = row.isCloser ? W.closerRowHeight : W.rowHeight;
-
     final tone = node.spec.colour;
+
+    // A block header is a title on the container, not a card. It hugs its own
+    // content and sits at the top of the block, so the only space between the
+    // title and the first child is the spacer - which is the thing that reacts
+    // to a tap. A centred 60dp header put ~19dp of dead height under the title
+    // before the spacer even started.
+    final isHeader = row.kind == RowKind.blockHeader;
 
     final content = Container(
       // A minimum, never a fixed height: 7.3 requires rows to survive OS text
       // scaling to 200% without clipping, so content decides the final height.
-      constraints: BoxConstraints(minHeight: height),
-      // Only a plain command is a card of its own. A block header and its END
-      // are part of the container behind them, so they take neither the fill nor
-      // the rounding - a rounded header inside a rounded block would read as two
-      // shapes where there is one.
-      margin: row.kind == RowKind.command
-          ? const EdgeInsets.symmetric(vertical: 2)
-          : null,
+      constraints: isHeader
+          ? null
+          : const BoxConstraints(minHeight: W.rowHeight),
+      // No margin: the gap between two siblings is a spacer, and a spacer is the
+      // only spacing mechanism in the program. A card margin on top of it would
+      // be a second one that means nothing.
+      //
+      // Only a plain command is a card of its own. A block header is part of the
+      // container behind it, so it takes neither the fill nor the rounding - a
+      // rounded header inside a rounded block would read as two shapes where
+      // there is one.
       decoration: row.kind == RowKind.command
           ? BoxDecoration(
               color: tone,
               borderRadius: BorderRadius.circular(W.rowRadius),
             )
           : null,
-      padding: const EdgeInsets.only(left: W.rowInset, right: 8),
+      padding: EdgeInsets.only(
+        left: W.rowInset,
+        right: 8,
+        top: isHeader ? W.headerTopPad : 0,
+      ),
       child: Opacity(
         opacity: dragging ? 0.35 : 1,
         child: Align(
-          alignment: Alignment.centerLeft,
+          alignment: isHeader ? Alignment.topLeft : Alignment.centerLeft,
           // Wrap, so a long condition runs onto a second line instead of
           // overflowing a narrow screen. Rows are height-flexible, so growing
           // is free.

@@ -143,8 +143,12 @@ class ProgramDocument {
 
   List<Node> root = <Node>[];
 
-  /// Where the next tray insertion lands. Defaults to the end of the program.
-  Slot caret = const Slot(null, 0, 0);
+  /// The open gap - the one spacer currently expanded - or null when none is.
+  ///
+  /// Nullable on purpose: "no gap is open" is a real, common state, reached by
+  /// tapping anywhere that is not a spacer. With nothing open, an insertion goes
+  /// to the end of the program, which is the only place a player can mean.
+  Slot? caret;
 
   final List<_Snapshot> _undo = [];
   final List<_Snapshot> _redo = [];
@@ -291,21 +295,27 @@ class ProgramDocument {
       commandId: commandId,
       palletArg: spec.argKind == ArgKind.pallet ? lastUsedPallet : 1,
     );
-    final list = _listFor(caret.parentId);
-    final index = caret.index.clamp(0, list.length);
+
+    // No open gap means the end of the program.
+    final at = caret ?? Slot(null, root.length, 0);
+    final list = _listFor(at.parentId);
+    final index = at.index.clamp(0, list.length);
     list.insert(index, node);
 
-    // Caret advances past the insertion. For a block, it drops inside the new
-    // body - which is where the player is going next in every real program.
+    // The gap moves past what was just placed. For a block it moves *inside* the
+    // new body, which is where the next instruction goes in every real program.
     caret = node.isBlock
-        ? Slot(node.id, 0, caret.depth + 1)
-        : Slot(caret.parentId, index + 1, caret.depth);
+        ? Slot(node.id, 0, at.depth + 1)
+        : Slot(at.parentId, index + 1, at.depth);
   }
 
   void insertAt(String commandId, Slot slot) {
     caret = slot;
     insert(commandId);
   }
+
+  /// Closes the open gap. Tapping anything that is not a spacer does this.
+  void closeGap() => caret = null;
 
   /// Deletes [id]. When it is a block, [keepContents] splices its body into the
   /// block's place instead of deleting it with the block.
@@ -318,8 +328,7 @@ class ProgramDocument {
     if (keepContents && node.isBlock) {
       at.list.insertAll(at.index, node.children!);
     }
-    caret = const Slot(null, 0, 0);
-    _normaliseCaret();
+    caret = null;
   }
 
   void duplicate(String id) {
@@ -427,10 +436,11 @@ class ProgramDocument {
 
   void setCaret(Slot slot) => caret = slot;
 
-  /// Caret target may have been removed by an edit; fall back to the end.
+  /// A gap whose container was deleted is not a gap any more.
   void _normaliseCaret() {
-    if (caret.parentId != null && nodeById(caret.parentId!) == null) {
-      caret = Slot(null, root.length, 0);
+    final at = caret;
+    if (at?.parentId != null && nodeById(at!.parentId!) == null) {
+      caret = null;
     }
   }
 
@@ -469,7 +479,7 @@ class ProgramDocument {
   void clear() {
     _push();
     root = <Node>[];
-    caret = const Slot(null, 0, 0);
+    caret = null;
   }
 
   /// Level 4's reference solution, for checking the editor against a program
@@ -489,12 +499,14 @@ class ProgramDocument {
         ],
       ),
     ];
-    caret = Slot(ifNode.id, 1, 2);
+    // Starts closed: a level should load as a program, not as a program with
+    // something already half-open in it.
+    caret = null;
   }
 }
 
 class _Snapshot {
   _Snapshot(this.root, this.caret);
   final List<Node> root;
-  final Slot caret;
+  final Slot? caret;
 }

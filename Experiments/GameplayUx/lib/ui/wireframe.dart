@@ -73,6 +73,11 @@ abstract final class W {
   /// Left inset for every row and slot, replacing the old line-number gutter.
   static const rowInset = 12.0;
 
+  /// A block header's only vertical padding, above the title. There is none
+  /// below it: the spacer between the title and the first child does that job,
+  /// and unlike padding it answers a tap.
+  static const headerTopPad = 12.0;
+
   /// Corner radii. Rows and tray buttons share one so a command looks the same
   /// wherever it is; a block is a touch rounder because it is the bigger shape.
   static const rowRadius = 8.0;

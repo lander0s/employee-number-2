@@ -52,6 +52,15 @@ Finder labelled(String label) => find.byWidgetPredicate(
   (w) => w is Semantics && w.properties.label == label,
 );
 
+/// Every spacer between siblings. They are the only way to insert, so tests
+/// address them directly.
+Finder spacers() => find.byType(DragTarget<String>);
+
+Future<void> openSpacer(WidgetTester tester, int index) async {
+  await tester.tap(spacers().at(index));
+  await tester.pumpAndSettle();
+}
+
 /// Brings a row into view, building it if the ListView has not yet.
 ///
 /// ensureVisible is not enough: at larger text scales a later row is outside the
@@ -125,65 +134,29 @@ void main() {
     });
   }
 
-  // The reported bug: the caret row was a fixed 20px, so its label clipped
-  // vertically. These two tests are the regression guard for it.
+  // The reported bug that started this: a fixed-height insertion row clipped its
+  // own label. The gap is content-sized now, but the guard is still worth having.
   for (final scale in scales) {
-    testWidgets('the caret label fits inside the caret row at x$scale', (
-      tester,
-    ) async {
+    testWidgets('an open gap never clips its label at x$scale', (tester) async {
       tester.view.physicalSize = const Size(393, 852);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(harness(textScale: scale));
       await tester.pumpAndSettle();
+      await openSpacer(tester, 0);
 
       final label = find.text('INSERT HERE');
-      await reveal(tester, label);
-
       final labelRect = tester.getRect(label);
-      final slotRect = tester.getRect(rowContainerFor(label));
+      final gap = tester.getRect(rowContainerFor(label));
 
       expect(labelRect.height, greaterThan(0));
-      expect(slotRect.height, greaterThanOrEqualTo(labelRect.height));
-      expect(slotRect.top, lessThanOrEqualTo(labelRect.top));
-      expect(slotRect.bottom, greaterThanOrEqualTo(labelRect.bottom));
+      expect(gap.height, greaterThanOrEqualTo(labelRect.height));
+      expect(gap.top, lessThanOrEqualTo(labelRect.top));
+      expect(gap.bottom, greaterThanOrEqualTo(labelRect.bottom));
       expect(tester.takeException(), isNull);
     });
   }
-
-  testWidgets('the caret row height is driven by its text, not a constant', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(393, 852);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    Future<double> caretHeight(double scale) async {
-      await tester.pumpWidget(harness(textScale: scale));
-      await tester.pumpAndSettle();
-      final label = find.text('INSERT HERE');
-      await reveal(tester, label);
-      return tester.getRect(rowContainerFor(label)).height;
-    }
-
-    // The caret shares the instruction row's 60px minimum and its card margin,
-    // so scales inside that are absorbed by it - the same as any row. Past the
-    // minimum it must still grow, which is what the old fixed 20px could not do
-    // and why the label clipped.
-    const carded = W.rowHeight + 4;
-    expect(await caretHeight(1.0), carded);
-    expect(await caretHeight(2.0), carded);
-    expect(tester.takeException(), isNull);
-
-    // x3 is past the 200% we support, where the IF row's argument controls stop
-    // fitting a 393-wide screen (a known limit, see the README). Only the
-    // caret's height is under test here, so that unrelated overflow is
-    // discarded rather than asserted away.
-    final pastTheMinimum = await caretHeight(3.0);
-    tester.takeException();
-    expect(pastTheMinimum, greaterThan(carded));
-  });
 
   group('divider', () {
     Finder divider() => labelled('Resize panes');
@@ -350,96 +323,99 @@ void main() {
     });
   });
 
-  group('caret', () {
-    double caretOpacity(WidgetTester tester) => tester
-        .widget<Opacity>(
-          find
-              .ancestor(
-                of: find.text('INSERT HERE'),
-                matching: find.byType(Opacity),
-              )
-              .first,
-        )
-        .opacity;
-
-    testWidgets('is a full instruction row tall', (tester) async {
+  group('spacers', () {
+    Future<void> boot(WidgetTester tester) async {
       tester.view.physicalSize = const Size(393, 852);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
-
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
+    }
 
-      final caret = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
+    Future<void> tapTray(WidgetTester tester, String label) async {
+      await tester.tap(
+        find.descendant(
+          of: find.byType(CommandTray),
+          matching: find.text(label),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the program starts with every gap closed', (tester) async {
+      await boot(tester);
+
+      // Nothing is half-open when a level loads: the program reads as a program.
+      expect(find.text('INSERT HERE'), findsNothing);
+      expect(spacers(), findsWidgets);
+    });
+
+    testWidgets('a closed spacer is as thick as the container left arm', (
+      tester,
+    ) async {
+      await boot(tester);
+
+      // One structural unit for the whole program: the bracket arms and the gaps
+      // between siblings are the same weight.
+      for (final e in spacers().evaluate()) {
+        expect(
+          tester.getRect(find.byWidget(e.widget)).height,
+          closeTo(W.indentPerDepth, 0.5),
+        );
+      }
+    });
+
+    testWidgets('tapping a spacer opens it, and only it', (tester) async {
+      await boot(tester);
+      await openSpacer(tester, 0);
+      expect(find.text('INSERT HERE'), findsOneWidget);
+
+      // Opening a second closes the first: at most one gap is ever open.
+      await openSpacer(tester, 2);
+      expect(find.text('INSERT HERE'), findsOneWidget);
+    });
+
+    testWidgets('an open gap is the size of the row about to land in it', (
+      tester,
+    ) async {
+      await boot(tester);
+      await openSpacer(tester, 0);
+
+      final gap = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
       final row = tester.getRect(rowContainerFor(inProgram('TAKE')));
 
-      expect(caret.height, row.height);
+      expect(gap.height, closeTo(row.height, 1));
     });
 
-    testWidgets('uses the instruction row font size', (tester) async {
-      tester.view.physicalSize = const Size(393, 852);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
+    testWidgets('an insertion lands in the open gap', (tester) async {
+      await boot(tester);
 
-      await tester.pumpWidget(harness(textScale: 1.0));
-      await tester.pumpAndSettle();
+      // The first spacer sits above REPEAT, at the root.
+      await openSpacer(tester, 0);
+      await tapTray(tester, 'SHIP');
 
-      final caretText = tester.widget<Text>(find.text('INSERT HERE'));
-      final rowText = tester.widget<Text>(inProgram('TAKE'));
-
-      expect(caretText.style?.fontSize, rowText.style?.fontSize);
-      expect(caretText.style?.fontWeight, rowText.style?.fontWeight);
+      final ship = tester.getRect(rowContainerFor(inProgram('SHIP').first));
+      final repeat = tester.getRect(rowContainerFor(inProgram('REPEAT')));
+      expect(
+        ship.top,
+        lessThan(repeat.top),
+        reason: 'it should have landed in the gap that was open',
+      );
     });
 
-    testWidgets('blinks', (tester) async {
-      tester.view.physicalSize = const Size(393, 852);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
+    testWidgets('with no gap open an insertion goes to the end', (
+      tester,
+    ) async {
+      await boot(tester);
+      expect(find.text('INSERT HERE'), findsNothing);
 
-      // No pumpAndSettle in this test: the blink timer never settles.
-      await tester.pumpWidget(harness(textScale: 1.0, animate: true));
-      await tester.pump();
+      await tapTray(tester, 'SHIP');
 
-      expect(caretOpacity(tester), 1);
-
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(caretOpacity(tester), 0);
-
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(caretOpacity(tester), 1);
-    });
-
-    testWidgets('does not blink under reduced motion', (tester) async {
-      tester.view.physicalSize = const Size(393, 852);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(harness(textScale: 1.0));
-      await tester.pumpAndSettle();
-
-      expect(caretOpacity(tester), 1);
-      // Would have toggled twice by now if the timer were running.
-      await tester.pump(const Duration(seconds: 1));
-      expect(caretOpacity(tester), 1);
-    });
-
-    testWidgets('blinking does not change the row height', (tester) async {
-      tester.view.physicalSize = const Size(393, 852);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(harness(textScale: 1.0, animate: true));
-      await tester.pump();
-
-      final lit = tester
-          .getRect(rowContainerFor(find.text('INSERT HERE')))
-          .height;
-      await tester.pump(const Duration(milliseconds: 500));
-      final dark = tester
-          .getRect(rowContainerFor(find.text('INSERT HERE')))
-          .height;
-
-      expect(dark, lit);
+      // The end of the program is the only place a player can mean when nothing
+      // is open.
+      final ship = tester.getRect(rowContainerFor(inProgram('SHIP').last));
+      final repeat = tester.getRect(rowContainerFor(inProgram('REPEAT')));
+      expect(ship.top, greaterThan(repeat.top));
     });
   });
 
@@ -828,6 +804,7 @@ void main() {
       tester,
     ) async {
       await boot(tester);
+      await openSpacer(tester, 0);
       expect(find.byType(CommandTray), findsOneWidget);
       expect(find.text('INSERT HERE'), findsOneWidget);
 
@@ -887,7 +864,7 @@ void main() {
   });
 
   group('row spacing', () {
-    testWidgets('consecutive rows sit flush, with no gap between them', (
+    testWidgets('siblings are separated by a spacer and nothing else', (
       tester,
     ) async {
       tester.view.physicalSize = const Size(393, 852);
@@ -897,24 +874,14 @@ void main() {
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
 
-      final repeat = tester.getRect(rowContainerFor(inProgram('REPEAT')));
       final take = tester.getRect(rowContainerFor(inProgram('TAKE')));
       final ifRow = tester.getRect(rowContainerFor(inProgram('IF')));
 
-      // A block's header sits directly on the body it opens.
-      expect(take.top, repeat.bottom);
+      // Exactly one spacer between two siblings - no card margin on top of it,
+      // which would be a second spacing system that means nothing.
+      expect(ifRow.top - take.bottom, closeTo(W.indentPerDepth, 0.5));
 
-      // The body is inset from the header. That inset is the container's left
-      // arm - the thing that replaced the connector lines.
-      expect(take.left, greaterThan(repeat.left));
-
-      // A nested block is set off from its siblings by its own margin, and only
-      // by that: enough to read as a container, not enough to look like a gap.
-      expect(ifRow.top - take.bottom, greaterThan(0));
-      expect(ifRow.top - take.bottom, lessThanOrEqualTo(4));
-
-      // A block header sits at its parent's indent - it is TAKE's sibling, not
-      // its child. Only the body it opens steps in again.
+      // A block header sits at its parent indent; only the body steps in.
       expect(ifRow.left, take.left);
       final ship = tester.getRect(rowContainerFor(inProgram('SHIP')));
       expect(ship.left, greaterThan(ifRow.left));
@@ -928,13 +895,13 @@ void main() {
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
 
-      double tallestSlot() => find
-          .byType(DragTarget<String>)
+      double tallestSpacer() => spacers()
           .evaluate()
           .map((e) => tester.getRect(find.byWidget(e.widget)).height)
           .fold<double>(0, (a, b) => a > b ? a : b);
 
-      // Collapsing the idle slots must not cost the drag its landing places.
+      final closed = tallestSpacer();
+
       final gesture = await tester.startGesture(
         tester.getCenter(inProgram('TAKE')),
       );
@@ -942,7 +909,9 @@ void main() {
       await gesture.moveBy(const Offset(0, 30));
       await tester.pump();
 
-      expect(tallestSlot(), greaterThan(0));
+      // A spacer and a drop target are the same object now, so a drag lands on
+      // the affordance the player can already see.
+      expect(tallestSpacer(), greaterThan(closed));
 
       await gesture.up();
       await tester.pumpAndSettle();
@@ -1104,13 +1073,15 @@ void main() {
     });
   });
 
-  group('tapping empty parts of a row', () {
+  group('tapping outside a spacer', () {
     Future<void> boot(WidgetTester tester) async {
       tester.view.physicalSize = const Size(393, 852);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
+      await openSpacer(tester, 0);
+      expect(find.text('INSERT HERE'), findsOneWidget);
     }
 
     /// Well to the right of any text, but still inside the visible pane.
@@ -1121,69 +1092,121 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('the bottom edge of a block places the caret after it', (
+    testWidgets('a plain row closes the open gap', (tester) async {
+      await boot(tester);
+      await tapEmptyPartOf(tester, inProgram('TAKE'));
+      expect(find.text('INSERT HERE'), findsNothing);
+    });
+
+    testWidgets('a block header closes the open gap', (tester) async {
+      await boot(tester);
+      await tapEmptyPartOf(tester, inProgram('REPEAT'));
+      expect(find.text('INSERT HERE'), findsNothing);
+    });
+
+    testWidgets('the bottom arm of a block opens a gap inside it', (
       tester,
     ) async {
       await boot(tester);
 
-      // The REPEAT block's foot: a bar as thick as the left arm, with no text
-      // in it at all. This is where you go to add an instruction after the
-      // block, so the whole strip has to answer a tap.
-      Rect blockRect() => tester.getRect(
+      // There is no foot bar any more: the body's trailing spacer is the bottom
+      // arm, so the bottom edge of a block inserts at the end of that block
+      // rather than doing nothing useful.
+      final block = tester.getRect(
         find
             .ancestor(of: inProgram('REPEAT'), matching: find.byType(Container))
             .at(1),
       );
-
       final pane = tester.getRect(find.byType(ProgramPane));
-      final foot = blockRect().bottom - W.indentPerDepth / 2;
-      await tester.tapAt(Offset(pane.right - 30, foot));
+      await tester.tapAt(
+        Offset(pane.right - 30, block.bottom - W.indentPerDepth / 2),
+      );
       await tester.pumpAndSettle();
 
-      // Measured after the tap: moving the caret collapses the zero-height slot
-      // it came from, so everything below it shifts up.
-      final block = blockRect();
-      final caret = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
+      final gap = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
+      final ifRow = tester.getRect(rowContainerFor(inProgram('IF')));
 
+      expect(find.text('INSERT HERE'), findsOneWidget);
       expect(
-        caret.top,
-        greaterThanOrEqualTo(block.bottom),
-        reason: 'the caret should have moved below the block',
+        gap.top,
+        greaterThan(ifRow.top),
+        reason: 'it should open at the end of the block, after the IF',
       );
-      // And out to the root, not left inside the block body.
-      expect(caret.left, lessThan(block.left + W.indentPerDepth));
-    });
-
-    testWidgets('the empty part of a block header places the caret inside', (
-      tester,
-    ) async {
-      await boot(tester);
-
-      await tapEmptyPartOf(tester, inProgram('REPEAT'));
-
-      final header = tester.getRect(rowContainerFor(inProgram('REPEAT')));
-      final caret = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
-
-      expect(caret.top, greaterThanOrEqualTo(header.bottom));
-      expect(
-        caret.left,
-        greaterThan(header.left),
-        reason: 'tapping a header puts the caret in the body it opens',
-      );
-    });
-
-    testWidgets('the empty part of a plain row still places the caret', (
-      tester,
-    ) async {
-      await boot(tester);
-
-      await tapEmptyPartOf(tester, inProgram('TAKE'));
-
-      final take = tester.getRect(rowContainerFor(inProgram('TAKE')));
-      final caret = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
-
-      expect(caret.top, greaterThanOrEqualTo(take.bottom));
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('the empty space below the program', () {
+    Future<void> boot(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('opens the gap at the end of the program', (tester) async {
+      await boot(tester);
+
+      // The trailing spacer is 18 tall and invisible against the pane, so
+      // reaching the end of the program used to mean hitting an edge.
+      final pane = tester.getRect(find.byType(ProgramPane));
+      await tester.tapAt(Offset(pane.center.dx, pane.bottom - 40));
+      await tester.pumpAndSettle();
+
+      expect(find.text('INSERT HERE'), findsOneWidget);
+
+      final gap = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
+      final repeat = tester.getRect(rowContainerFor(inProgram('REPEAT')));
+      expect(gap.top, greaterThan(repeat.bottom));
+
+      // At the root, not tucked inside the block.
+      expect(gap.left, lessThan(repeat.left + W.indentPerDepth));
+    });
+
+    testWidgets('an insertion then lands at the end', (tester) async {
+      await boot(tester);
+
+      final pane = tester.getRect(find.byType(ProgramPane));
+      await tester.tapAt(Offset(pane.center.dx, pane.bottom - 40));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(CommandTray),
+          matching: find.text('SHIP'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final ship = tester.getRect(rowContainerFor(inProgram('SHIP').last));
+      final repeat = tester.getRect(rowContainerFor(inProgram('REPEAT')));
+      expect(ship.top, greaterThan(repeat.bottom));
+    });
+
+    testWidgets('a block arm opens that block, not the end of the program', (
+      tester,
+    ) async {
+      await boot(tester);
+
+      // The left arm belongs to its own block. Falling through to the pane here
+      // would jump the insertion point to the end of the whole program, which is
+      // nowhere near where the finger landed.
+      final ship = tester.getRect(rowContainerFor(inProgram('SHIP')));
+      await tester.tapAt(
+        Offset(ship.left - W.indentPerDepth / 2, ship.center.dy),
+      );
+      await tester.pumpAndSettle();
+
+      final gap = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
+      final ifRow = tester.getRect(rowContainerFor(inProgram('IF')));
+
+      expect(gap.top, greaterThan(ifRow.top));
+      expect(
+        gap.left,
+        greaterThan(ifRow.left),
+        reason: 'the gap should be inside the IF, at its indent',
+      );
     });
   });
 }

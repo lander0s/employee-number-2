@@ -1,5 +1,15 @@
-/// The program pane: nested block containers, caret, and block-aware drag
+/// The program pane: nested block containers, spacers, and block-aware drag
 /// reorder.
+///
+/// Insertion works through **spacers**, not a caret. Every legal insertion point
+/// is a visible gap between siblings, as thick as the container's left arm. Tap
+/// one and it expands into the shape of the row about to land there; tap
+/// anything else and it closes. There is no invisible position to remember and no
+/// rule about where a command "goes" - the answer is already on screen.
+///
+/// That also means a row is just a row again. Tapping one used to move the
+/// insertion point somewhere else, which is exactly the indirection this
+/// replaces.
 ///
 /// A block is drawn as a literal container with its body inset, so it reads as a
 /// "C" wrapped around the instructions it owns. There are no connector lines: the
@@ -103,32 +113,40 @@ class ProgramPaneState extends State<ProgramPane> {
   Widget build(BuildContext context) {
     final empty = doc.root.isEmpty && _draggingId == null;
 
-    return Container(
-      key: _paneKey,
-      color: W.paneProgram,
-      child: empty
-          ? _EmptyState(
-              slot: const Slot(null, 0, 0),
-              onTapSlot: (slot) => _mutate(() => doc.setCaret(slot)),
-            )
-          : LayoutBuilder(
-              builder: (context, constraints) => SingleChildScrollView(
-                controller: _scroll,
-                padding: const EdgeInsets.only(bottom: 40),
-                // Laid out wider than the pane and clipped, so no block ever
-                // shows its right edge. The inner scroll view exists only to
-                // give the extra width a legitimate home - it never scrolls, and
-                // without it Flutter would report the overflow as an error.
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const NeverScrollableScrollPhysics(),
-                  child: SizedBox(
-                    width: constraints.maxWidth + W.programOverhang,
-                    child: _buildList(doc.root, null, 0),
+    return GestureDetector(
+      // Everything below the program belongs to the end of the program. The
+      // trailing spacer is 18 tall and invisible against the pane, so reaching
+      // it was a game of hitting an edge; this makes the whole empty area the
+      // same target. Rows and spacers are opaque, so they still win their own
+      // taps - this only catches what nothing else claimed.
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _mutate(() => doc.setCaret(Slot(null, doc.root.length, 0))),
+      child: Container(
+        key: _paneKey,
+        color: W.paneProgram,
+        child: empty
+            ? _EmptyState(
+                slot: const Slot(null, 0, 0),
+                onTapSlot: (slot) => _mutate(() => doc.setCaret(slot)),
+              )
+            : LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  controller: _scroll,
+                  // Laid out wider than the pane and clipped, so no block ever
+                  // shows its right edge. The inner scroll view exists only to
+                  // give the extra width a legitimate home - it never scrolls, and
+                  // without it Flutter would report the overflow as an error.
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const NeverScrollableScrollPhysics(),
+                    child: SizedBox(
+                      width: constraints.maxWidth + W.programOverhang,
+                      child: _buildList(doc.root, null, 0),
+                    ),
                   ),
                 ),
               ),
-            ),
+      ),
     );
   }
 
@@ -176,48 +194,46 @@ class ProgramPaneState extends State<ProgramPane> {
     final fill = W.blockFill(node.spec.colour, depth);
     final body = _buildList(node.children!, node.id, depth + 1, on: fill);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 3),
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(W.blockRadius),
+    return GestureDetector(
+      // The left arm and the corners are part of *this* block, so a tap there
+      // opens this block's trailing gap rather than falling through to the pane
+      // and jumping to the end of the whole program.
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _mutate(
+        () => doc.setCaret(Slot(node.id, node.children!.length, depth + 1)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Only the header is draggable, as before: a draggable wrapping the
-          // whole container would fight its own children for the gesture.
-          _draggable(
-            node,
-            _buildRow(
-              DisplayRow(node: node, kind: RowKind.blockHeader, depth: depth),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: W.indentPerDepth, right: 4),
-            child: node.children!.isEmpty
-                // An empty body still has to show the inset, or the container
-                // stops reading as a container.
-                ? ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 18),
-                    child: body,
-                  )
-                : body,
-          ),
-          _BlockFoot(
-            onTap: () => _mutate(
-              () => doc.setCaret(
-                _caretForRow(
-                  DisplayRow(
-                    node: node,
-                    kind: RowKind.blockCloser,
-                    depth: depth,
-                  ),
-                ),
+      child: Container(
+        // No margin. The spacers on either side are the separation, and a margin
+        // on top of them would be a second spacing system that means nothing.
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(W.blockRadius),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Only the header is draggable, as before: a draggable wrapping the
+            // whole container would fight its own children for the gesture.
+            _draggable(
+              node,
+              _buildRow(
+                DisplayRow(node: node, kind: RowKind.blockHeader, depth: depth),
               ),
             ),
-          ),
-        ],
+            // The body's trailing spacer *is* the bottom arm of the "C": it is
+            // already the same thickness as the left arm, and the left arm runs
+            // down past it, so together they close the bracket. There used to be a
+            // separate foot bar here, which meant 36 of bottom edge where 18 was
+            // wanted - and half of it was dead space that only closed the gap.
+            //
+            // An empty body needs no special minimum either: one spacer is the
+            // body, and it is exactly the right height already.
+            Padding(
+              padding: const EdgeInsets.only(left: W.indentPerDepth, right: 4),
+              child: body,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -244,7 +260,7 @@ class ProgramPaneState extends State<ProgramPane> {
     row: row,
     interactive: !widget.running,
     dragging: _draggingId == row.node.id,
-    onTap: () => _mutate(() => doc.setCaret(_caretForRow(row))),
+    onTap: () => _mutate(doc.closeGap),
     onDelete: () => _confirmDelete(row),
     onDuplicate: () => _mutate(() => doc.duplicate(row.node.id)),
     onCycleArg: (slot) => _mutate(() => doc.cycleArg(row.node.id, slot)),
@@ -270,26 +286,6 @@ class ProgramPaneState extends State<ProgramPane> {
       childWhenDragging: rowWidget,
       child: rowWidget,
     );
-  }
-
-  /// Tapping a row parks the caret "below" it - which for a block header means
-  /// the first slot inside the block, since that is where a program continues.
-  Slot _caretForRow(DisplayRow row) {
-    final node = row.node;
-    if (row.kind == RowKind.blockHeader) {
-      return Slot(node.id, 0, row.depth + 1);
-    }
-    final located = doc.flattenWithSlots();
-    // The slot immediately following this row in render order is the one that
-    // means "after this row, in this row's parent".
-    final index = located.indexWhere(
-      (e) => e is DisplayRow && e.node.id == node.id && e.kind == row.kind,
-    );
-    for (var i = index + 1; i < located.length; i++) {
-      final candidate = located[i];
-      if (candidate is Slot) return candidate;
-    }
-    return Slot(null, doc.root.length, 0);
   }
 
   Future<void> _confirmDelete(DisplayRow row) async {
@@ -372,7 +368,9 @@ class _SlotWidget extends StatefulWidget {
   /// The enclosing block's colour, or null at the root.
   final Color? on;
 
-  final Slot caret;
+  /// The open gap, or null when none is.
+  final Slot? caret;
+
   final bool dragActive;
   final bool Function(String) accepts;
   final VoidCallback onTap;
@@ -387,7 +385,7 @@ class _SlotWidgetState extends State<_SlotWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final isCaret = widget.slot == widget.caret;
+    final isOpen = widget.slot == widget.caret;
 
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) {
@@ -407,53 +405,40 @@ class _SlotWidgetState extends State<_SlotWidget> {
         // pane it is drawn in the pale theme colours.
         final onColour = widget.on != null;
         final markColour = onColour ? W.ink : W.caret;
-        final ruleColour = onColour ? W.inkDim : W.lineSoft;
         final dropColour = onColour ? W.ink : W.dropTarget;
 
-        // The caret's height comes from its own text, not a constant, so it
-        // cannot clip when the OS text scale is above 1.0. Everything else here
-        // is a bare rule with no text in it, so a fixed height is safe.
+        // A spacer is always there and always the same thickness as the
+        // container's left arm, so the program has one structural unit and every
+        // gap in it means the same thing: something can go here.
+        //
+        // Open, it takes the shape of the row about to land in it. It is not a
+        // caret: there is nothing to remember and nothing blinking, just a gap
+        // that is currently wide.
         final Widget child;
         final double? fixedHeight;
         if (active) {
           child = Container(height: 4, color: dropColour);
-          fixedHeight = 34;
-        } else if (widget.dragActive) {
-          child = Container(height: 1, color: ruleColour);
-          fixedHeight = 16;
-        } else if (isCaret) {
-          child = _Caret(colour: markColour);
+          fixedHeight = null;
+        } else if (isOpen) {
+          child = _OpenGap(colour: markColour);
           fixedHeight = null;
         } else {
-          // Zero, so rows sit flush against each other and the list reads as one
-          // block of text. The slot only needs height when it has something to
-          // show - the caret, or a drop target during a drag. It used to keep 6px
-          // to stay tappable, but tapping a *row* already places the caret, so
-          // the height bought nothing.
           child = const SizedBox.shrink();
-          fixedHeight = 0;
+          fixedHeight = W.indentPerDepth;
         }
 
         return GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: widget.onTap,
           child: Container(
             height: fixedHeight,
-            // The caret occupies a full instruction row: it is where the next
-            // instruction will land, so it should be the size of one. Still a
-            // minimum rather than a fixed height, so it grows with text scale.
-            constraints: isCaret
+            // Open, it is the size of an instruction row - still a minimum, so
+            // it grows with text scale like one.
+            constraints: fixedHeight == null
                 ? const BoxConstraints(minHeight: W.rowHeight)
                 : null,
-            // The caret stands in for the row that is about to land here, so it
-            // carries the same margin a command row does.
-            margin: isCaret ? const EdgeInsets.symmetric(vertical: 2) : null,
-            padding: EdgeInsets.only(
-              left: W.rowInset,
-              right: 10,
-              top: isCaret ? 8 : 0,
-              bottom: isCaret ? 8 : 0,
-            ),
-            child: Align(alignment: Alignment.centerLeft, child: child),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: child,
           ),
         );
       },
@@ -461,79 +446,88 @@ class _SlotWidgetState extends State<_SlotWidget> {
   }
 }
 
-/// The insertion caret: a full-height row carrying a dash and a label, blinking
-/// like a text cursor so it reads as a cursor rather than as an instruction.
+/// An expanded spacer: the shape of the instruction about to land in it.
 ///
-/// Blinking is suppressed under `disableAnimations` - a blinking element is
-/// exactly what that setting exists for - and the timer is cancelled in that
-/// case rather than left spinning.
-class _Caret extends StatefulWidget {
-  const _Caret({required this.colour});
+/// This replaced a blinking caret. The blink was a text-cursor metaphor, and the
+/// whole point of spacers is that the insertion point is a place rather than a
+/// cursor - a gap that is currently wide needs no animation to explain itself.
+class _OpenGap extends StatelessWidget {
+  const _OpenGap({required this.colour});
 
-  /// Dark ink on a coloured block, pale on the dark pane.
   final Color colour;
 
   @override
-  State<_Caret> createState() => _CaretState();
-}
-
-class _CaretState extends State<_Caret> {
-  /// Matches Flutter's own text caret cadence.
-  static const _halfPeriod = Duration(milliseconds: 500);
-
-  Timer? _timer;
-  bool _on = true;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _timer?.cancel();
-      _timer = null;
-      _on = true;
-    } else {
-      _timer ??= Timer.periodic(_halfPeriod, (_) {
-        if (mounted) setState(() => _on = !_on);
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // Opacity rather than removing the child: the row must not change height
-    // between blinks.
-    return Opacity(
-      opacity: _on ? 1 : 0,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(width: 26, height: 3, color: widget.colour),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              'INSERT HERE',
-              // Same size and weight as an instruction row: a smaller caret read
-              // as a different kind of thing.
-              style: W.row.copyWith(color: widget.colour),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              softWrap: false,
-            ),
+    return DottedOutline(
+      colour: colour,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(left: W.rowInset - 4, right: 10),
+          child: Text(
+            'INSERT HERE',
+            style: W.row.copyWith(color: colour, fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-/// What follows the finger during a drag. Renders the whole subtree, so it is
-/// visible that a block carries its body.
+/// A dashed border in the row's own corner radius, so an open gap reads as a
+/// space waiting to be filled rather than as another card.
+class DottedOutline extends StatelessWidget {
+  const DottedOutline({super.key, required this.colour, required this.child});
+
+  final Color colour;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+    painter: _DashPainter(colour: colour),
+    child: child,
+  );
+}
+
+class _DashPainter extends CustomPainter {
+  const _DashPainter({required this.colour});
+
+  final Color colour;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = colour
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(1, 1, size.width - 2, size.height - 2),
+      const Radius.circular(W.rowRadius),
+    );
+
+    // Walk the outline, drawing every other segment.
+    const dash = 7.0;
+    const gap = 5.0;
+    for (final metric in (Path()..addRRect(rect)).computeMetrics()) {
+      var d = 0.0;
+      while (d < metric.length) {
+        final end = (d + dash).clamp(0.0, metric.length);
+        canvas.drawPath(metric.extractPath(d, end), paint);
+        d = end + gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashPainter old) => old.colour != colour;
+}
+
+/// What follows the finger during a drag: the real nested shape, so a block
+/// visibly carries its body while in the air.
 class _DragFeedback extends StatelessWidget {
   const _DragFeedback({required this.node});
 
@@ -596,33 +590,10 @@ class _DragFeedback extends StatelessWidget {
               ],
             ),
           ),
-          const _BlockFoot(),
         ],
       ),
     );
   }
-}
-
-/// The bottom arm of a block's "C".
-///
-/// It used to be a row reading `END`. The word was redundant once the block
-/// became a container - the shape already says where it stops - so the foot is
-/// now just a bar as thick as the left arm, which makes the bracket symmetrical.
-///
-/// It stays tappable, because the bottom edge of a block is exactly where you go
-/// to add an instruction *after* it. Short (18) but full width, and opaque, so
-/// the whole strip answers.
-class _BlockFoot extends StatelessWidget {
-  const _BlockFoot({this.onTap});
-
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    onTap: onTap,
-    child: const SizedBox(height: W.indentPerDepth),
-  );
 }
 
 class _EmptyState extends StatelessWidget {
@@ -640,7 +611,11 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _Caret(colour: W.caret),
+            SizedBox(
+              height: W.rowHeight,
+              width: 220,
+              child: const _OpenGap(colour: W.caret),
+            ),
             const SizedBox(height: 14),
             Text('Tap a command below to add it here.', style: W.labelDim),
           ],
