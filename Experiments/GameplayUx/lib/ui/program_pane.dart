@@ -138,25 +138,34 @@ class ProgramPaneState extends State<ProgramPane> {
               // exactly, and on an empty program there was nothing to hit at
               // all - the pane rendered a hint and no drop target whatsoever.
               //
-              // SliverFillRemaining grows it into the leftover viewport and
-              // shrinks it back to a normal spacer once the program is long
-              // enough to scroll.
+              // It is a pane tall at minimum, which is what makes a short
+              // program scrollable: without it the content ended exactly at the
+              // viewport, so the end of the program was stuck wherever it
+              // happened to fall - often right above the tray, which is the
+              // least comfortable place to be dropping things. Now any row can
+              // be pulled up to the top, and the room it opens up is still one
+              // drop target for the end of the program rather than dead space.
               if (!widget.running)
                 SliverFillRemaining(
                   hasScrollBody: false,
                   child: _overhang(
                     width,
-                    _buildSlot(
-                      Slot(null, doc.root.length, 0),
-                      null,
-                      key: const ValueKey('program-tail'),
-                      fill: true,
-                      hint: doc.root.isEmpty
-                          ? Text(
-                              'Drag a command up from below.',
-                              style: W.labelDim,
-                            )
-                          : null,
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: _buildSlot(
+                        Slot(null, doc.root.length, 0),
+                        null,
+                        key: const ValueKey('program-tail'),
+                        fill: true,
+                        hint: doc.root.isEmpty
+                            ? Text(
+                                'Drag a command up from below.',
+                                style: W.labelDim,
+                              )
+                            : null,
+                      ),
                     ),
                   ),
                 ),

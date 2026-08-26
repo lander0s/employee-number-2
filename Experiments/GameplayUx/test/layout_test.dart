@@ -1735,11 +1735,14 @@ void main() {
 
       // The reported bug: the last spacer was an 18dp strip, so appending meant
       // finding an invisible edge with a finger that is covered by the row it is
-      // carrying. The empty pane below the program is that spacer now.
+      // carrying. The empty pane below the program is that spacer now - and it
+      // runs on past the bottom of the pane, which is the slack that makes a
+      // short program scrollable.
       final pane = tester.getRect(find.byType(ProgramPane));
       final tail = tester.getRect(tailSpacer());
-      expect(tail.bottom, closeTo(pane.bottom, 1));
-      expect(tail.height, greaterThan(W.rowHeight));
+      expect(tail.top, lessThan(pane.bottom));
+      expect(tail.bottom, greaterThanOrEqualTo(pane.bottom));
+      expect(tail.height, closeTo(pane.height, 0.5));
     });
 
     testWidgets('a drop far below the last row still appends', (tester) async {
@@ -1756,6 +1759,40 @@ void main() {
         closeTo(block.left, 0.5),
         reason: 'appended at the root, not into the block it was dropped past',
       );
+    });
+
+    testWidgets('is slack a short program can be scrolled into', (
+      tester,
+    ) async {
+      await boot(tester);
+      final before = tester.getRect(rowContainerFor(inProgram('REPEAT'))).top;
+
+      // The sample program is shorter than the pane, so there was nothing to
+      // scroll at all: the end of the program sat wherever it fell.
+      await tester.drag(find.byType(ProgramPane), const Offset(0, -120));
+      await tester.pumpAndSettle();
+
+      final after = tester.getRect(rowContainerFor(inProgram('REPEAT'))).top;
+      expect(after, lessThan(before), reason: 'the program moved up');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('and the slack is still the end of the program', (
+      tester,
+    ) async {
+      await boot(tester);
+      await tester.drag(find.byType(ProgramPane), const Offset(0, -120));
+      await tester.pumpAndSettle();
+
+      // Scrolled into, it has to keep taking drops - otherwise pulling the
+      // program up to get comfortable would cost you the place to drop.
+      final pane = tester.getRect(find.byType(ProgramPane));
+      await dropAt(tester, 'SHIP', Offset(pane.center.dx, pane.bottom - 40));
+
+      final dropped = tester.getRect(rowContainerFor(inProgram('SHIP').last));
+      final block = tester.getRect(rowContainerFor(inProgram('REPEAT')));
+      expect(dropped.top, greaterThan(block.top));
+      expect(dropped.left, closeTo(block.left, 0.5));
     });
 
     testWidgets('an empty program is one big drop target', (tester) async {
