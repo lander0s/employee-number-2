@@ -465,6 +465,9 @@ class _SlotWidget extends StatefulWidget {
 class _SlotWidgetState extends State<_SlotWidget> {
   bool _hovering = false;
 
+  /// Set for the single frame after a drop lands here. See [build].
+  bool _dropped = false;
+
   @override
   Widget build(BuildContext context) {
     return DragTarget<DragPayload>(
@@ -475,6 +478,7 @@ class _SlotWidgetState extends State<_SlotWidget> {
       },
       onLeave: (_) => setState(() => _hovering = false),
       onAcceptWithDetails: (details) {
+        _dropped = true;
         setState(() => _hovering = false);
         widget.onAccept(details.data);
       },
@@ -485,6 +489,18 @@ class _SlotWidgetState extends State<_SlotWidget> {
         // On a bright block this is drawn in ink; on the dark pane, in the pale
         // theme colour.
         final markColour = widget.on != null ? W.ink : W.caret;
+
+        // Closing after a drop is instant. The row that lands takes exactly the
+        // space the open gap was holding, so animating the gap shut would push
+        // everything below it down and pull it straight back for nothing. Every
+        // other change of size is worth following.
+        //
+        // Instant means *no* AnimatedSize rather than a zero duration: given
+        // one, AnimatedSize finishes inside its own layout pass and asserts.
+        final animate = !_dropped && !MediaQuery.disableAnimationsOf(context);
+        if (_dropped) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _dropped = false);
+        }
 
         if (widget.fill) {
           return Container(
@@ -513,32 +529,44 @@ class _SlotWidgetState extends State<_SlotWidget> {
         // is a preview of where the thing in your hand will land, and previewing
         // it without its margins meant everything shifted the moment it landed.
         // An empty body is the same shape held permanently.
-        if (open || widget.wide) {
-          return Container(
-            // A minimum, not a height: the outline grows with text scale like
-            // the row it is standing in for.
-            constraints: const BoxConstraints(minHeight: W.openSlotHeight),
-            padding: const EdgeInsets.fromLTRB(
-              4,
-              W.indentPerDepth + 2,
-              4,
-              W.indentPerDepth + 2,
-            ),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: widget.ghost,
-                borderRadius: BorderRadius.circular(W.rowRadius),
-              ),
-              child: open
-                  ? _OpenGap(colour: markColour)
-                  : const SizedBox.shrink(),
-            ),
-          );
-        }
+        //
+        // One expression for both states, so the box is the same element either
+        // way and AnimatedSize sees a size change rather than a new child.
+        final box = open || widget.wide
+            ? Container(
+                // A minimum, not a height: the outline grows with text scale like
+                // the row it is standing in for.
+                constraints: const BoxConstraints(minHeight: W.openSlotHeight),
+                padding: const EdgeInsets.fromLTRB(
+                  4,
+                  W.indentPerDepth + 2,
+                  4,
+                  W.indentPerDepth + 2,
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: widget.ghost,
+                    borderRadius: BorderRadius.circular(W.rowRadius),
+                  ),
+                  child: open
+                      ? _OpenGap(colour: markColour)
+                      : const SizedBox.shrink(),
+                ),
+              )
+            : Container(
+                height: W.indentPerDepth,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              );
 
-        return Container(
-          height: W.indentPerDepth,
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        if (!animate) return box;
+
+        return AnimatedSize(
+          duration: W.slotGrow,
+          curve: Curves.linear,
+          // Top-anchored: the gap opens downwards, so the row above it holds
+          // still while it grows.
+          alignment: Alignment.topCenter,
+          child: box,
         );
       },
     );

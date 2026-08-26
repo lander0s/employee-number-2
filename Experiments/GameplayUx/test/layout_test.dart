@@ -534,6 +534,78 @@ void main() {
       await tester.pumpAndSettle();
     });
 
+    testWidgets('a gap grows into place rather than snapping open', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(textScale: 1.0, animate: true));
+      await tester.pumpAndSettle();
+
+      double gapHeight() =>
+          tester.getRect(find.byWidget(innerSpacers()[0].widget)).height;
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(trayCommand('TAKE')),
+      );
+      await tester.pump(const Duration(milliseconds: 40));
+      await gesture.moveBy(const Offset(0, -30));
+      await tester.pump();
+      await gesture.moveTo(tester.getCenter(spacers().at(0)));
+      await tester.pump();
+
+      // Caught in the middle of opening: neither closed nor open.
+      await tester.pump(W.slotGrow ~/ 2);
+      final mid = gapHeight();
+      expect(mid, greaterThan(W.indentPerDepth + 1));
+      expect(mid, lessThan(W.openSlotHeight - 1));
+
+      await tester.pumpAndSettle();
+      expect(gapHeight(), closeTo(W.openSlotHeight, 0.5));
+
+      // And on the way out again.
+      await gesture.moveTo(tester.getCenter(inProgram('SHIP')));
+      await tester.pump();
+      await tester.pump(W.slotGrow ~/ 2);
+      final closing = gapHeight();
+      expect(closing, lessThan(W.openSlotHeight - 1));
+      expect(closing, greaterThan(W.indentPerDepth + 1));
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(gapHeight(), closeTo(W.indentPerDepth, 0.5));
+    });
+
+    testWidgets('but a landing row does not make it animate shut', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(textScale: 1.0, animate: true));
+      await tester.pumpAndSettle();
+
+      final gesture = await holdOverSpacer(tester, 'SHIP', 1);
+      await tester.pumpAndSettle();
+
+      // Measured with the gap fully open: that is the layout the drop inherits.
+      final ifTop = tester.getRect(rowContainerFor(inProgram('IF'))).top;
+
+      await gesture.up();
+      await tester.pump();
+
+      // The dropped row takes the space the gap was holding, so animating the
+      // gap shut would shove everything below it down for two frames and pull it
+      // back. One frame after the drop, nothing below has moved.
+      expect(
+        tester.getRect(rowContainerFor(inProgram('IF'))).top,
+        closeTo(ifTop, 1),
+      );
+
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('everything closes again once the drag ends', (tester) async {
       await boot(tester);
       await dragIntoSpacer(tester, 'SHIP', 0);

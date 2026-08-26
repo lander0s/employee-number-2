@@ -85,6 +85,10 @@ abstract final class W {
   /// reads as one invisible instruction rather than as spacing between siblings
   /// that are not there.
   static const openSlotHeight = rowHeight + indentPerDepth * 2;
+
+  /// How long a spacer takes to open under a held command, and to close again
+  /// when it leaves. Linear: the gap is following the finger, not performing.
+  static const slotGrow = Duration(milliseconds: 120);
   static const minTarget = 48.0;
 
   /// Left inset for every row and slot, replacing the old line-number gutter.
