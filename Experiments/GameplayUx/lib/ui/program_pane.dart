@@ -310,8 +310,13 @@ class _SlotWidgetState extends State<_SlotWidget> {
           child = const _Caret();
           fixedHeight = null;
         } else {
+          // Zero, so rows sit flush against each other and the list reads as one
+          // block of text. The slot only needs height when it has something to
+          // show - the caret, or a drop target during a drag. It used to keep 6px
+          // to stay tappable, but tapping a *row* already places the caret, so
+          // the height bought nothing.
           child = const SizedBox.shrink();
-          fixedHeight = 6;
+          fixedHeight = 0;
         }
 
         return GestureDetector(

@@ -881,4 +881,54 @@ void main() {
       expect(running, greaterThan(editing));
     });
   });
+
+  group('row spacing', () {
+    testWidgets('consecutive rows sit flush, with no gap between them', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+
+      final repeat = tester.getRect(rowContainerFor(inProgram('REPEAT')));
+      final take = tester.getRect(rowContainerFor(inProgram('TAKE')));
+      final ifRow = tester.getRect(rowContainerFor(inProgram('IF')));
+
+      // The 1px separator lives inside each row's own decoration, so the boxes
+      // themselves touch.
+      expect(take.top, repeat.bottom);
+      expect(ifRow.top, take.bottom);
+    });
+
+    testWidgets('drop targets still open up during a drag', (tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+
+      double tallestSlot() => find
+          .byType(DragTarget<String>)
+          .evaluate()
+          .map((e) => tester.getRect(find.byWidget(e.widget)).height)
+          .fold<double>(0, (a, b) => a > b ? a : b);
+
+      // Collapsing the idle slots must not cost the drag its landing places.
+      final gesture = await tester.startGesture(
+        tester.getCenter(inProgram('TAKE')),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await gesture.moveBy(const Offset(0, 30));
+      await tester.pump();
+
+      expect(tallestSlot(), greaterThan(0));
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+  });
 }

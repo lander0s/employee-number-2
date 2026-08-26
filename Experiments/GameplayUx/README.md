@@ -33,7 +33,7 @@ size, set in [`windows/runner/main.cpp`](windows/runner/main.cpp). It stays
 resizable on purpose, so the divider can be tested at other aspect ratios.
 
 ```
-flutter test      # 82 tests: block editing, layout/text-scale, divider, caret, conditions
+flutter test      # 84 tests: block editing, layout/text-scale, divider, caret, conditions
 flutter analyze   # clean
 ```
 
@@ -171,6 +171,13 @@ The scaffolding block is the first thing dropped when the floor pane is dragged
 small: it is the least important content on screen.
 
 ## One visual rule for the language
+
+**Rows sit flush against each other**, separated only by a 1px line inside each
+row's own decoration, so the program reads as one block of text rather than a
+stack of cards. The insertion slots between rows are zero-height when idle; they
+only take space when they have something to show — the caret, or a drop target
+during a drag. They used to keep 6px to stay tappable, but tapping a *row* already
+places the caret, so the height bought nothing.
 
 **No line numbers.** A numbered gutter made the editor look like something to be
 memorised and reasoned about, which is exactly the wrong first impression for a
