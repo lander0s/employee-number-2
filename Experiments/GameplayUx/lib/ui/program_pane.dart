@@ -182,6 +182,7 @@ class ProgramPaneState extends State<ProgramPane> {
     String? parentId,
     int depth, {
     Color? on,
+    Color? ghost,
   }) {
     // While running there are no slots at all, so no drop target exists on a
     // program that cannot be edited.
@@ -208,6 +209,7 @@ class ProgramPaneState extends State<ProgramPane> {
             // An empty block's body is this one slot and nothing else, so it is
             // the only thing that can say "something goes in here".
             wide: nodes.isEmpty,
+            ghost: ghost,
           ),
       ],
     );
@@ -222,7 +224,17 @@ class ProgramPaneState extends State<ProgramPane> {
     }
 
     final fill = W.blockFill(node.spec.colour, depth);
-    final body = _buildList(node.children!, node.id, depth + 1, on: fill);
+    final body = _buildList(
+      node.children!,
+      node.id,
+      depth + 1,
+      on: fill,
+      // The shade a child of this block would wear: one step along the same
+      // alternation that keeps an IF inside an IF readable. An empty body paints
+      // its reserved row in it, so the gap reads as a row that is not there
+      // rather than as a hole in the container.
+      ghost: W.blockFill(node.spec.colour, depth + 1),
+    );
 
     return Container(
       // No margin. The spacers on either side are the separation, and a margin
@@ -263,6 +275,7 @@ class ProgramPaneState extends State<ProgramPane> {
     Key? key,
     bool fill = false,
     bool wide = false,
+    Color? ghost,
     Widget? hint,
   }) => _SlotWidget(
     key: key,
@@ -270,6 +283,7 @@ class ProgramPaneState extends State<ProgramPane> {
     on: on,
     fill: fill,
     wide: wide,
+    ghost: ghost,
     hint: hint,
     accepts: (payload) => _accepts(payload, slot),
     onAccept: (payload) => _mutate(() {
@@ -394,6 +408,7 @@ class _SlotWidget extends StatefulWidget {
     required this.onAccept,
     this.fill = false,
     this.wide = false,
+    this.ghost,
     this.hint,
   });
 
@@ -412,6 +427,10 @@ class _SlotWidget extends StatefulWidget {
   /// True for the lone spacer in an empty block body, which is drawn thicker so
   /// the gap reads as a container waiting for something.
   final bool wide;
+
+  /// The fill for the row an empty body is holding space for: the shade a real
+  /// child at this depth would have.
+  final Color? ghost;
 
   /// Shown in place of the drop outline when the program is empty.
   final Widget? hint;
@@ -462,16 +481,28 @@ class _SlotWidgetState extends State<_SlotWidget> {
         }
 
         // An empty body keeps the same height whether or not something is held
-        // over it: the shape that lands there is already reserved. The bottom
-        // padding is the gap a real command would have below it, so the dashed
-        // outline sits exactly where the row will sit.
+        // over it: the shape that lands there is already reserved. The padding
+        // is the gap a real command would have above and below it - the first
+        // from the spacer under a block header, the second from the spacer that
+        // closes the body - so the ghost sits exactly where the row will sit.
         if (widget.wide) {
           return Container(
             constraints: const BoxConstraints(minHeight: W.emptyBodyHeight),
-            padding: const EdgeInsets.fromLTRB(4, 2, 4, W.indentPerDepth + 2),
-            child: open
-                ? _OpenGap(colour: markColour)
-                : const SizedBox.shrink(),
+            padding: const EdgeInsets.fromLTRB(
+              4,
+              W.indentPerDepth + 2,
+              4,
+              W.indentPerDepth + 2,
+            ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: widget.ghost,
+                borderRadius: BorderRadius.circular(W.rowRadius),
+              ),
+              child: open
+                  ? _OpenGap(colour: markColour)
+                  : const SizedBox.shrink(),
+            ),
           );
         }
 

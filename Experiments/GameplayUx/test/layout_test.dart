@@ -1236,7 +1236,7 @@ void main() {
       // should look like it is holding one instruction that is not there yet.
       final take = tester.getRect(rowContainerFor(inProgram('TAKE')));
       final well = gaps(tester).fold<double>(0, (a, b) => a > b ? a : b);
-      expect(well, closeTo(take.height + W.indentPerDepth, 1));
+      expect(well, closeTo(take.height + W.indentPerDepth * 2, 1));
     });
 
     testWidgets('the drop shape appears where the row will be, gap and all', (
@@ -1260,10 +1260,62 @@ void main() {
         closeTo(W.indentPerDepth + 2, 1.5),
         reason: 'the outline keeps the bottom gap a command would have',
       );
-      expect(outline.top, closeTo(slot.top + 2, 1.5));
+      expect(
+        outline.top - slot.top,
+        closeTo(W.indentPerDepth + 2, 1.5),
+        reason: 'and the top gap too',
+      );
 
       await gesture.up();
       await tester.pumpAndSettle();
+    });
+
+    /// The fill painted behind an empty body's reserved row.
+    Color ghostFill(WidgetTester tester, int index) {
+      final box = tester.widget<DecoratedBox>(
+        find
+            .descendant(
+              of: find.byWidget(innerSpacers()[index].widget),
+              matching: find.byType(DecoratedBox),
+            )
+            .first,
+      );
+      return (box.decoration as BoxDecoration).color!;
+    }
+
+    testWidgets('the reserved row wears the shade a child would', (
+      tester,
+    ) async {
+      await boot(tester);
+      final pane = tester.getRect(find.byType(ProgramPane));
+      await dropAt(tester, 'REPEAT', pane.center);
+
+      // Same alternation that keeps an IF inside an IF readable: the block sits
+      // at depth 0, so its child sits at depth 1 and is a step lighter.
+      final repeat = specFor('repeat').colour;
+      expect(ghostFill(tester, body), W.blockFill(repeat, 1));
+      expect(ghostFill(tester, body), isNot(W.blockFill(repeat, 0)));
+    });
+
+    testWidgets('and alternates again one level down', (tester) async {
+      await boot(tester);
+      final pane = tester.getRect(find.byType(ProgramPane));
+      await dropAt(tester, 'REPEAT', pane.center);
+      await dragIntoSpacer(tester, 'IF', body);
+
+      // The IF is the only empty block now. It sits at depth 1, so its own
+      // reserved row steps back to the unlightened colour.
+      final wide = innerSpacers().indexWhere(
+        (e) =>
+            (tester.getRect(find.byWidget(e.widget)).height - W.emptyBodyHeight)
+                .abs() <
+            0.5,
+      );
+      expect(wide, isNot(-1));
+
+      final ifColour = specFor('ifCond').colour;
+      expect(ghostFill(tester, wide), W.blockFill(ifColour, 2));
+      expect(ghostFill(tester, wide), ifColour);
     });
 
     testWidgets('goes back to an ordinary gap once it holds something', (

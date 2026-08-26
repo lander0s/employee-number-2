@@ -69,13 +69,13 @@ abstract final class W {
   static const closerRowHeight = 44.0;
   static const indentPerDepth = 18.0;
 
-  /// The one spacer inside an empty block: a command's worth of space plus the
-  /// gap that would follow that command.
+  /// The one spacer inside an empty block: a command's worth of space, with the
+  /// gap a real child would have above and below it.
   ///
   /// So an empty body reads as holding one invisible instruction, which is what
   /// it is short of. An 18dp strip read as spacing between siblings that are not
-  /// there; this reads as a missing row.
-  static const emptyBodyHeight = rowHeight + indentPerDepth;
+  /// there; this reads as a missing row, sitting where that row will sit.
+  static const emptyBodyHeight = rowHeight + indentPerDepth * 2;
   static const minTarget = 48.0;
 
   /// Left inset for every row and slot, replacing the old line-number gutter.
