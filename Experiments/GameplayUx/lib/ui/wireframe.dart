@@ -73,6 +73,12 @@ abstract final class W {
   /// Left inset for every row and slot, replacing the old line-number gutter.
   static const rowInset = 12.0;
 
+  /// Corner radii. Rows and tray buttons share one so a command looks the same
+  /// wherever it is; a block is a touch rounder because it is the bigger shape.
+  static const rowRadius = 8.0;
+  static const blockRadius = 12.0;
+  static const chipRadius = 5.0;
+
   /// How far the program is laid out past the right edge of its pane.
   ///
   /// A block is meant to read as a "C" wrapped around its body. Seeing its right

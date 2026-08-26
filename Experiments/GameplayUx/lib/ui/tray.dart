@@ -192,6 +192,7 @@ class _TrayButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: spec.colour,
             border: Border.all(color: W.chipEdge(spec.colour)),
+            borderRadius: BorderRadius.circular(W.rowRadius),
           ),
           child: Row(
             children: [

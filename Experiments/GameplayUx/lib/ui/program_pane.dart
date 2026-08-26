@@ -180,7 +180,7 @@ class ProgramPaneState extends State<ProgramPane> {
       margin: const EdgeInsets.symmetric(vertical: 3),
       decoration: BoxDecoration(
         color: fill,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(W.blockRadius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -434,6 +434,9 @@ class _SlotWidgetState extends State<_SlotWidget> {
             constraints: isCaret
                 ? const BoxConstraints(minHeight: W.rowHeight)
                 : null,
+            // The caret stands in for the row that is about to land here, so it
+            // carries the same margin a command row does.
+            margin: isCaret ? const EdgeInsets.symmetric(vertical: 2) : null,
             padding: EdgeInsets.only(
               left: W.rowInset,
               right: 10,

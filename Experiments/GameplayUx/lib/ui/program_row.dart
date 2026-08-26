@@ -54,10 +54,17 @@ class ProgramRow extends StatelessWidget {
       // A minimum, never a fixed height: 7.3 requires rows to survive OS text
       // scaling to 200% without clipping, so content decides the final height.
       constraints: BoxConstraints(minHeight: height),
+      // Only a plain command is a card of its own. A block header and its END
+      // are part of the container behind them, so they take neither the fill nor
+      // the rounding - a rounded header inside a rounded block would read as two
+      // shapes where there is one.
+      margin: row.kind == RowKind.command
+          ? const EdgeInsets.symmetric(vertical: 2)
+          : null,
       decoration: row.kind == RowKind.command
           ? BoxDecoration(
               color: tone,
-              border: Border(bottom: BorderSide(color: W.rowEdge(tone))),
+              borderRadius: BorderRadius.circular(W.rowRadius),
             )
           : null,
       padding: const EdgeInsets.only(left: W.rowInset, right: 8),
@@ -95,10 +102,20 @@ class ProgramRow extends StatelessWidget {
     // A closer is not independently addressable: it belongs to its header.
     // Tapping one only parks the caret after the block.
     if (row.isCloser) {
-      return GestureDetector(onTap: onTap, child: content);
+      return GestureDetector(
+        // Opaque, or the row would only answer where its glyphs are. A block
+        // header and its END paint no background of their own, and a Container
+        // with no decoration does not absorb hits - so tapping anywhere along
+        // the bottom edge of a block did nothing, which is exactly where you go
+        // to add an instruction after it.
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: content,
+      );
     }
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Dismissible(
         key: ValueKey('dismiss-${node.id}-${row.kind}'),
@@ -182,7 +199,7 @@ class _ArgWord extends StatelessWidget {
           decoration: BoxDecoration(
             color: W.chipFill(tone),
             border: Border.all(color: W.chipEdge(tone)),
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(W.chipRadius),
           ),
           child: Text(
             text,

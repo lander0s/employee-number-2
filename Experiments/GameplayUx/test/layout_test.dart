@@ -167,12 +167,13 @@ void main() {
       return tester.getRect(rowContainerFor(label)).height;
     }
 
-    // The caret now shares the instruction row's 60px minimum, so scales inside
-    // that are absorbed by it - the same as any row. Past the minimum it must
-    // still grow, which is what the old fixed 20px could not do and why the
-    // label clipped.
-    expect(await caretHeight(1.0), W.rowHeight);
-    expect(await caretHeight(2.0), W.rowHeight);
+    // The caret shares the instruction row's 60px minimum and its card margin,
+    // so scales inside that are absorbed by it - the same as any row. Past the
+    // minimum it must still grow, which is what the old fixed 20px could not do
+    // and why the label clipped.
+    const carded = W.rowHeight + 4;
+    expect(await caretHeight(1.0), carded);
+    expect(await caretHeight(2.0), carded);
     expect(tester.takeException(), isNull);
 
     // x3 is past the 200% we support, where the IF row's argument controls stop
@@ -181,7 +182,7 @@ void main() {
     // discarded rather than asserted away.
     final pastTheMinimum = await caretHeight(3.0);
     tester.takeException();
-    expect(pastTheMinimum, greaterThan(W.rowHeight));
+    expect(pastTheMinimum, greaterThan(carded));
   });
 
   group('divider', () {
@@ -571,7 +572,9 @@ void main() {
       final conditionRow = tester.getRect(rowContainerFor(inProgram('IF')));
       final plainRow = tester.getRect(rowContainerFor(inProgram('TAKE')));
 
-      expect(conditionRow.height, greaterThanOrEqualTo(plainRow.height));
+      // Only an upper bound: a block header carries no card margin, so it is
+      // legitimately a few pixels shorter than a plain row. What this guards is
+      // the collapse into one word per line, which made it four rows tall.
       expect(conditionRow.height, lessThan(plainRow.height * 2));
     });
 
@@ -1090,6 +1093,81 @@ void main() {
 
       // A horizontal drag is a swipe gesture on a row, not a pan of the program.
       expect(tester.getRect(inProgram('REPEAT')).left, before.left);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('tapping empty parts of a row', () {
+    Future<void> boot(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+    }
+
+    /// Well to the right of any text, but still inside the visible pane.
+    Future<void> tapEmptyPartOf(WidgetTester tester, Finder row) async {
+      final pane = tester.getRect(find.byType(ProgramPane));
+      final rect = tester.getRect(rowContainerFor(row));
+      await tester.tapAt(Offset(pane.right - 30, rect.center.dy));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the bottom edge of a block places the caret after it', (
+      tester,
+    ) async {
+      await boot(tester);
+
+      // The outer END, i.e. the bottom edge of the REPEAT block. This is where
+      // you go to add an instruction after the block, and it used to answer only
+      // where the word itself was.
+      final outerEnd = inProgram('END').last;
+      await tapEmptyPartOf(tester, outerEnd);
+
+      // Measured after the tap: moving the caret collapses the zero-height slot
+      // it came from, so everything below it shifts up.
+      final endRect = tester.getRect(rowContainerFor(inProgram('END').last));
+      final caret = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
+
+      expect(
+        caret.top,
+        greaterThanOrEqualTo(endRect.bottom),
+        reason: 'the caret should have moved below the block',
+      );
+      // And out to the root, not left inside the block body.
+      expect(caret.left, lessThan(endRect.left + W.indentPerDepth));
+    });
+
+    testWidgets('the empty part of a block header places the caret inside', (
+      tester,
+    ) async {
+      await boot(tester);
+
+      await tapEmptyPartOf(tester, inProgram('REPEAT'));
+
+      final header = tester.getRect(rowContainerFor(inProgram('REPEAT')));
+      final caret = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
+
+      expect(caret.top, greaterThanOrEqualTo(header.bottom));
+      expect(
+        caret.left,
+        greaterThan(header.left),
+        reason: 'tapping a header puts the caret in the body it opens',
+      );
+    });
+
+    testWidgets('the empty part of a plain row still places the caret', (
+      tester,
+    ) async {
+      await boot(tester);
+
+      await tapEmptyPartOf(tester, inProgram('TAKE'));
+
+      final take = tester.getRect(rowContainerFor(inProgram('TAKE')));
+      final caret = tester.getRect(rowContainerFor(find.text('INSERT HERE')));
+
+      expect(caret.top, greaterThanOrEqualTo(take.bottom));
       expect(tester.takeException(), isNull);
     });
   });
