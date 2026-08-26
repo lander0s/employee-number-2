@@ -111,18 +111,19 @@ class ProgramRow extends StatelessWidget {
     // row's only gestures are the ones that act on the row itself.
     return Dismissible(
       key: ValueKey('dismiss-${node.id}-${row.kind}'),
-      // One gesture, one direction. There used to be a second one - swipe the
-      // other way to duplicate - and two opposite swipes on the same row meant
-      // committing to a direction before knowing which was which. Deleting is
-      // the one thing a row needs to be able to do to itself.
-      direction: DismissDirection.startToEnd,
+      // One gesture, either direction. There used to be a second one - swipe
+      // the other way to duplicate - which meant committing to a direction
+      // before knowing which was which. Deleting is the one thing a row needs to
+      // be able to do to itself, so both ways do it and there is nothing to aim
+      // at: whichever way the thumb happens to fall is right.
       // Handled here and the row is never actually dismissed, so the tree stays
       // the single source of truth.
       confirmDismiss: (direction) async {
         onDelete();
         return false;
       },
-      background: const _SwipeHint(label: 'DELETE'),
+      background: const _SwipeHint(label: 'DELETE', end: false),
+      secondaryBackground: const _SwipeHint(label: 'DELETE', end: true),
       child: content,
     );
   }
@@ -206,18 +207,24 @@ class _ArgWord extends StatelessWidget {
 }
 
 class _SwipeHint extends StatelessWidget {
-  const _SwipeHint({required this.label});
+  const _SwipeHint({required this.label, required this.end});
   final String label;
+
+  /// True for the hint revealed by a leftward swipe, which sits on the right.
+  final bool end;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: W.chrome,
-      // Revealed on the left, where the row is pulled away from: the right edge
-      // of a row is off-screen behind the overhang, so a hint over there would
-      // land where nobody can see it.
-      alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      alignment: end ? Alignment.centerRight : Alignment.centerLeft,
+      // The row runs past the right edge of the screen, so the right-hand hint
+      // has to be pulled back by the overhang or it lands where nobody can see
+      // it.
+      padding: EdgeInsets.only(
+        left: 18,
+        right: end ? 18 + W.programOverhang : 18,
+      ),
       child: Text(label, style: W.meta.copyWith(color: W.textDim)),
     );
   }

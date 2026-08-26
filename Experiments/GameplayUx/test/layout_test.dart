@@ -1166,12 +1166,14 @@ void main() {
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
 
-      final before = tester.getRect(inProgram('REPEAT'));
-      await tester.drag(inProgram('REPEAT'), const Offset(-200, 0));
+      final before = tester.getRect(inProgram('IF'));
+      await tester.drag(inProgram('TAKE'), const Offset(-200, 0));
       await tester.pumpAndSettle();
 
-      // A horizontal drag is a swipe gesture on a row, not a pan of the program.
-      expect(tester.getRect(inProgram('REPEAT')).left, before.left);
+      // A horizontal drag is a swipe gesture on a row, not a pan of the program:
+      // it deletes the row it started on, and nothing else moves sideways.
+      expect(inProgram('TAKE'), findsNothing);
+      expect(tester.getRect(inProgram('IF')).left, before.left);
       expect(tester.takeException(), isNull);
     });
   });
@@ -1390,42 +1392,37 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('a swipe to the right deletes the row', (tester) async {
-      await boot(tester);
-      await swipe(tester, inProgram('SHIP'), 400);
+    for (final (name, dx) in [('right', 400.0), ('left', -400.0)]) {
+      testWidgets('a swipe to the $name deletes the row', (tester) async {
+        await boot(tester);
+        await swipe(tester, inProgram('SHIP'), dx);
 
-      expect(inProgram('SHIP'), findsNothing);
-      expect(find.text('UNDO'), findsOneWidget, reason: 'and it is undoable');
-    });
+        // Either direction, so there is nothing to aim at.
+        expect(inProgram('SHIP'), findsNothing);
+        expect(find.text('UNDO'), findsOneWidget, reason: 'and it is undoable');
+      });
 
-    testWidgets('a swipe to the left does nothing', (tester) async {
-      await boot(tester);
-      await swipe(tester, inProgram('SHIP'), -400);
+      testWidgets('and says DELETE on the way $name', (tester) async {
+        await boot(tester);
 
-      // The other direction used to duplicate the row. One row, one gesture.
-      expect(inProgram('SHIP'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
+        // Mid-swipe is where the hint shows, so look while the row is moving.
+        final gesture = await tester.startGesture(
+          tester.getCenter(inProgram('SHIP')),
+        );
+        await tester.pump(const Duration(milliseconds: 20));
+        await gesture.moveBy(Offset(dx.sign * 30, 0));
+        await tester.pump();
+        await gesture.moveBy(Offset(dx.sign * 60, 0));
+        await tester.pump();
 
-    testWidgets('DUPLICATE is not offered anywhere', (tester) async {
-      await boot(tester);
+        // The other direction used to duplicate the row.
+        expect(find.text('DUPLICATE'), findsNothing);
+        expect(find.text('DELETE'), findsOneWidget);
 
-      // Mid-swipe is where the hint shows, so look while the row is moving.
-      final gesture = await tester.startGesture(
-        tester.getCenter(inProgram('SHIP')),
-      );
-      await tester.pump(const Duration(milliseconds: 20));
-      await gesture.moveBy(const Offset(30, 0));
-      await tester.pump();
-      await gesture.moveBy(const Offset(60, 0));
-      await tester.pump();
-
-      expect(find.text('DUPLICATE'), findsNothing);
-      expect(find.text('DELETE'), findsOneWidget);
-
-      await gesture.up();
-      await tester.pumpAndSettle();
-    });
+        await gesture.up();
+        await tester.pumpAndSettle();
+      });
+    }
 
     testWidgets('a block goes with its contents, without asking', (
       tester,
