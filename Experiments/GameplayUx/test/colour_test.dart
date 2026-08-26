@@ -145,6 +145,21 @@ void main() {
     }
   });
 
+  test('the delete backdrop reads as an alert, not as a command', () {
+    // Near-white on it, like the rest of the app's furniture - the dark ink is
+    // for coloured rows.
+    expect(contrast(W.text, W.danger), greaterThanOrEqualTo(7));
+
+    // And it must not be mistaken for SHIP, the one command wearing a red.
+    for (final spec in commandCatalogue) {
+      expect(
+        deltaE(W.danger, spec.colour),
+        greaterThan(12),
+        reason: '${spec.id} is too close to the delete backdrop',
+      );
+    }
+  });
+
   test('the caret is legible on every block colour', () {
     // The caret is drawn in ink when it sits inside a block, because the dark
     // theme's pale grey vanished on a bright yellow one.

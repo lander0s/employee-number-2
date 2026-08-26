@@ -35,6 +35,13 @@ abstract final class W {
   static const cyclableEdge = Color(0xFF606060);
   static const dropTarget = Color(0xFF6E6E6E);
 
+  /// Revealed behind a row being swiped away. It was the same grey as the rest
+  /// of the chrome, which said "something is behind this row" and nothing about
+  /// what. Deep rather than bright: this one is read in near-white like the
+  /// app's own furniture, not in the dark ink the coloured rows use, and it has
+  /// to stay clear of SHIP's salmon so a delete never reads as a command.
+  static const danger = Color(0xFF991B1B);
+
   /// A block is a literal container with its body inset, so it reads as a "C"
   /// wrapped around the instructions it owns. Its colour is the command's own,
   /// stepped very slightly by depth so that a block nested inside another of the

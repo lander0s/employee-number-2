@@ -1,16 +1,19 @@
 /// One instruction row.
 ///
-/// Carries the gestures from 7.2: tap to move the caret, swipe left to delete,
-/// swipe right to duplicate, long-press to drag. Arguments are edited in place -
-/// no modal ever opens for an argument.
+/// The row itself answers one gesture: tap an argument to cycle it. Arguments
+/// are edited in place - no modal ever opens for an argument. Deleting and
+/// reordering are owned by the pane, because for a block those gestures act on
+/// the whole container rather than on this one row, and insertion is not a row
+/// gesture at all: it is a drop into a spacer.
 ///
 /// A row reads as a sentence. The fixed command words are bare, bright and
 /// semibold; every word you can change is a quiet button.
 ///
 /// Each command carries a bright colour (see commands.dart), so rows are written
 /// in dark ink rather than the near-white used elsewhere. A plain row paints its
-/// colour; a block header and its `END` do not, because the block container
-/// behind them already has it - painting twice would double the tone.
+/// own colour; a block header paints the fill of the container it belongs to, so
+/// the two read as one shape at rest and the header still has a background of
+/// its own to carry when it slides.
 library;
 
 import 'package:flutter/material.dart';
@@ -22,14 +25,12 @@ class ProgramRow extends StatelessWidget {
   const ProgramRow({
     super.key,
     required this.row,
-    required this.onDelete,
     required this.onCycleArg,
     this.dragging = false,
     this.interactive = true,
   });
 
   final DisplayRow row;
-  final VoidCallback onDelete;
   final ValueChanged<ArgSlot> onCycleArg;
 
   /// True while this row is the source of an active drag.
@@ -60,17 +61,28 @@ class ProgramRow extends StatelessWidget {
       // No margin: the gap between two siblings is a spacer, and a spacer is the
       // only spacing mechanism in the program. A card margin on top of it would
       // be a second one that means nothing.
-      //
-      // Only a plain command is a card of its own. A block header is part of the
-      // container behind it, so it takes neither the fill nor the rounding - a
-      // rounded header inside a rounded block would read as two shapes where
-      // there is one.
-      decoration: row.kind == RowKind.command
-          ? BoxDecoration(
-              color: tone,
-              borderRadius: BorderRadius.circular(W.rowRadius),
-            )
-          : null,
+      decoration: switch (row.kind) {
+        // A plain command is a card of its own.
+        RowKind.command => BoxDecoration(
+          color: tone,
+          borderRadius: BorderRadius.circular(W.rowRadius),
+        ),
+        // A block header takes the container's fill and the container's rounding
+        // at the top, so at rest the two are indistinguishable - one shape, not
+        // a card inside a card.
+        //
+        // It has to paint that itself rather than let the container show
+        // through: a swipe or a drag moves the header alone, and a title sliding
+        // out from under its own background looked like the letters had come
+        // loose from the block.
+        RowKind.blockHeader => BoxDecoration(
+          color: W.blockFill(tone, row.depth),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(W.blockRadius),
+          ),
+        ),
+        RowKind.blockCloser => null,
+      },
       padding: EdgeInsets.only(
         left: W.rowInset,
         right: 8,
@@ -105,27 +117,7 @@ class ProgramRow extends StatelessWidget {
       ),
     );
 
-    if (!interactive) return content;
-
-    // Nothing to tap on a row any more: insertion is a drop into a spacer, so a
-    // row's only gestures are the ones that act on the row itself.
-    return Dismissible(
-      key: ValueKey('dismiss-${node.id}-${row.kind}'),
-      // One gesture, either direction. There used to be a second one - swipe
-      // the other way to duplicate - which meant committing to a direction
-      // before knowing which was which. Deleting is the one thing a row needs to
-      // be able to do to itself, so both ways do it and there is nothing to aim
-      // at: whichever way the thumb happens to fall is right.
-      // Handled here and the row is never actually dismissed, so the tree stays
-      // the single source of truth.
-      confirmDismiss: (direction) async {
-        onDelete();
-        return false;
-      },
-      background: const _SwipeHint(label: 'DELETE', end: false),
-      secondaryBackground: const _SwipeHint(label: 'DELETE', end: true),
-      child: content,
-    );
+    return content;
   }
 }
 
@@ -202,30 +194,6 @@ class _ArgWord extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _SwipeHint extends StatelessWidget {
-  const _SwipeHint({required this.label, required this.end});
-  final String label;
-
-  /// True for the hint revealed by a leftward swipe, which sits on the right.
-  final bool end;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: W.chrome,
-      alignment: end ? Alignment.centerRight : Alignment.centerLeft,
-      // The row runs past the right edge of the screen, so the right-hand hint
-      // has to be pulled back by the overhang or it lands where nobody can see
-      // it.
-      padding: EdgeInsets.only(
-        left: 18,
-        right: end ? 18 + W.programOverhang : 18,
-      ),
-      child: Text(label, style: W.meta.copyWith(color: W.textDim)),
     );
   }
 }

@@ -1032,9 +1032,8 @@ void main() {
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
 
-      // A block header paints nothing itself, so the first decorated ancestor
-      // above it is the block container. (A plain command row *does* paint, so
-      // this only works from a header.)
+      // The header paints the same fill as the container it belongs to, so the
+      // first decorated box above the title is that fill either way.
       Color? fillOf(String rowText) {
         final ancestors = find
             .ancestor(of: inProgram(rowText), matching: find.byType(Container))
@@ -1057,6 +1056,50 @@ void main() {
       // itself, where colour alone would hide the inset arm.
       final base = specFor('repeat').colour;
       expect(W.blockFill(base, 0), isNot(W.blockFill(base, 1)));
+    });
+
+    testWidgets('a block header carries its own background', (tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+
+      // The header paints the container's own fill, in the container's
+      // rounding, so at rest the two are one shape - and the title always has a
+      // background of its own to travel on, wherever it is rendered (the drag
+      // ghost draws the same row outside the pane).
+      final header = tester.widget<Container>(
+        rowContainerFor(inProgram('REPEAT')),
+      );
+      final decoration = header.decoration as BoxDecoration;
+      expect(decoration.color, W.blockFill(specFor('repeat').colour, 0));
+      expect(
+        decoration.borderRadius,
+        const BorderRadius.vertical(top: Radius.circular(W.blockRadius)),
+      );
+
+      // And it travels: mid-swipe the painted box is the thing that moves.
+      final before = tester.getRect(rowContainerFor(inProgram('REPEAT')));
+      final gesture = await tester.startGesture(
+        tester.getCenter(inProgram('REPEAT')),
+      );
+      await tester.pump(const Duration(milliseconds: 20));
+      await gesture.moveBy(const Offset(30, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(60, 0));
+      await tester.pump();
+
+      final moved = rowContainerFor(inProgram('REPEAT'));
+      expect(tester.getRect(moved).left, greaterThan(before.left));
+      expect(
+        (tester.widget<Container>(moved).decoration as BoxDecoration).color,
+        decoration.color,
+      );
+
+      await gesture.up();
+      await tester.pumpAndSettle();
     });
 
     testWidgets('the body of a block is fully contained by it', (tester) async {
@@ -1423,6 +1466,74 @@ void main() {
         await tester.pumpAndSettle();
       });
     }
+
+    testWidgets('the hint is readable in both directions', (tester) async {
+      await boot(tester);
+      final pane = tester.getRect(find.byType(ProgramPane));
+
+      for (final dx in [30.0, -30.0]) {
+        final gesture = await tester.startGesture(
+          tester.getCenter(inProgram('REPEAT')),
+        );
+        await tester.pump(const Duration(milliseconds: 20));
+        await gesture.moveBy(Offset(dx, 0));
+        await tester.pump();
+        await gesture.moveBy(Offset(dx * 4, 0));
+        await tester.pump();
+
+        // A row runs 56dp past the right edge of the screen, so the hint on that
+        // side has to be pulled back inside or the word is half off the phone.
+        final label = tester.getRect(find.text('DELETE'));
+        expect(label.left, greaterThanOrEqualTo(pane.left - 0.5));
+        expect(label.right, lessThanOrEqualTo(pane.right + 0.5));
+
+        await gesture.moveBy(Offset(-dx * 5, 0));
+        await tester.pump();
+        await gesture.up();
+        await tester.pumpAndSettle();
+      }
+    });
+
+    testWidgets('swiping a block carries its whole body along', (tester) async {
+      await boot(tester);
+      final take = tester.getRect(rowContainerFor(inProgram('TAKE')));
+      final ship = tester.getRect(rowContainerFor(inProgram('SHIP')));
+
+      // The swipe used to be on the header alone, so a block slid its title out
+      // and left its instructions behind. A block is one thing.
+      final gesture = await tester.startGesture(
+        tester.getCenter(inProgram('REPEAT')),
+      );
+      await tester.pump(const Duration(milliseconds: 20));
+      await gesture.moveBy(const Offset(30, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(60, 0));
+      await tester.pump();
+
+      final moved = tester.getRect(rowContainerFor(inProgram('TAKE'))).left;
+      expect(moved, greaterThan(take.left));
+      expect(
+        tester.getRect(rowContainerFor(inProgram('SHIP'))).left - ship.left,
+        closeTo(moved - take.left, 1),
+        reason: 'every row inside moves by the same amount',
+      );
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('but a row inside a block still deletes on its own', (
+      tester,
+    ) async {
+      await boot(tester);
+      await swipe(tester, inProgram('TAKE'), 400);
+
+      // Both the child and the block it sits in have a swipe now; the deeper one
+      // has to win, or a block would be impossible to edit from the inside.
+      expect(inProgram('TAKE'), findsNothing);
+      expect(inProgram('REPEAT'), findsOneWidget);
+      expect(inProgram('SHIP'), findsOneWidget);
+    });
 
     testWidgets('a block goes with its contents, without asking', (
       tester,

@@ -219,7 +219,12 @@ class ProgramPaneState extends State<ProgramPane> {
     if (!node.isBlock) {
       return _draggable(
         node,
-        _buildRow(DisplayRow(node: node, kind: RowKind.command, depth: depth)),
+        _swipeable(
+          node,
+          _buildRow(
+            DisplayRow(node: node, kind: RowKind.command, depth: depth),
+          ),
+        ),
       );
     }
 
@@ -236,36 +241,61 @@ class ProgramPaneState extends State<ProgramPane> {
       ghost: W.blockFill(node.spec.colour, depth + 1),
     );
 
-    return Container(
-      // No margin. The spacers on either side are the separation, and a margin
-      // on top of them would be a second spacing system that means nothing.
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(W.blockRadius),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Only the header is draggable: a draggable wrapping the whole
-          // container would fight its own children for the gesture.
-          _draggable(
-            node,
-            _buildRow(
-              DisplayRow(node: node, kind: RowKind.blockHeader, depth: depth),
+    // The swipe wraps the whole container, not the header: a block is one thing,
+    // so the gesture that deletes it takes its body along. Rows inside keep
+    // their own swipe - the deeper recognizer wins the arena - so a child is
+    // still deletable on its own.
+    return _swipeable(
+      node,
+      Container(
+        // No margin. The spacers on either side are the separation, and a margin
+        // on top of them would be a second spacing system that means nothing.
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(W.blockRadius),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Only the header is draggable: a draggable wrapping the whole
+            // container would fight its own children for the gesture.
+            _draggable(
+              node,
+              _buildRow(
+                DisplayRow(node: node, kind: RowKind.blockHeader, depth: depth),
+              ),
             ),
-          ),
-          // The body's trailing spacer *is* the bottom arm of the "C": it is
-          // already the same thickness as the left arm, and the left arm runs
-          // down past it, so together they close the bracket.
-          //
-          // An empty body needs no special minimum either: one spacer is the
-          // body, and it is exactly the right height already.
-          Padding(
-            padding: const EdgeInsets.only(left: W.indentPerDepth, right: 4),
-            child: body,
-          ),
-        ],
+            // The body's trailing spacer *is* the bottom arm of the "C": it is
+            // already the same thickness as the left arm, and the left arm runs
+            // down past it, so together they close the bracket.
+            //
+            // An empty body needs no special minimum either: one spacer is the
+            // body, and it is exactly the right height already.
+            Padding(
+              padding: const EdgeInsets.only(left: W.indentPerDepth, right: 4),
+              child: body,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  /// The swipe that deletes, either way, on whatever it wraps.
+  Widget _swipeable(Node node, Widget child) {
+    if (widget.running) return child;
+
+    return Dismissible(
+      key: ValueKey('dismiss-${node.id}'),
+      // Handled here and the node is never actually dismissed by the widget, so
+      // the tree stays the single source of truth.
+      confirmDismiss: (direction) async {
+        _delete(node);
+        return false;
+      },
+      background: const _SwipeHint(label: 'DELETE', end: false),
+      secondaryBackground: const _SwipeHint(label: 'DELETE', end: true),
+      child: child,
     );
   }
 
@@ -308,7 +338,6 @@ class ProgramPaneState extends State<ProgramPane> {
     row: row,
     interactive: !widget.running,
     dragging: _draggingId == row.node.id,
-    onDelete: () => _delete(row),
     onCycleArg: (slot) => _mutate(() => doc.cycleArg(row.node.id, slot)),
   );
 
@@ -334,9 +363,7 @@ class ProgramPaneState extends State<ProgramPane> {
     );
   }
 
-  void _delete(DisplayRow row) {
-    final node = row.node;
-
+  void _delete(Node node) {
     // A block goes with everything inside it, no questions asked. There used to
     // be a sheet here offering "keep the contents" instead, which put a decision
     // in front of someone who had just made a gesture meaning "get rid of this"
@@ -599,7 +626,6 @@ class _DragFeedback extends StatelessWidget {
     Widget row(RowKind kind) => ProgramRow(
       row: DisplayRow(node: node, kind: kind, depth: depth),
       interactive: false,
-      onDelete: () {},
       onCycleArg: (_) {},
     );
 
@@ -633,6 +659,30 @@ class _DragFeedback extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SwipeHint extends StatelessWidget {
+  const _SwipeHint({required this.label, required this.end});
+  final String label;
+
+  /// True for the hint revealed by a leftward swipe, which sits on the right.
+  final bool end;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: W.danger,
+      alignment: end ? Alignment.centerRight : Alignment.centerLeft,
+      // The row runs past the right edge of the screen, so the right-hand hint
+      // has to be pulled back by the overhang or it lands where nobody can see
+      // it.
+      padding: EdgeInsets.only(
+        left: 18,
+        right: end ? 18 + W.programOverhang : 18,
+      ),
+      child: Text(label, style: W.meta.copyWith(color: W.text)),
     );
   }
 }
