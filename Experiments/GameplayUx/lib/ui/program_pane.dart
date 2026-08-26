@@ -461,10 +461,22 @@ class _SlotWidgetState extends State<_SlotWidget> {
           );
         }
 
+        // An empty body keeps the same height whether or not something is held
+        // over it: the shape that lands there is already reserved. The bottom
+        // padding is the gap a real command would have below it, so the dashed
+        // outline sits exactly where the row will sit.
+        if (widget.wide) {
+          return Container(
+            constraints: const BoxConstraints(minHeight: W.emptyBodyHeight),
+            padding: const EdgeInsets.fromLTRB(4, 2, 4, W.indentPerDepth + 2),
+            child: open
+                ? _OpenGap(colour: markColour)
+                : const SizedBox.shrink(),
+          );
+        }
+
         return Container(
-          height: open
-              ? null
-              : (widget.wide ? W.emptyBodyHeight : W.indentPerDepth),
+          height: open ? null : W.indentPerDepth,
           // Open, it is the size of an instruction row - still a minimum, so it
           // grows with text scale like one.
           constraints: open

@@ -1224,6 +1224,48 @@ void main() {
       expect(heights[body], closeTo(W.emptyBodyHeight, 0.5));
     });
 
+    testWidgets('reserves a whole row and the gap that follows it', (
+      tester,
+    ) async {
+      await boot(tester);
+      final pane = tester.getRect(find.byType(ProgramPane));
+      await dropAt(tester, 'REPEAT', pane.center);
+      await dragIntoSpacer(tester, 'TAKE', 0);
+
+      // Measured against a real command rather than the token: the empty body
+      // should look like it is holding one instruction that is not there yet.
+      final take = tester.getRect(rowContainerFor(inProgram('TAKE')));
+      final well = gaps(tester).fold<double>(0, (a, b) => a > b ? a : b);
+      expect(well, closeTo(take.height + W.indentPerDepth, 1));
+    });
+
+    testWidgets('the drop shape appears where the row will be, gap and all', (
+      tester,
+    ) async {
+      await boot(tester);
+      final pane = tester.getRect(find.byType(ProgramPane));
+      await dropAt(tester, 'REPEAT', pane.center);
+      final before = gaps(tester)[body];
+
+      final gesture = await holdOverSpacer(tester, 'TAKE', body);
+
+      // The space was already reserved, so nothing shifts when the outline
+      // appears - the only change on screen is the outline itself.
+      expect(gaps(tester)[body], closeTo(before, 0.5));
+
+      final slot = tester.getRect(find.byWidget(innerSpacers()[body].widget));
+      final outline = tester.getRect(find.byType(DottedOutline));
+      expect(
+        slot.bottom - outline.bottom,
+        closeTo(W.indentPerDepth + 2, 1.5),
+        reason: 'the outline keeps the bottom gap a command would have',
+      );
+      expect(outline.top, closeTo(slot.top + 2, 1.5));
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('goes back to an ordinary gap once it holds something', (
       tester,
     ) async {
