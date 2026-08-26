@@ -3,8 +3,9 @@
 A throwaway Flutter app for iterating on the **Employee #2** gameplay screen: the
 two-pane portrait layout and, mainly, **how programming feels**.
 
-Deliberately joyless — greys, plain text, flat buttons. Colour and character
-would flatter the design and hide problems.
+Deliberately plain — flat fills, plain text, no delight. The one exception is
+command colour (below): it was added because the structure could not be judged
+without it.
 
 ## Run
 
@@ -33,7 +34,7 @@ size, set in [`windows/runner/main.cpp`](windows/runner/main.cpp). It stays
 resizable on purpose, so the divider can be tested at other aspect ratios.
 
 ```
-flutter test      # 84 tests: block editing, layout/text-scale, divider, caret, conditions
+flutter test      # 97 tests: block editing, layout/text-scale, divider, caret, conditions
 flutter analyze   # clean
 ```
 
@@ -47,8 +48,10 @@ flutter analyze   # clean
 | Tap-insert at a caret, from a scrolling tray | yes |
 | `SIZE` / `SPEED` par readout | **no** — removed, see below |
 | Block-aware drag reorder | yes — the point of the experiment |
-| Inline `[n]` argument editing, no modals | yes |
-| Swipe delete / duplicate, undo & redo | yes |
+| Inline argument editing, no modals | yes |
+| Blocks as containers, no connector lines | yes |
+| Swipe delete / duplicate | yes |
+| `UNDO` / `REDO` buttons | **no** — removed, see below |
 | Floor simulation | **no** — grey placeholder |
 | Program execution / instruction highlight | **no** — see below |
 
@@ -95,11 +98,11 @@ go too.
 | Scroll the tray sideways | the fading edge shows which way there is more |
 | Tap a row | caret moves below it — into the body, for a block header |
 | **Long-press + drag** a row | reorder; a block carries its whole body |
-| Drag near the top/bottom edge | list auto-scrolls |
+| Drag near the top/bottom edge | the program auto-scrolls |
 | Swipe row left | delete, with a 4s undo toast |
 | Swipe row right | duplicate |
 | Tap an argument chip | cycle to the next value, wrapping |
-| Tap `ELSE` on an `IF` header | add / remove the else branch |
+| Tap `TYPE` / `IS` on an `IF` | cycle the condition's subject or comparator |
 | Drag the divider grip | free positioning, snaps when released near a snap state |
 | Double-tap the divider | toggle between the two snap states |
 | Tap `RUN` / `STOP` (top-right of the floor) | flips the run state (fake); the tray, caret and all editing gestures go away while running |
@@ -171,6 +174,73 @@ The scaffolding block is the first thing dropped when the floor pane is dragged
 small: it is the least important content on screen.
 
 ## One visual rule for the language
+
+## Command colour
+
+**Every command wears a bright, cheerful colour** — cyan, green, blue, yellow,
+orange, purple, pink, red, and a warm grey for `CLOCK OUT` — in the tray and in
+the program, so the tray reads as a shelf of the very things you are about to
+place. Rows are written in dark ink rather than the near-white used on the app's
+own chrome.
+
+The palette is pulled back about a fifth of the way to grey. That is the headroom
+for the executing line once a VM exists: **push saturation up on the same hue** and
+the running row brightens instead of changing colour.
+
+Two contracts, both asserted in `test/colour_test.dart`:
+
+1. **No two commands look alike** — minimum CIE76 ΔE of 20 between any pair (the
+   palette sits around 24).
+2. **Every colour clears 7:1 against the ink**, including argument chips, the
+   depth step, and the caret when it sits inside a block.
+
+### How this palette was arrived at
+
+The first attempt started from the constraint — dark, desaturated tones chosen to
+clear 7:1 against near-white text — and produced nine colours nobody could tell
+apart: `TAKE` and `SHIP` were about ten degrees of hue apart and read as one
+colour. Two rounds of optimising for perceptual spread inside that constraint got
+ΔE up to about 11, which is still "similar".
+
+Starting from **playdoh colours and stepping down** fixed it in one pass. Bright
+fills also flip the ink dark, which inverts every derived tone: on a dark fill,
+darkening improves contrast; on a bright one, lightening does. The block depth
+step had to reverse direction, and so did the argument chips — they are now cut
+*lighter* out of their row rather than darker.
+
+The caret needed the same treatment. It is drawn in ink inside a block and in the
+pale theme colour on the dark pane, because the pale grey was invisible on yellow.
+
+## Blocks are containers, not connected lines
+
+**A block is drawn as a literal container with its body inset**, so it reads as a
+"C" wrapped around the instructions it owns: the header is the top arm, the inset
+is the left arm, `END` is the bottom arm. The vertical spines that used to join a
+`REPEAT` to its `END` are gone — a naive eye reads a box without being taught what
+a connector line means, and a program four levels deep was four parallel rails.
+
+A block wears its command's own colour, so `REPEAT` and an `IF` nested inside it
+are already distinct. The depth step exists only for the harder case — the same
+block nested inside itself, where colour alone would hide the inset arm.
+
+The structural cost: the program pane is now a **recursive widget tree built
+eagerly** inside a scroll view, where it used to be a flat `ListView.builder`.
+Fine at puzzle scale — a level's program is tens of rows — but it is no longer
+lazy, which matters if programs ever get long. Listed under known gaps.
+
+**The program is laid out wider than its pane and clipped**, so no block ever
+shows its right edge. Seeing that edge closes the "C" into a rectangle and the
+bracket reading disappears — the rounded corners now only exist on the left, which
+is the whole point. `W.programOverhang` sets how far it runs off.
+
+The extra width lives in a horizontal scroll view pinned with
+`NeverScrollableScrollPhysics`: it never scrolls, it just gives the overflow a
+legitimate home. Forcing an oversized child directly would make Flutter report it
+as an error. One knock-on: the `DELETE` swipe hint sits at the row's right edge,
+which is now off-screen, so it is pulled back by the overhang.
+
+The drag ghost renders the same nested shape, so a block visibly carries its body
+while in the air (capped at four children, with a `+n more` line).
 
 **Rows sit flush against each other**, separated only by a 1px line inside each
 row's own decoration, so the program reads as one block of text rather than a
@@ -275,6 +345,8 @@ after the last one in each list, which also makes empty block bodies reachable.
   directions, so the row never actually dismisses and the tree stays the single
   source of truth. It works, but it is a hack, and a purpose-built swipe widget
   is the real answer.
+- The program pane builds its whole tree eagerly (see block containers above), so
+  it is not virtualised. Fine for a level-sized program, wrong for a long one.
 - The whole pane rebuilds on every edit. Fine at this scale; §13.3 requires
   per-row `ValueListenable` rebuilds once there is a running highlight. The caret
   blink is already scoped to its own widget for the same reason.

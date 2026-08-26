@@ -4,10 +4,13 @@
 /// swipe right to duplicate, long-press to drag. Arguments are edited in place -
 /// no modal ever opens for an argument.
 ///
-/// A row reads as a sentence. The fixed command words are the brightest thing on
-/// it; every word you can change is a distinctly dimmer grey. That tone *is* the
-/// affordance - one visual rule for the whole language, no boxes, no chrome, no
-/// stepper buttons.
+/// A row reads as a sentence. The fixed command words are bare, bright and
+/// semibold; every word you can change is a quiet button.
+///
+/// Each command carries a bright colour (see commands.dart), so rows are written
+/// in dark ink rather than the near-white used elsewhere. A plain row paints its
+/// colour; a block header and its `END` do not, because the block container
+/// behind them already has it - painting twice would double the tone.
 library;
 
 import 'package:flutter/material.dart';
@@ -45,58 +48,42 @@ class ProgramRow extends StatelessWidget {
     final node = row.node;
     final height = row.isCloser ? W.closerRowHeight : W.rowHeight;
 
+    final tone = node.spec.colour;
+
     final content = Container(
       // A minimum, never a fixed height: 7.3 requires rows to survive OS text
       // scaling to 200% without clipping, so content decides the final height.
       constraints: BoxConstraints(minHeight: height),
-      decoration: BoxDecoration(
-        color: switch (row.kind) {
-          RowKind.blockCloser => W.rowFillCloser,
-          RowKind.blockHeader => W.rowFillAlt,
-          RowKind.command => W.rowFill,
-        },
-        border: const Border(
-          bottom: BorderSide(color: W.paneProgram, width: 1),
-        ),
-      ),
+      decoration: row.kind == RowKind.command
+          ? BoxDecoration(
+              color: tone,
+              border: Border(bottom: BorderSide(color: W.rowEdge(tone))),
+            )
+          : null,
+      padding: const EdgeInsets.only(left: W.rowInset, right: 8),
       child: Opacity(
         opacity: dragging ? 0.35 : 1,
-        child: IntrinsicHeight(
-          child: Row(
-            // Stretch so the spines span the row whatever height it settles at.
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          // Wrap, so a long condition runs onto a second line instead of
+          // overflowing a narrow screen. Rows are height-flexible, so growing
+          // is free.
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 6,
+            runSpacing: 4,
             children: [
-              const SizedBox(width: W.rowInset),
-              Spines(depth: row.depth),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  // No vertical padding here: the row's 60dp minimum already
-                  // provides the breathing room, and adding padding on top of a
-                  // cyclable word's own 48dp tap padding made a condition row a
-                  // pixel taller than a plain one.
-                  child: Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      _Keyword(
-                        text: row.isCloser ? 'END' : node.spec.label,
-                        dim: row.isCloser,
-                      ),
-                      if (!row.isCloser)
-                        for (final chip in node.chips)
-                          _ArgWord(
-                            text: chip.text,
-                            onTap: interactive
-                                ? () => onCycleArg(chip.slot)
-                                : () {},
-                          ),
-                    ],
-                  ),
-                ),
+              _Keyword(
+                text: row.isCloser ? 'END' : node.spec.label,
+                dim: row.isCloser,
               ),
+              if (!row.isCloser)
+                for (final chip in node.chips)
+                  _ArgWord(
+                    text: chip.text,
+                    tone: tone,
+                    onTap: interactive ? () => onCycleArg(chip.slot) : () {},
+                  ),
             ],
           ),
         ),
@@ -146,7 +133,9 @@ class _Keyword extends StatelessWidget {
       padding: const EdgeInsets.only(right: 2),
       child: Text(
         text,
-        style: dim ? W.row.copyWith(color: W.textDim, fontSize: 18) : W.row,
+        style: dim
+            ? W.row.copyWith(color: W.inkDim, fontSize: 18)
+            : W.row.copyWith(color: W.ink),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         softWrap: false,
@@ -162,9 +151,14 @@ class _Keyword extends StatelessWidget {
 /// carries up to three of these, so the fill is deliberately much softer than a
 /// real button's.
 class _ArgWord extends StatelessWidget {
-  const _ArgWord({required this.text, required this.onTap});
+  const _ArgWord({required this.text, required this.tone, required this.onTap});
 
   final String text;
+
+  /// The row's colour: the chip is cut out of it rather than sitting on top in
+  /// a neutral grey, which would fight every hue it landed on.
+  final Color tone;
+
   final VoidCallback onTap;
 
   @override
@@ -186,48 +180,18 @@ class _ArgWord extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
           decoration: BoxDecoration(
-            color: W.cyclableFill,
-            border: Border.all(color: W.cyclableEdge),
+            color: W.chipFill(tone),
+            border: Border.all(color: W.chipEdge(tone)),
             borderRadius: BorderRadius.circular(2),
           ),
           child: Text(
             text,
-            style: W.row.copyWith(fontWeight: FontWeight.w400),
+            style: W.row.copyWith(color: W.ink, fontWeight: FontWeight.w400),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             softWrap: false,
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// The vertical guides of the enclosing blocks. One per level of nesting, so a
-/// block's header and its closer are visually connected by the guide running
-/// down its body.
-///
-/// Slot rows render this too - otherwise the guide breaks wherever the caret or
-/// a drop target sits, and the block looks torn in half.
-class Spines extends StatelessWidget {
-  const Spines({super.key, required this.depth});
-  final int depth;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 10 + W.indentPerDepth * depth,
-      child: Row(
-        // Height comes from the enclosing IntrinsicHeight, so the spines stretch
-        // rather than needing an explicit (and clippable) height.
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(width: 6),
-          for (var d = 0; d < depth; d++) ...[
-            Container(width: 2, color: W.spineFor(d)),
-            SizedBox(width: W.indentPerDepth - 2),
-          ],
-        ],
       ),
     );
   }
@@ -243,7 +207,12 @@ class _SwipeHint extends StatelessWidget {
     return Container(
       color: W.chrome,
       alignment: end ? Alignment.centerRight : Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      // The row runs past the right edge of the screen, so the DELETE hint has
+      // to be pulled back by the overhang or it lands where nobody can see it.
+      padding: EdgeInsets.only(
+        left: 18,
+        right: end ? 18 + W.programOverhang : 18,
+      ),
       child: Text(label, style: W.meta.copyWith(color: W.textDim)),
     );
   }

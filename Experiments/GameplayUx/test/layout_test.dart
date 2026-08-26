@@ -11,6 +11,7 @@ import 'package:gameplay_ux/ui/gameplay_screen.dart';
 import 'package:gameplay_ux/ui/floor_pane.dart';
 import 'package:gameplay_ux/ui/program_pane.dart';
 import 'package:gameplay_ux/ui/tray.dart';
+import 'package:gameplay_ux/model/commands.dart';
 import 'package:gameplay_ux/ui/wireframe.dart';
 
 /// MaterialApp installs its own MediaQuery from the view, so an outer one is
@@ -897,10 +898,23 @@ void main() {
       final take = tester.getRect(rowContainerFor(inProgram('TAKE')));
       final ifRow = tester.getRect(rowContainerFor(inProgram('IF')));
 
-      // The 1px separator lives inside each row's own decoration, so the boxes
-      // themselves touch.
+      // A block's header sits directly on the body it opens.
       expect(take.top, repeat.bottom);
-      expect(ifRow.top, take.bottom);
+
+      // The body is inset from the header. That inset is the container's left
+      // arm - the thing that replaced the connector lines.
+      expect(take.left, greaterThan(repeat.left));
+
+      // A nested block is set off from its siblings by its own margin, and only
+      // by that: enough to read as a container, not enough to look like a gap.
+      expect(ifRow.top - take.bottom, greaterThan(0));
+      expect(ifRow.top - take.bottom, lessThanOrEqualTo(4));
+
+      // A block header sits at its parent's indent - it is TAKE's sibling, not
+      // its child. Only the body it opens steps in again.
+      expect(ifRow.left, take.left);
+      final ship = tester.getRect(rowContainerFor(inProgram('SHIP')));
+      expect(ship.left, greaterThan(ifRow.left));
     });
 
     testWidgets('drop targets still open up during a drag', (tester) async {
@@ -929,6 +943,154 @@ void main() {
 
       await gesture.up();
       await tester.pumpAndSettle();
+    });
+  });
+
+  group('block containers', () {
+    testWidgets('a block wraps its body in a container of its own tone', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+
+      // A block header paints nothing itself, so the first decorated ancestor
+      // above it is the block container. (A plain command row *does* paint, so
+      // this only works from a header.)
+      Color? fillOf(String rowText) {
+        final ancestors = find
+            .ancestor(of: inProgram(rowText), matching: find.byType(Container))
+            .evaluate()
+            .toList();
+        for (final e in ancestors) {
+          final d = (e.widget as Container).decoration;
+          if (d is BoxDecoration && d.color != null) return d.color;
+        }
+        return null;
+      }
+
+      // Each block wears its own command's colour, so REPEAT and the IF nested
+      // inside it are already distinct without any depth trick.
+      expect(fillOf('REPEAT'), W.blockFill(specFor('repeat').colour, 0));
+      expect(fillOf('IF'), W.blockFill(specFor('ifCond').colour, 1));
+      expect(fillOf('REPEAT'), isNot(fillOf('IF')));
+
+      // The depth step exists for the harder case: the same block nested in
+      // itself, where colour alone would hide the inset arm.
+      final base = specFor('repeat').colour;
+      expect(W.blockFill(base, 0), isNot(W.blockFill(base, 1)));
+    });
+
+    testWidgets('the body of a block is fully contained by it', (tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+
+      // The "C": the header is the top arm, END is the bottom arm, and every
+      // instruction in between sits inside that span.
+      final header = tester.getRect(rowContainerFor(inProgram('REPEAT')));
+      final closers = inProgram('END');
+      final outerEnd = tester.getRect(rowContainerFor(closers.last));
+      final take = tester.getRect(rowContainerFor(inProgram('TAKE')));
+
+      expect(take.top, greaterThanOrEqualTo(header.bottom));
+      expect(take.bottom, lessThanOrEqualTo(outerEnd.top));
+    });
+
+    testWidgets('no connector lines are drawn', (tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+
+      // The spines that used to join a header to its END are gone: the
+      // container's shape carries that now. A 2px-wide box inside the program
+      // pane would be one of them.
+      final hairlines = find
+          .descendant(
+            of: find.byType(ProgramPane),
+            matching: find.byType(Container),
+          )
+          .evaluate()
+          .where((e) {
+            final r = tester.getRect(find.byWidget(e.widget));
+            return r.width == 2 && r.height > 20;
+          });
+
+      expect(hairlines, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('right overhang', () {
+    testWidgets('a block runs off the right edge of the pane', (tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+
+      final pane = tester.getRect(find.byType(ProgramPane));
+      // The block container behind the REPEAT header.
+      final block = tester.getRect(
+        find
+            .ancestor(of: inProgram('REPEAT'), matching: find.byType(Container))
+            .at(1),
+      );
+
+      // Seeing the right edge would close the "C" into a rectangle.
+      expect(block.right, greaterThan(pane.right));
+      expect(block.right - pane.right, closeTo(W.programOverhang, 8));
+    });
+
+    testWidgets('nothing is clipped that a player needs to read', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+
+      final pane = tester.getRect(find.byType(ProgramPane));
+      // Rows are left-aligned, so every word still lands inside the viewport.
+      for (final word in ['REPEAT', 'TAKE', 'IF', 'TYPE', 'IS', 'BLUE']) {
+        expect(
+          tester.getRect(inProgram(word)).right,
+          lessThanOrEqualTo(pane.right),
+          reason: '$word is off-screen',
+        );
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the program still cannot be scrolled sideways', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+
+      final before = tester.getRect(inProgram('REPEAT'));
+      await tester.drag(inProgram('REPEAT'), const Offset(-200, 0));
+      await tester.pumpAndSettle();
+
+      // A horizontal drag is a swipe gesture on a row, not a pan of the program.
+      expect(tester.getRect(inProgram('REPEAT')).left, before.left);
+      expect(tester.takeException(), isNull);
     });
   });
 }

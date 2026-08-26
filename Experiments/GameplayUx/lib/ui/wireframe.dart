@@ -13,9 +13,6 @@ abstract final class W {
   static const page = Color(0xFF2B2B2B);
   static const paneFloor = Color(0xFF3A3A3A);
   static const paneProgram = Color(0xFF232323);
-  static const rowFill = Color(0xFF333333);
-  static const rowFillAlt = Color(0xFF2E2E2E);
-  static const rowFillCloser = Color(0xFF292929);
   static const chrome = Color(0xFF1C1C1C);
   static const line = Color(0xFF505050);
   static const lineSoft = Color(0xFF3F3F3F);
@@ -38,16 +35,34 @@ abstract final class W {
   static const cyclableEdge = Color(0xFF606060);
   static const dropTarget = Color(0xFF6E6E6E);
 
-  /// Spine greys by nesting depth. Lightness stands in for the colour the real
-  /// build uses, so nesting still reads without introducing a palette.
-  static const spines = <Color>[
-    Color(0xFF6B6B6B),
-    Color(0xFF888888),
-    Color(0xFF5A5A5A),
-    Color(0xFF9C9C9C),
-  ];
+  /// A block is a literal container with its body inset, so it reads as a "C"
+  /// wrapped around the instructions it owns. Its colour is the command's own,
+  /// stepped very slightly by depth so that a block nested inside another of the
+  /// *same* command still shows its inset arm.
+  /// The dark ink every coloured row is written in.
+  ///
+  /// Command colours are bright, so the text on them is dark rather than the
+  /// near-white used on the app's own chrome. That flip also inverts every
+  /// derived tone below: on a dark fill, darkening improves contrast; on a
+  /// bright one, lightening does.
+  static const ink = Color(0xFF1B1B1B);
+  static const inkDim = Color(0x991B1B1B);
 
-  static Color spineFor(int depth) => spines[depth % spines.length];
+  /// The step *lightens*, because the ink is dark. (It darkened when the
+  /// palette was dark and the ink near-white - the same reasoning, inverted.)
+  static Color blockFill(Color base, int depth) =>
+      depth.isEven ? base : Color.lerp(base, Colors.white, 0.14)!;
+
+  /// A cyclable word sits in a well cut into its own row: the row's colour taken
+  /// up, with an edge taken down. Deriving both from the row keeps the chip
+  /// legible on every hue, and lighter-than-the-row can only improve the ink
+  /// contrast the row already passes.
+  static Color chipFill(Color base) => Color.lerp(base, Colors.white, 0.24)!;
+  static Color chipEdge(Color base) => Color.lerp(base, Colors.black, 0.30)!;
+
+  /// Hairline between two adjacent rows. Invisible where colours differ, and
+  /// just enough where two of the same command sit together.
+  static Color rowEdge(Color base) => Color.lerp(base, Colors.black, 0.18)!;
 
   // Dimensions. 7.3: rows 56-64, targets >= 48, indent must be legible.
   static const rowHeight = 60.0;
@@ -57,6 +72,13 @@ abstract final class W {
 
   /// Left inset for every row and slot, replacing the old line-number gutter.
   static const rowInset = 12.0;
+
+  /// How far the program is laid out past the right edge of its pane.
+  ///
+  /// A block is meant to read as a "C" wrapped around its body. Seeing its right
+  /// edge closes the shape into a rectangle and the bracket reading disappears,
+  /// so the whole program runs off the screen and is clipped.
+  static const programOverhang = 56.0;
   static const dividerHitHeight = 34.0;
 
   /// Chrome text stops scaling here, while program rows keep scaling to 200%
@@ -73,11 +95,14 @@ abstract final class W {
   static const rowFamily = 'Consolas';
   static const rowFallback = <String>['Courier New', 'monospace'];
 
+  /// Command words are extra bold. They are the fixed part of every sentence,
+  /// and the weight is half of what separates them from the cyclable values,
+  /// which stay at regular.
   static const TextStyle row = TextStyle(
     fontFamily: rowFamily,
     fontFamilyFallback: rowFallback,
     fontSize: 20,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w800,
     color: text,
     height: 1.1,
   );

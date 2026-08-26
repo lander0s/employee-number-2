@@ -9,6 +9,8 @@
 ///   through the whole document model.
 library;
 
+import 'dart:ui' show Color;
+
 enum ArgKind {
   /// No argument.
   none,
@@ -27,6 +29,7 @@ class CommandSpec {
     required this.id,
     required this.label,
     required this.trayLabel,
+    required this.colour,
     this.argKind = ArgKind.none,
     this.isBlock = false,
   });
@@ -42,6 +45,16 @@ class CommandSpec {
 
   final ArgKind argKind;
   final bool isBlock;
+
+  /// Bright and cheerful first, then pulled back about a fifth of the way to
+  /// grey. Starting from a dark, desaturated palette produced nine tones nobody
+  /// could tell apart; starting from playdoh colours and stepping *down* leaves
+  /// them obviously distinct - no two are closer than deltaE 23 - while keeping
+  /// headroom to push saturation back up for the executing line.
+  ///
+  /// Every one clears 7.3's 7:1 floor against [W.ink], the dark text these
+  /// fills are written in.
+  final Color colour;
 
   bool get takesArg => argKind != ArgKind.none;
 }
@@ -79,13 +92,25 @@ ObjectKind objectKindFor(String subject, String comparator) {
 /// tray scrolls horizontally and the most-reached-for commands should never
 /// require a scroll.
 const commandCatalogue = <CommandSpec>[
-  CommandSpec(id: 'take', label: 'TAKE', trayLabel: 'TAKE'),
-  CommandSpec(id: 'ship', label: 'SHIP', trayLabel: 'SHIP'),
+  CommandSpec(
+    id: 'take',
+    label: 'TAKE',
+    trayLabel: 'TAKE',
+    colour: Color(0xFF59C579), // green
+  ),
+  CommandSpec(
+    id: 'ship',
+    label: 'SHIP',
+    trayLabel: 'SHIP',
+    colour: Color(0xFFE4938B), // red
+  ),
+
   CommandSpec(
     id: 'repeat',
     label: 'REPEAT',
     trayLabel: 'REPEAT',
     isBlock: true,
+    colour: Color(0xFF80ACDD), // blue
   ),
   CommandSpec(
     id: 'ifCond',
@@ -93,32 +118,47 @@ const commandCatalogue = <CommandSpec>[
     trayLabel: 'IF',
     argKind: ArgKind.condition,
     isBlock: true,
+    colour: Color(0xFFE4C858), // yellow
   ),
+
   CommandSpec(
     id: 'stackOn',
     label: 'STACK ON',
     trayLabel: 'STACK ON',
     argKind: ArgKind.pallet,
+    colour: Color(0xFFE0985A), // orange
   ),
   CommandSpec(
     id: 'pickFrom',
     label: 'PICK FROM',
     trayLabel: 'PICK FROM',
     argKind: ArgKind.pallet,
+    colour: Color(0xFFBF9ADF), // purple
   ),
+
   CommandSpec(
     id: 'mergeWith',
     label: 'MERGE WITH',
     trayLabel: 'MERGE',
     argKind: ArgKind.pallet,
+    colour: Color(0xFFE290B9), // pink
   ),
   CommandSpec(
     id: 'stripBy',
     label: 'STRIP BY',
     trayLabel: 'STRIP',
     argKind: ArgKind.pallet,
+    colour: Color(0xFF61C6D1), // cyan
   ),
-  CommandSpec(id: 'clockOut', label: 'CLOCK OUT', trayLabel: 'CLOCK OUT'),
+
+  CommandSpec(
+    id: 'clockOut',
+    label: 'CLOCK OUT',
+    trayLabel: 'CLOCK OUT',
+    colour: Color(
+      0xFFBBA498,
+    ), // warm grey - the one that ends a shift stands apart
+  ),
 ];
 
 CommandSpec specFor(String id) =>

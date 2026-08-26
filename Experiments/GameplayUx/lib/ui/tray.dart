@@ -187,23 +187,27 @@ class _TrayButton extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: W.minTarget),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           alignment: Alignment.center,
+          // The same colour the command wears in the program, so the tray reads
+          // as a shelf of the very things you are about to place.
           decoration: BoxDecoration(
-            color: spec.isBlock ? W.buttonPressed : W.button,
-            border: Border.all(color: W.line),
+            color: spec.colour,
+            border: Border.all(color: W.chipEdge(spec.colour)),
           ),
           child: Row(
             children: [
               Text(
                 spec.trayLabel,
                 style: W.label.copyWith(
+                  color: W.ink,
+                  fontWeight: FontWeight.w800,
                   fontFamily: W.rowFamily,
                   fontFamilyFallback: W.rowFallback,
                 ),
               ),
               if (spec.takesArg)
-                Text(' _', style: W.label.copyWith(color: W.textFaint)),
+                Text(' _', style: W.label.copyWith(color: W.inkDim)),
               if (spec.isBlock)
-                Text('  ┐', style: W.label.copyWith(color: W.textDim)),
+                Text('  ┐', style: W.label.copyWith(color: W.inkDim)),
             ],
           ),
         ),

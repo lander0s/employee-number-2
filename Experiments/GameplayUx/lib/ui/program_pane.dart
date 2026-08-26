@@ -1,4 +1,15 @@
-/// The program pane: rows, caret, and block-aware drag reorder.
+/// The program pane: nested block containers, caret, and block-aware drag
+/// reorder.
+///
+/// A block is drawn as a literal container with its body inset, so it reads as a
+/// "C" wrapped around the instructions it owns. There are no connector lines: the
+/// container's own shape says what belongs to what, which a naive eye reads
+/// without being taught. Nesting alternates two background tones, so an inner
+/// block always contrasts with the one holding it.
+///
+/// That means the pane is a recursive widget tree rather than a flat list, and
+/// the tree is built eagerly inside a scroll view. Fine at puzzle scale; see the
+/// README's known gaps for what that costs.
 ///
 /// Flutter gives us nothing for the drag here. ReorderableListView moves one row
 /// and knows nothing about a REPEAT owning its body, so this is hand-rolled from
@@ -90,46 +101,128 @@ class ProgramPaneState extends State<ProgramPane> {
 
   @override
   Widget build(BuildContext context) {
-    final items = widget.running ? doc.flatten() : doc.flattenWithSlots();
-    final dragging = _draggingId != null;
+    final empty = doc.root.isEmpty && _draggingId == null;
 
     return Container(
       key: _paneKey,
       color: W.paneProgram,
-      child: Column(
-        children: [
-          Expanded(
-            child: doc.root.isEmpty && !dragging
-                ? _EmptyState(
-                    slot: const Slot(null, 0, 0),
-                    onTapSlot: (slot) => _mutate(() => doc.setCaret(slot)),
-                  )
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.only(bottom: 40),
-                    itemCount: items.length,
-                    itemBuilder: (context, i) {
-                      final item = items[i];
-                      if (item is Slot) {
-                        return _SlotWidget(
-                          slot: item,
-                          caret: doc.caret,
-                          dragActive: dragging,
-                          accepts: (id) => _accepts(id, item),
-                          onTap: () => _mutate(() => doc.setCaret(item)),
-                          onAccept: (id) => _mutate(() {
-                            doc.move(id, item);
-                          }),
-                        );
-                      }
-                      return _buildRow(item as DisplayRow);
-                    },
+      child: empty
+          ? _EmptyState(
+              slot: const Slot(null, 0, 0),
+              onTapSlot: (slot) => _mutate(() => doc.setCaret(slot)),
+            )
+          : LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                controller: _scroll,
+                padding: const EdgeInsets.only(bottom: 40),
+                // Laid out wider than the pane and clipped, so no block ever
+                // shows its right edge. The inner scroll view exists only to
+                // give the extra width a legitimate home - it never scrolls, and
+                // without it Flutter would report the overflow as an error.
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const NeverScrollableScrollPhysics(),
+                  child: SizedBox(
+                    width: constraints.maxWidth + W.programOverhang,
+                    child: _buildList(doc.root, null, 0),
                   ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  /// One child list: a slot before every node and one after the last, so every
+  /// legal insertion point - including an empty block body - is reachable.
+  ///
+  /// [on] is the colour of the block this list sits inside, or null at the root.
+  /// Slots need it: a caret drawn in the dark theme's pale grey is invisible on
+  /// a bright yellow block.
+  Widget _buildList(
+    List<Node> nodes,
+    String? parentId,
+    int depth, {
+    Color? on,
+  }) {
+    // While running there are no slots at all, so the caret and every drop gap
+    // disappear together rather than being individually suppressed.
+    if (widget.running) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [for (final node in nodes) _buildNode(node, depth)],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < nodes.length; i++) ...[
+          _buildSlot(Slot(parentId, i, depth), on),
+          _buildNode(nodes[i], depth),
+        ],
+        _buildSlot(Slot(parentId, nodes.length, depth), on),
+      ],
+    );
+  }
+
+  Widget _buildNode(Node node, int depth) {
+    if (!node.isBlock) {
+      return _draggable(
+        node,
+        _buildRow(DisplayRow(node: node, kind: RowKind.command, depth: depth)),
+      );
+    }
+
+    final fill = W.blockFill(node.spec.colour, depth);
+    final body = _buildList(node.children!, node.id, depth + 1, on: fill);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Only the header is draggable, as before: a draggable wrapping the
+          // whole container would fight its own children for the gesture.
+          _draggable(
+            node,
+            _buildRow(
+              DisplayRow(node: node, kind: RowKind.blockHeader, depth: depth),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: W.indentPerDepth, right: 4),
+            child: node.children!.isEmpty
+                // An empty body still has to show the inset, or the container
+                // stops reading as a container.
+                ? ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 18),
+                    child: body,
+                  )
+                : body,
+          ),
+          _buildRow(
+            DisplayRow(node: node, kind: RowKind.blockCloser, depth: depth),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildSlot(Slot slot, Color? on) => _SlotWidget(
+    slot: slot,
+    on: on,
+    caret: doc.caret,
+    dragActive: _draggingId != null,
+    accepts: (id) => _accepts(id, slot),
+    onTap: () => _mutate(() => doc.setCaret(slot)),
+    onAccept: (id) => _mutate(() {
+      doc.move(id, slot);
+    }),
+  );
 
   /// A block may not be dropped into its own body.
   bool _accepts(String draggedId, Slot slot) {
@@ -137,23 +230,23 @@ class ProgramPaneState extends State<ProgramPane> {
     return !doc.contains(draggedId, slot.parentId!);
   }
 
-  Widget _buildRow(DisplayRow row) {
-    final rowWidget = ProgramRow(
-      row: row,
-      interactive: !widget.running,
-      dragging: _draggingId == row.node.id,
-      onTap: () => _mutate(() => doc.setCaret(_caretForRow(row))),
-      onDelete: () => _confirmDelete(row),
-      onDuplicate: () => _mutate(() => doc.duplicate(row.node.id)),
-      onCycleArg: (slot) => _mutate(() => doc.cycleArg(row.node.id, slot)),
-    );
+  Widget _buildRow(DisplayRow row) => ProgramRow(
+    row: row,
+    interactive: !widget.running,
+    dragging: _draggingId == row.node.id,
+    onTap: () => _mutate(() => doc.setCaret(_caretForRow(row))),
+    onDelete: () => _confirmDelete(row),
+    onDuplicate: () => _mutate(() => doc.duplicate(row.node.id)),
+    onCycleArg: (slot) => _mutate(() => doc.cycleArg(row.node.id, slot)),
+  );
 
-    if (!row.isDraggable || widget.running) return rowWidget;
+  Widget _draggable(Node node, Widget rowWidget) {
+    if (widget.running) return rowWidget;
 
     return LongPressDraggable<String>(
-      data: row.node.id,
+      data: node.id,
       delay: const Duration(milliseconds: 180),
-      onDragStarted: () => setState(() => _draggingId = row.node.id),
+      onDragStarted: () => setState(() => _draggingId = node.id),
       onDragUpdate: (d) => _startAutoScroll(d.globalPosition),
       onDragEnd: (_) {
         _stopAutoScroll();
@@ -163,7 +256,7 @@ class ProgramPaneState extends State<ProgramPane> {
         _stopAutoScroll();
         setState(() => _draggingId = null);
       },
-      feedback: _DragFeedback(doc: doc, row: row),
+      feedback: _DragFeedback(node: node),
       childWhenDragging: rowWidget,
       child: rowWidget,
     );
@@ -256,6 +349,7 @@ class ProgramPaneState extends State<ProgramPane> {
 class _SlotWidget extends StatefulWidget {
   const _SlotWidget({
     required this.slot,
+    required this.on,
     required this.caret,
     required this.dragActive,
     required this.accepts,
@@ -264,6 +358,10 @@ class _SlotWidget extends StatefulWidget {
   });
 
   final Slot slot;
+
+  /// The enclosing block's colour, or null at the root.
+  final Color? on;
+
   final Slot caret;
   final bool dragActive;
   final bool Function(String) accepts;
@@ -295,19 +393,26 @@ class _SlotWidgetState extends State<_SlotWidget> {
       builder: (context, candidate, rejected) {
         final active = _hovering || candidate.isNotEmpty;
 
+        // On a bright block everything here has to be drawn in ink; on the dark
+        // pane it is drawn in the pale theme colours.
+        final onColour = widget.on != null;
+        final markColour = onColour ? W.ink : W.caret;
+        final ruleColour = onColour ? W.inkDim : W.lineSoft;
+        final dropColour = onColour ? W.ink : W.dropTarget;
+
         // The caret's height comes from its own text, not a constant, so it
         // cannot clip when the OS text scale is above 1.0. Everything else here
         // is a bare rule with no text in it, so a fixed height is safe.
         final Widget child;
         final double? fixedHeight;
         if (active) {
-          child = Container(height: 4, color: W.dropTarget);
+          child = Container(height: 4, color: dropColour);
           fixedHeight = 34;
         } else if (widget.dragActive) {
-          child = Container(height: 1, color: W.lineSoft);
+          child = Container(height: 1, color: ruleColour);
           fixedHeight = 16;
         } else if (isCaret) {
-          child = const _Caret();
+          child = _Caret(colour: markColour);
           fixedHeight = null;
         } else {
           // Zero, so rows sit flush against each other and the list reads as one
@@ -329,21 +434,13 @@ class _SlotWidgetState extends State<_SlotWidget> {
             constraints: isCaret
                 ? const BoxConstraints(minHeight: W.rowHeight)
                 : null,
-            padding: EdgeInsets.symmetric(vertical: isCaret ? 8 : 0),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(width: W.rowInset),
-                  Spines(depth: widget.slot.depth),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Align(alignment: Alignment.centerLeft, child: child),
-                  ),
-                  const SizedBox(width: 10),
-                ],
-              ),
+            padding: EdgeInsets.only(
+              left: W.rowInset,
+              right: 10,
+              top: isCaret ? 8 : 0,
+              bottom: isCaret ? 8 : 0,
             ),
+            child: Align(alignment: Alignment.centerLeft, child: child),
           ),
         );
       },
@@ -358,7 +455,10 @@ class _SlotWidgetState extends State<_SlotWidget> {
 /// exactly what that setting exists for - and the timer is cancelled in that
 /// case rather than left spinning.
 class _Caret extends StatefulWidget {
-  const _Caret();
+  const _Caret({required this.colour});
+
+  /// Dark ink on a coloured block, pale on the dark pane.
+  final Color colour;
 
   @override
   State<_Caret> createState() => _CaretState();
@@ -400,14 +500,14 @@ class _CaretState extends State<_Caret> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 26, height: 3, color: W.caret),
+          Container(width: 26, height: 3, color: widget.colour),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
               'INSERT HERE',
               // Same size and weight as an instruction row: a smaller caret read
               // as a different kind of thing.
-              style: W.row.copyWith(color: W.textDim),
+              style: W.row.copyWith(color: widget.colour),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               softWrap: false,
@@ -422,35 +522,12 @@ class _CaretState extends State<_Caret> {
 /// What follows the finger during a drag. Renders the whole subtree, so it is
 /// visible that a block carries its body.
 class _DragFeedback extends StatelessWidget {
-  const _DragFeedback({required this.doc, required this.row});
-  final ProgramDocument doc;
-  final DisplayRow row;
+  const _DragFeedback({required this.node});
+
+  final Node node;
 
   @override
   Widget build(BuildContext context) {
-    final node = row.node;
-    final rows = <DisplayRow>[];
-
-    void walk(node, int depth) {
-      rows.add(
-        DisplayRow(
-          node: node,
-          kind: node.isBlock ? RowKind.blockHeader : RowKind.command,
-          depth: depth,
-        ),
-      );
-      for (final c in [...?node.children]) {
-        walk(c, depth + 1);
-      }
-      if (node.isBlock) {
-        rows.add(
-          DisplayRow(node: node, kind: RowKind.blockCloser, depth: depth),
-        );
-      }
-    }
-
-    walk(node, 0);
-
     return Opacity(
       opacity: 0.92,
       child: Material(
@@ -460,28 +537,54 @@ class _DragFeedback extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border.all(color: W.text, width: 2),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final r in rows.take(8))
-                ProgramRow(
-                  row: r,
-                  onTap: () {},
-                  onDelete: () {},
-                  onDuplicate: () {},
-                  onCycleArg: (_) {},
-                  interactive: false,
-                ),
-              if (rows.length > 8)
-                Container(
-                  height: 24,
-                  color: W.chrome,
-                  alignment: Alignment.center,
-                  child: Text('+${rows.length - 8} more', style: W.meta),
-                ),
-            ],
-          ),
+          child: _ghost(node, 0),
         ),
+      ),
+    );
+  }
+
+  /// The same shape the pane draws, minus every gesture. Depth restarts at 0 so
+  /// the ghost is tinted as if it were top level.
+  Widget _ghost(Node node, int depth) {
+    Widget row(RowKind kind) => ProgramRow(
+      row: DisplayRow(node: node, kind: kind, depth: depth),
+      interactive: false,
+      onTap: () {},
+      onDelete: () {},
+      onDuplicate: () {},
+      onCycleArg: (_) {},
+    );
+
+    if (!node.isBlock) return row(RowKind.command);
+
+    return Container(
+      color: W.blockFill(node.spec.colour, depth),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          row(RowKind.blockHeader),
+          Padding(
+            padding: const EdgeInsets.only(left: W.indentPerDepth, right: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final child in node.children!.take(4))
+                  _ghost(child, depth + 1),
+                if (node.children!.length > 4)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Text(
+                      '+${node.children!.length - 4} more',
+                      style: W.meta,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          row(RowKind.blockCloser),
+        ],
       ),
     );
   }
@@ -502,7 +605,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _Caret(),
+            const _Caret(colour: W.caret),
             const SizedBox(height: 14),
             Text('Tap a command below to add it here.', style: W.labelDim),
           ],
