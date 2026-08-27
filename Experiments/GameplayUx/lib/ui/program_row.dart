@@ -218,24 +218,41 @@ class _ArgWord extends StatelessWidget {
         onTap: onTap,
         // Opaque so the whole padded area is tappable, not just the glyphs.
         behavior: HitTestBehavior.opaque,
-        // No `alignment` and no `constraints` on this Container. With either
-        // set it expands to its incoming width constraint, and inside a Wrap
-        // that constraint is the full row - which put every word on its own line
-        // and made the IF row four lines tall. Padding alone gets the 48dp
-        // target and lets the Container size to its text.
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-          decoration: BoxDecoration(
-            color: W.chipFill(tone),
-            border: Border.all(color: W.chipEdge(tone)),
-            borderRadius: BorderRadius.circular(W.chipRadius),
-          ),
-          child: Text(
-            text,
-            style: W.row.copyWith(color: W.ink, fontWeight: FontWeight.w400),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            softWrap: false,
+        // The touch target and the painted chip are two different boxes. 7.3
+        // wants 48dp under a thumb, and padding the chip itself to that height
+        // made a three-word condition look like a row of form fields. So the
+        // 48dp lives in transparent space around the chip, which is padded to
+        // its word and no further.
+        //
+        // The minimum goes on the outer box only. Given `alignment` or
+        // `constraints`, the *inner* Container would expand to its incoming
+        // width - and inside a Wrap that is the whole row, which once put every
+        // word on its own line and made the IF row four lines tall.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: W.minTarget),
+          child: Center(
+            widthFactor: 1,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: W.chipPadH,
+                vertical: W.chipPadV,
+              ),
+              decoration: BoxDecoration(
+                color: W.chipFill(tone),
+                border: Border.all(color: W.chipEdge(tone)),
+                borderRadius: BorderRadius.circular(W.chipRadius),
+              ),
+              child: Text(
+                text,
+                style: W.row.copyWith(
+                  color: W.ink,
+                  fontWeight: FontWeight.w400,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
+            ),
           ),
         ),
       ),

@@ -134,6 +134,12 @@ abstract final class W {
   static const autoScrollFast = 16.0;
   static const minTarget = 48.0;
 
+  /// A chip hugs its word. The thumb target it needs is carried by transparent
+  /// space around it - see _ArgWord - so the padding here can be the least that
+  /// still reads as a button.
+  static const chipPadH = 10.0;
+  static const chipPadV = 3.0;
+
   /// Left inset for every row and slot, replacing the old line-number gutter.
   static const rowInset = 12.0;
 
@@ -167,34 +173,37 @@ abstract final class W {
   static const chromeMaxTextScale = 1.3;
 
   // Type. 7.3: instruction rows 20 semibold, nothing functional under 17.
-  /// Instructions are set in Luckiest Guy: a single-weight, all-caps display
-  /// face, vendored in assets/fonts. It is the one place in the app with any
-  /// character - the chrome around it stays plain - and it suits commands that
-  /// are always shouted in capitals anyway.
+  /// Instructions are set in Sniglet Regular, vendored in assets/fonts. It is
+  /// the one place in the app with any character - the chrome around it stays
+  /// plain.
   ///
-  /// Single weight matters: asking for w800 gets you the 400 face, so weight
-  /// cannot be used to separate a keyword from an argument the way it did with
-  /// the monospace it replaced. The argument chips carry that distinction on
-  /// their own, with a fill and an edge.
-  static const rowFamily = 'LuckiestGuy';
+  /// Only the one face is shipped, so weight cannot separate a keyword from an
+  /// argument the way it did with the monospace this replaced. The argument
+  /// chips carry that distinction on their own, with a fill and an edge.
+  static const rowFamily = 'Sniglet';
   static const rowFallback = <String>['Consolas', 'Courier New', 'monospace'];
 
-  /// Luckiest Guy sets tight by default - the letters lean on each other, which
-  /// is fine for a logo and hard work for a word you are scanning for. A little
-  /// air lets each one be read on its own.
+  /// A little air between letters, so each one can be read on its own.
   static const rowLetterSpacing = 0.8;
 
-  /// Command words are extra bold. They are the fixed part of every sentence,
-  /// and the weight is half of what separates them from the cyclable values,
-  /// which stay at regular.
+  /// One weight for every word on a row. What separates a fixed command word
+  /// from a value you can change is the chip around the value, not the weight of
+  /// the letters.
+  /// `leadingDistribution: even` is doing real work here. The labels are all
+  /// caps, and by default the leftover line height is split the way the font
+  /// declares it - most of it below the caps, in descender space nothing here
+  /// ever uses. That reads as a chunk of padding under every word, worst inside
+  /// the argument chips where the box is tight to begin with. Even splits it
+  /// top and bottom, so a word sits in the middle of whatever holds it.
   static const TextStyle row = TextStyle(
     fontFamily: rowFamily,
     fontFamilyFallback: rowFallback,
     fontSize: 20,
-    fontWeight: FontWeight.w800,
+    fontWeight: FontWeight.w400,
     letterSpacing: rowLetterSpacing,
+    leadingDistribution: TextLeadingDistribution.even,
     color: text,
-    height: 1.1,
+    height: 1.0,
   );
 
   static const TextStyle rowArg = TextStyle(
@@ -203,8 +212,9 @@ abstract final class W {
     fontSize: 20,
     fontWeight: FontWeight.w400,
     letterSpacing: rowLetterSpacing,
+    leadingDistribution: TextLeadingDistribution.even,
     color: textDim,
-    height: 1.1,
+    height: 1.0,
   );
 
   static const TextStyle label = TextStyle(

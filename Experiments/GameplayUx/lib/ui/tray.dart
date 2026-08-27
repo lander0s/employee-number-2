@@ -265,7 +265,7 @@ class _Face extends StatelessWidget {
               spec.trayLabel,
               style: W.label.copyWith(
                 color: W.ink,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w400,
                 fontFamily: W.rowFamily,
                 fontFamilyFallback: W.rowFallback,
                 letterSpacing: W.rowLetterSpacing,

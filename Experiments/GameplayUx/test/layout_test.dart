@@ -746,6 +746,35 @@ void main() {
       expect(inProgram('RED'), findsOneWidget);
     });
 
+    testWidgets('a chip hugs its word but stays a thumb target', (
+      tester,
+    ) async {
+      await boot(tester);
+
+      // Painted: tight around the text. The chip used to be padded to 48dp
+      // itself, which made a three-word condition look like a row of form
+      // fields.
+      final word = tester.getRect(inProgram('TYPE'));
+      final chip = tester.getRect(rowContainerFor(inProgram('TYPE')));
+      expect(chip.height - word.height, lessThan(12));
+
+      // Tappable: still 48, carried by transparent space around the chip.
+      final target = tester.getRect(
+        find
+            .ancestor(
+              of: inProgram('TYPE'),
+              matching: find.byType(ConstrainedBox),
+            )
+            .first,
+      );
+      expect(target.height, greaterThanOrEqualTo(W.minTarget));
+
+      // And the tap still lands from the edge of that target, not just the chip.
+      await tester.tapAt(Offset(target.center.dx, target.top + 3));
+      await tester.pumpAndSettle();
+      expect(inProgram('WEIGHT'), findsOneWidget);
+    });
+
     testWidgets('a row carries one argument control, not a stepper', (
       tester,
     ) async {
