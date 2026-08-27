@@ -1025,22 +1025,57 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('hides the tray and every spacer, and brings them back', (
+    testWidgets('hides the tray but leaves the program where it was', (
       tester,
     ) async {
       await boot(tester);
       expect(find.byType(CommandTray), findsOneWidget);
-      expect(spacers(), findsWidgets);
+      // Relative to the pane: the pane itself does move, because it grows into
+      // the space the tray leaves.
+      double offsetOf(String row) =>
+          tester.getRect(rowContainerFor(inProgram(row))).top -
+          tester.getRect(find.byType(ProgramPane)).top;
+
+      const rows = ['REPEAT', 'TAKE', 'IF', 'SHIP'];
+      final before = [for (final row in rows) offsetOf(row)];
 
       await start(tester);
-      // Nothing to drag from, and nowhere to drop: a program that cannot be
-      // edited should offer no drop targets at all.
       expect(find.byType(CommandTray), findsNothing);
-      expect(spacers(), findsNothing);
+
+      // The spacers used to be removed along with the tray, which reflowed the
+      // whole program at the exact moment you wanted to be watching it run.
+      expect(spacers(), findsWidgets);
+      for (var i = 0; i < rows.length; i++) {
+        expect(
+          offsetOf(rows[i]),
+          closeTo(before[i], 0.5),
+          reason: '${rows[i]} moved within the pane when the program started',
+        );
+      }
 
       await start(tester); // STOP
       expect(find.byType(CommandTray), findsOneWidget);
       expect(spacers(), findsWidgets);
+    });
+
+    testWidgets('a spacer takes nothing while the program runs', (
+      tester,
+    ) async {
+      await boot(tester);
+      await start(tester);
+
+      // There is nothing to drag from with the tray gone, but the targets are
+      // still in the tree, so they have to refuse on their own account.
+      final slot = tester.widget<DragTarget<DragPayload>>(spacers().first);
+      expect(
+        slot.onWillAcceptWithDetails!(
+          DragTargetDetails(
+            data: const NewCommand('take'),
+            offset: Offset.zero,
+          ),
+        ),
+        isFalse,
+      );
     });
 
     testWidgets('the program is still readable while running', (tester) async {

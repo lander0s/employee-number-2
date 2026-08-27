@@ -145,30 +145,29 @@ class ProgramPaneState extends State<ProgramPane> {
               // least comfortable place to be dropping things. Now any row can
               // be pulled up to the top, and the room it opens up is still one
               // drop target for the end of the program rather than dead space.
-              if (!widget.running)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _overhang(
-                    width,
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
-                      child: _buildSlot(
-                        Slot(null, doc.root.length, 0),
-                        null,
-                        key: const ValueKey('program-tail'),
-                        fill: true,
-                        hint: doc.root.isEmpty
-                            ? Text(
-                                'Drag a command up from below.',
-                                style: W.labelDim,
-                              )
-                            : null,
-                      ),
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _overhang(
+                  width,
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: _buildSlot(
+                      Slot(null, doc.root.length, 0),
+                      null,
+                      key: const ValueKey('program-tail'),
+                      fill: true,
+                      hint: doc.root.isEmpty
+                          ? Text(
+                              'Drag a command up from below.',
+                              style: W.labelDim,
+                            )
+                          : null,
                     ),
                   ),
                 ),
+              ),
             ],
           );
         },
@@ -199,15 +198,10 @@ class ProgramPaneState extends State<ProgramPane> {
     Color? on,
     Color? ghost,
   }) {
-    // While running there are no slots at all, so no drop target exists on a
-    // program that cannot be edited.
-    if (widget.running) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [for (final node in nodes) _buildNode(node, depth)],
-      );
-    }
-
+    // The spacers stay while the program runs. They are the spacing between
+    // instructions, not a mode: taking them away reflowed the whole program the
+    // moment you pressed RUN, which is the one moment you want to be watching it
+    // rather than re-reading it. They refuse drops instead - see _buildSlot.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -331,7 +325,9 @@ class ProgramPaneState extends State<ProgramPane> {
     wide: wide,
     ghost: ghost,
     hint: hint,
-    accepts: (payload) => _accepts(payload, slot),
+    // Inert while running: the spacer is still there, but a program that cannot
+    // be edited takes nothing.
+    accepts: (payload) => !widget.running && _accepts(payload, slot),
     onAccept: (payload) => _mutate(() {
       switch (payload) {
         case NewCommand(:final commandId):
