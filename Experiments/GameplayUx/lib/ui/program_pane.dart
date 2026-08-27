@@ -31,6 +31,7 @@
 library;
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -90,31 +91,59 @@ class ProgramPaneState extends State<ProgramPane> {
   ///
   /// The pane's geometry is resolved here rather than in build: during build the
   /// render box may not be laid out yet, and localToGlobal asserts on it.
-  void _startAutoScroll(Offset globalPosition) {
+  /// Scrolls the program while something is held near its top or bottom edge.
+  ///
+  /// Called from both kinds of drag - a row being moved and a command being
+  /// carried up out of the tray - because the expectation is the same either
+  /// way: holding at the edge of a list should bring the rest of it into view.
+  void autoScrollTo(Offset globalPosition) {
     _autoScroll?.cancel();
-    const edge = 90.0;
-    const speed = 14.0;
 
     final box = _paneKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return;
+
+    final height = box.size.height;
+    final edge = math.min(W.autoScrollEdge, height / 4);
     final y = globalPosition.dy - box.localToGlobal(Offset.zero).dy;
-    final direction = y < edge
-        ? -1.0
-        : y > box.size.height - edge
-        ? 1.0
-        : 0.0;
-    if (direction == 0) return;
+
+    // `into` is how deep into the zone the finger is, 0 at the inner boundary
+    // and 1 at the very edge of the pane.
+    final double direction;
+    final double into;
+    if (y < edge) {
+      direction = -1;
+      into = (edge - y) / edge;
+    } else if (y > height - edge) {
+      direction = 1;
+      into = (y - (height - edge)) / edge;
+    } else {
+      return;
+    }
+
+    final speed =
+        W.autoScrollSlow +
+        (W.autoScrollFast - W.autoScrollSlow) * into.clamp(0.0, 1.0);
+
     _autoScroll = Timer.periodic(const Duration(milliseconds: 16), (_) {
-      if (!_scroll.hasClients) return;
+      if (!_scroll.hasClients) {
+        stopAutoScroll();
+        return;
+      }
       final next = (_scroll.offset + direction * speed).clamp(
         0.0,
         _scroll.position.maxScrollExtent,
       );
+      // Nothing left to scroll in that direction: stop rather than tick forever
+      // against the end of the list.
+      if (next == _scroll.offset) {
+        stopAutoScroll();
+        return;
+      }
       _scroll.jumpTo(next);
     });
   }
 
-  void _stopAutoScroll() {
+  void stopAutoScroll() {
     _autoScroll?.cancel();
     _autoScroll = null;
   }
@@ -364,13 +393,13 @@ class ProgramPaneState extends State<ProgramPane> {
       data: MoveNode(node.id),
       delay: const Duration(milliseconds: 180),
       onDragStarted: () => setState(() => _draggingId = node.id),
-      onDragUpdate: (d) => _startAutoScroll(d.globalPosition),
+      onDragUpdate: (d) => autoScrollTo(d.globalPosition),
       onDragEnd: (_) {
-        _stopAutoScroll();
+        stopAutoScroll();
         setState(() => _draggingId = null);
       },
       onDraggableCanceled: (_, _) {
-        _stopAutoScroll();
+        stopAutoScroll();
         setState(() => _draggingId = null);
       },
       feedback: _DragFeedback(node: node),

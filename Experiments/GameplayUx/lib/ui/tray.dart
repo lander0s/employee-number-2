@@ -31,7 +31,14 @@ import '../model/program.dart';
 import 'wireframe.dart';
 
 class CommandTray extends StatefulWidget {
-  const CommandTray({super.key});
+  const CommandTray({super.key, this.onDragUpdate, this.onDragEnd});
+
+  /// Where the finger is while a command is being carried out of the tray, in
+  /// global coordinates. The program pane uses it to scroll itself when the
+  /// finger reaches one of its edges - the tray cannot know that on its own, and
+  /// a command dragged from here has the same right to it as a row being moved.
+  final ValueChanged<Offset>? onDragUpdate;
+  final VoidCallback? onDragEnd;
 
   @override
   State<CommandTray> createState() => _CommandTrayState();
@@ -99,7 +106,11 @@ class _CommandTrayState extends State<CommandTray> {
                 child: Row(
                   children: [
                     for (final spec in commandCatalogue) ...[
-                      _TrayButton(spec: spec),
+                      _TrayButton(
+                        spec: spec,
+                        onDragUpdate: widget.onDragUpdate,
+                        onDragEnd: widget.onDragEnd,
+                      ),
                       const SizedBox(width: 6),
                     ],
                   ],
@@ -172,9 +183,11 @@ class _EdgeFade extends StatelessWidget {
 }
 
 class _TrayButton extends StatelessWidget {
-  const _TrayButton({required this.spec});
+  const _TrayButton({required this.spec, this.onDragUpdate, this.onDragEnd});
 
   final CommandSpec spec;
+  final ValueChanged<Offset>? onDragUpdate;
+  final VoidCallback? onDragEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -192,6 +205,9 @@ class _TrayButton extends StatelessWidget {
         // scroll is a tray you cannot use. Up picks a command out; sideways
         // still moves the shelf.
         affinity: Axis.vertical,
+        onDragUpdate: (d) => onDragUpdate?.call(d.globalPosition),
+        onDragEnd: (_) => onDragEnd?.call(),
+        onDraggableCanceled: (_, _) => onDragEnd?.call(),
         // No long press: the tray exists to be picked from, so a command should
         // come away on the first movement rather than after a hold.
         feedback: _Feedback(spec: spec),

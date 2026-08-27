@@ -120,6 +120,18 @@ abstract final class W {
   /// How long a spacer takes to open under a held command, and to close again
   /// when it leaves. Linear: the gap is following the finger, not performing.
   static const slotGrow = Duration(milliseconds: 120);
+
+  /// Hold a dragged command near the top or bottom of the program and it
+  /// scrolls, because that is what holding something at the edge of a list
+  /// means. The zone is capped at a quarter of the pane: on a short pane a fixed
+  /// 90 would leave no neutral middle, so every drag would scroll.
+  ///
+  /// The speed ramps from [autoScrollSlow] at the inner boundary to
+  /// [autoScrollFast] at the very edge. A constant speed makes the zone feel
+  /// like a switch you trip by accident; a ramp makes it feel like pressure.
+  static const autoScrollEdge = 90.0;
+  static const autoScrollSlow = 2.0;
+  static const autoScrollFast = 16.0;
   static const minTarget = 48.0;
 
   /// Left inset for every row and slot, replacing the old line-number gutter.

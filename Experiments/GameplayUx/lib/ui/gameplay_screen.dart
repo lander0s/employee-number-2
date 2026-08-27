@@ -36,6 +36,10 @@ class GameplayScreen extends StatefulWidget {
 
 class _GameplayScreenState extends State<GameplayScreen> {
   final _doc = ProgramDocument();
+
+  /// The pane answers drags that start in the tray as well as its own, so the
+  /// screen holds the handle that lets one talk to the other.
+  final _pane = GlobalKey<ProgramPaneState>();
   double _floorFraction = _programFocused;
   bool _draggingDivider = false;
 
@@ -134,6 +138,7 @@ class _GameplayScreenState extends State<GameplayScreen> {
                       ),
                       Expanded(
                         child: ProgramPane(
+                          key: _pane,
                           doc: _doc,
                           onChanged: _refresh,
                           running: _running,
@@ -146,7 +151,16 @@ class _GameplayScreenState extends State<GameplayScreen> {
             ),
             // The tray is hidden while running: nothing can be inserted, and
             // the program pane gets the space back to watch the program in.
-            if (!_running) Chrome(child: const CommandTray()),
+            if (!_running)
+              Chrome(
+                child: CommandTray(
+                  // A command carried up from the tray scrolls the program when
+                  // it reaches an edge, exactly as a row being moved does.
+                  onDragUpdate: (position) =>
+                      _pane.currentState?.autoScrollTo(position),
+                  onDragEnd: () => _pane.currentState?.stopAutoScroll(),
+                ),
+              ),
           ],
         ),
       ),

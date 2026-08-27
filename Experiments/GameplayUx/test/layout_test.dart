@@ -5,6 +5,8 @@
 // here instead: any RenderFlex/RenderBox overflow throws, and takeException
 // turns that into a test failure.
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gameplay_ux/ui/gameplay_screen.dart';
@@ -1762,6 +1764,137 @@ void main() {
       expect(inProgram('REPEAT'), findsOneWidget);
       expect(inProgram('TAKE'), findsOneWidget);
       expect(inProgram('SHIP'), findsOneWidget);
+    });
+  });
+
+  group('auto-scroll while dragging', () {
+    Future<void> boot(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+    }
+
+    /// `.first` is the pane's own vertical scroll view: the overhang wrappers
+    /// inside it are scroll views too, and they never scroll.
+    double offset(WidgetTester tester) => tester
+        .state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byType(ProgramPane),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        )
+        .position
+        .pixels;
+
+    /// Picks [label] out of the tray and holds it at [point], without dropping.
+    Future<TestGesture> carryTo(
+      WidgetTester tester,
+      String label,
+      Offset point,
+    ) async {
+      final gesture = await tester.startGesture(
+        tester.getCenter(trayCommand(label)),
+      );
+      await tester.pump(const Duration(milliseconds: 40));
+      await gesture.moveBy(const Offset(0, -30));
+      await tester.pump();
+      await gesture.moveTo(point);
+      await tester.pump();
+      return gesture;
+    }
+
+    testWidgets('holding a tray command at the bottom edge scrolls down', (
+      tester,
+    ) async {
+      await boot(tester);
+      final pane = tester.getRect(find.byType(ProgramPane));
+      expect(offset(tester), 0);
+
+      // A command from the tray used to be the one drag that could not scroll:
+      // the pane only heard about rows being moved within it.
+      final gesture = await carryTo(
+        tester,
+        'SHIP',
+        Offset(pane.center.dx, pane.bottom - 8),
+      );
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(offset(tester), greaterThan(0));
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('and stops as soon as the finger leaves the edge', (
+      tester,
+    ) async {
+      await boot(tester);
+      final pane = tester.getRect(find.byType(ProgramPane));
+
+      final gesture = await carryTo(
+        tester,
+        'SHIP',
+        Offset(pane.center.dx, pane.bottom - 8),
+      );
+      await tester.pump(const Duration(milliseconds: 150));
+
+      await gesture.moveTo(pane.center);
+      await tester.pump();
+      final settled = offset(tester);
+
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(offset(tester), settled);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('the middle of the pane never scrolls', (tester) async {
+      await boot(tester);
+      final pane = tester.getRect(find.byType(ProgramPane));
+
+      final gesture = await carryTo(tester, 'SHIP', pane.center);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(offset(tester), 0, reason: 'there has to be a neutral middle');
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('the edge speed ramps rather than switching on', (
+      tester,
+    ) async {
+      await boot(tester);
+      final pane = tester.getRect(find.byType(ProgramPane));
+      final edge = math.min(W.autoScrollEdge, pane.height / 4);
+
+      // Just inside the zone: slow.
+      var gesture = await carryTo(
+        tester,
+        'SHIP',
+        Offset(pane.center.dx, pane.bottom - edge + 2),
+      );
+      await tester.pump(const Duration(milliseconds: 160));
+      final gentle = offset(tester);
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      // Hard against the edge: fast.
+      gesture = await carryTo(
+        tester,
+        'SHIP',
+        Offset(pane.center.dx, pane.bottom - 2),
+      );
+      await tester.pump(const Duration(milliseconds: 160));
+      expect(offset(tester) - gentle, greaterThan(gentle));
+
+      await gesture.up();
+      await tester.pumpAndSettle();
     });
   });
 
