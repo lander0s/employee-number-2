@@ -46,6 +46,7 @@ class ProgramPane extends StatefulWidget {
     required this.onChanged,
     required this.running,
     this.bottomInset = 0,
+    this.shadows = true,
   });
 
   final ProgramDocument doc;
@@ -57,6 +58,9 @@ class ProgramPane extends StatefulWidget {
   /// the program reachable: scrollable room below it, and an auto-scroll edge
   /// measured from where the page is actually visible.
   final double bottomInset;
+
+  /// Scaffolding switch: whether commands cast a shadow.
+  final bool shadows;
 
   /// While running, the program is read-only: no spacers, no drop targets, no
   /// gestures. A program that cannot be edited should not keep offering the
@@ -299,12 +303,15 @@ class ProgramPaneState extends State<ProgramPane> {
 
   Widget _buildNode(Node node, int depth) {
     if (!node.isBlock) {
-      return _draggable(
-        node,
-        _swipeable(
+      return Transform.rotate(
+        angle: W.tiltFor(node.commandId),
+        child: _draggable(
           node,
-          _buildRow(
-            DisplayRow(node: node, kind: RowKind.command, depth: depth),
+          _swipeable(
+            node,
+            _buildRow(
+              DisplayRow(node: node, kind: RowKind.command, depth: depth),
+            ),
           ),
         ),
       );
@@ -328,40 +335,53 @@ class ProgramPaneState extends State<ProgramPane> {
     // so the gesture that deletes it takes its body along. Rows inside keep
     // their own swipe - the deeper recognizer wins the arena - so a child is
     // still deletable on its own.
-    return _swipeable(
-      node,
-      Container(
-        // No margin. The spacers on either side are the separation, and a margin
-        // on top of them would be a second spacing system that means nothing.
-        decoration: BoxDecoration(
-          color: fill,
-          borderRadius: BorderRadius.circular(W.blockRadius),
-          // The block is the moulded object here; its header sits flush in it,
-          // and the rows inside sit in it like keys in a tray.
-          boxShadow: W.plastic(fill),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Only the header is draggable: a draggable wrapping the whole
-            // container would fight its own children for the gesture.
-            _draggable(
-              node,
-              _buildRow(
-                DisplayRow(node: node, kind: RowKind.blockHeader, depth: depth),
+    // The tilt goes on the block, not on its header: a container and its title
+    // are one sticker, and rotating them separately would come apart at the
+    // corner.
+    return Transform.rotate(
+      angle: W.tiltFor(node.commandId),
+      child: _swipeable(
+        node,
+        Container(
+          // No margin. The spacers on either side are the separation, and a margin
+          // on top of them would be a second spacing system that means nothing.
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(W.blockRadius),
+            // The block is the moulded object here; its header sits flush in it,
+            // and the rows inside sit in it like keys in a tray.
+            boxShadow: W.shadowIf(widget.shadows),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Only the header is draggable: a draggable wrapping the whole
+              // container would fight its own children for the gesture.
+              _draggable(
+                node,
+                _buildRow(
+                  DisplayRow(
+                    node: node,
+                    kind: RowKind.blockHeader,
+                    depth: depth,
+                  ),
+                ),
               ),
-            ),
-            // The body's trailing spacer *is* the bottom arm of the "C": it is
-            // already the same thickness as the left arm, and the left arm runs
-            // down past it, so together they close the bracket.
-            //
-            // An empty body needs no special minimum either: one spacer is the
-            // body, and it is exactly the right height already.
-            Padding(
-              padding: const EdgeInsets.only(left: W.indentPerDepth, right: 3),
-              child: body,
-            ),
-          ],
+              // The body's trailing spacer *is* the bottom arm of the "C": it is
+              // already the same thickness as the left arm, and the left arm runs
+              // down past it, so together they close the bracket.
+              //
+              // An empty body needs no special minimum either: one spacer is the
+              // body, and it is exactly the right height already.
+              Padding(
+                padding: const EdgeInsets.only(
+                  left: W.indentPerDepth,
+                  right: 3,
+                ),
+                child: body,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -424,6 +444,7 @@ class ProgramPaneState extends State<ProgramPane> {
 
   Widget _buildRow(DisplayRow row) => ProgramRow(
     row: row,
+    shadows: widget.shadows,
     interactive: !widget.running,
     dragging: _draggingId == row.node.id,
     onCycleArg: (slot) => _mutate(() => doc.cycleArg(row.node.id, slot)),

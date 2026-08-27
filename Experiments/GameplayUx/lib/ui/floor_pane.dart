@@ -23,16 +23,19 @@ class FloorPane extends StatelessWidget {
     required this.onToggleRun,
     required this.onLoadSample,
     required this.onClear,
-    required this.rows,
-    required this.depth,
+    required this.shadows,
+    required this.onToggleShadows,
   });
 
   final bool running;
   final VoidCallback onToggleRun;
   final VoidCallback onLoadSample;
   final VoidCallback onClear;
-  final int rows;
-  final int depth;
+
+  /// Whether commands cast a shadow. A switch rather than a decision, for now:
+  /// it is quicker to judge with the thing in front of you.
+  final bool shadows;
+  final VoidCallback onToggleShadows;
 
   @override
   Widget build(BuildContext context) {
@@ -81,8 +84,8 @@ class FloorPane extends StatelessWidget {
                           child: _Scaffolding(
                             onLoadSample: onLoadSample,
                             onClear: onClear,
-                            rows: rows,
-                            depth: depth,
+                            shadows: shadows,
+                            onToggleShadows: onToggleShadows,
                           ),
                         ),
                     ],
@@ -198,14 +201,14 @@ class _Scaffolding extends StatelessWidget {
   const _Scaffolding({
     required this.onLoadSample,
     required this.onClear,
-    required this.rows,
-    required this.depth,
+    required this.shadows,
+    required this.onToggleShadows,
   });
 
   final VoidCallback onLoadSample;
   final VoidCallback onClear;
-  final int rows;
-  final int depth;
+  final bool shadows;
+  final VoidCallback onToggleShadows;
 
   @override
   Widget build(BuildContext context) {
@@ -238,8 +241,12 @@ class _Scaffolding extends StatelessWidget {
             children: [
               _MiniButton(label: 'SAMPLE', onTap: onLoadSample),
               _MiniButton(label: 'CLEAR', onTap: onClear),
+              _MiniButton(
+                label: shadows ? 'SHADOWS ON' : 'SHADOWS OFF',
+                onTap: onToggleShadows,
+              ),
               Text(
-                'ROWS $rows   DEPTH $depth   TEXT x${scale.toStringAsFixed(2)}',
+                'TEXT x${scale.toStringAsFixed(2)}',
                 style: W.meta.copyWith(color: W.textDim),
               ),
             ],

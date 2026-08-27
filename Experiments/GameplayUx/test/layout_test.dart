@@ -55,6 +55,16 @@ Finder labelled(String label) => find.byWidgetPredicate(
   (w) => w is Semantics && w.properties.label == label,
 );
 
+/// Commands are tilted (W.stickerTilt), so every measured rect is a *bounding*
+/// box larger than the thing inside it: rotating a box of width w by a small
+/// angle a adds about w*a to its height. Geometry assertions carry that much
+/// slack rather than pretending the rotation is not there.
+///
+/// Derived from the token, not a constant, so changing the tilt does not send
+/// somebody hunting through twenty tolerances. The 500 is the widest thing on
+/// screen - a full-width row plus the overhang.
+final tiltSlack = 500 * W.stickerTilt + 1;
+
 /// Every spacer between siblings. They are the only way to insert, so tests
 /// address them directly.
 Finder spacers() => find.byType(DragTarget<DragPayload>);
@@ -181,9 +191,15 @@ void main() {
       final labelRect = tester.getRect(label);
       final rowRect = tester.getRect(rowContainerFor(label));
 
-      expect(rowRect.height, greaterThanOrEqualTo(labelRect.height));
-      expect(rowRect.top, lessThanOrEqualTo(labelRect.top));
-      expect(rowRect.bottom, greaterThanOrEqualTo(labelRect.bottom));
+      expect(
+        rowRect.height,
+        greaterThanOrEqualTo(labelRect.height - tiltSlack),
+      );
+      expect(rowRect.top, lessThanOrEqualTo(labelRect.top + tiltSlack));
+      expect(
+        rowRect.bottom,
+        greaterThanOrEqualTo(labelRect.bottom - tiltSlack),
+      );
       expect(tester.takeException(), isNull);
     });
   }
@@ -403,7 +419,7 @@ void main() {
       for (final e in innerSpacers()) {
         expect(
           tester.getRect(find.byWidget(e.widget)).height,
-          closeTo(W.indentPerDepth, 0.5),
+          closeTo(W.indentPerDepth, tiltSlack),
         );
       }
     });
@@ -440,14 +456,20 @@ void main() {
       // on each side...
       final outline = tester.getRect(find.byType(DottedOutline));
       final row = tester.getRect(rowContainerFor(inProgram('TAKE').first));
-      expect(outline.height, closeTo(row.height - 4, 1));
+      expect(outline.height, closeTo(row.height - 4, tiltSlack));
 
       // ...and the spacer around it carries the gaps that row will have, so the
       // preview occupies exactly the space the drop will take.
       final slot = tester.getRect(find.byWidget(innerSpacers()[0].widget));
-      expect(slot.height, closeTo(row.height + W.indentPerDepth * 2, 1));
-      expect(outline.top - slot.top, closeTo(W.indentPerDepth + 2, 1.5));
-      expect(slot.bottom - outline.bottom, closeTo(W.indentPerDepth + 2, 1.5));
+      expect(
+        slot.height,
+        closeTo(row.height + W.indentPerDepth * 2, tiltSlack),
+      );
+      expect(outline.top - slot.top, closeTo(W.indentPerDepth + 2, tiltSlack));
+      expect(
+        slot.bottom - outline.bottom,
+        closeTo(W.indentPerDepth + 2, tiltSlack),
+      );
 
       await gesture.up();
       await tester.pumpAndSettle();
@@ -491,7 +513,7 @@ void main() {
 
       expect(
         tester.getRect(rowContainerFor(inProgram('IF'))).top,
-        closeTo(previewed.top, 1),
+        closeTo(previewed.top, tiltSlack),
         reason: 'the preview already occupied the space the row now takes',
       );
     });
@@ -574,7 +596,7 @@ void main() {
       expect(mid, lessThan(W.openSlotHeight - 1));
 
       await tester.pumpAndSettle();
-      expect(gapHeight(), closeTo(W.openSlotHeight, 0.5));
+      expect(gapHeight(), closeTo(W.openSlotHeight, tiltSlack));
 
       // And on the way out again.
       await gesture.moveTo(tester.getCenter(inProgram('SHIP')));
@@ -586,7 +608,7 @@ void main() {
 
       await gesture.up();
       await tester.pumpAndSettle();
-      expect(gapHeight(), closeTo(W.indentPerDepth, 0.5));
+      expect(gapHeight(), closeTo(W.indentPerDepth, tiltSlack));
     });
 
     testWidgets('but a landing row does not make it animate shut', (
@@ -612,7 +634,7 @@ void main() {
       // back. One frame after the drop, nothing below has moved.
       expect(
         tester.getRect(rowContainerFor(inProgram('IF'))).top,
-        closeTo(ifTop, 1),
+        closeTo(ifTop, tiltSlack),
       );
 
       await tester.pumpAndSettle();
@@ -626,7 +648,7 @@ void main() {
       for (final e in innerSpacers()) {
         expect(
           tester.getRect(find.byWidget(e.widget)).height,
-          closeTo(W.indentPerDepth, 0.5),
+          closeTo(W.indentPerDepth, tiltSlack),
         );
       }
     });
@@ -664,7 +686,11 @@ void main() {
 
       final dropped = tester.getRect(rowContainerFor(inProgram('TAKE').last));
       final ship = tester.getRect(rowContainerFor(inProgram('SHIP')));
-      expect(dropped.left, ship.left, reason: 'same indent means same body');
+      expect(
+        dropped.left,
+        closeTo(ship.left, tiltSlack),
+        reason: 'same indent means same body',
+      );
     });
 
     testWidgets('a drop that misses every spacer does nothing', (tester) async {
@@ -988,6 +1014,54 @@ void main() {
     });
   });
 
+  group('the shadow switch', () {
+    Future<void> boot(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+    }
+
+    List<BoxShadow>? shadowOn(WidgetTester tester, Finder label) {
+      final box = tester.widget<Container>(rowContainerFor(label));
+      return (box.decoration as BoxDecoration?)?.boxShadow;
+    }
+
+    testWidgets('turns the shadows off on the page and in the tray', (
+      tester,
+    ) async {
+      await boot(tester);
+      expect(shadowOn(tester, inProgram('TAKE')), isNotEmpty);
+      expect(shadowOn(tester, trayCommand('SHIP')), isNotEmpty);
+
+      await tester.tap(find.text('SHADOWS ON'));
+      await tester.pumpAndSettle();
+
+      // One switch for everything that paints one, or the tray and the page
+      // would disagree about what a command looks like.
+      expect(shadowOn(tester, inProgram('TAKE')), isEmpty);
+      expect(shadowOn(tester, trayCommand('SHIP')), isEmpty);
+      expect(find.text('SHADOWS OFF'), findsOneWidget);
+
+      await tester.tap(find.text('SHADOWS OFF'));
+      await tester.pumpAndSettle();
+      expect(shadowOn(tester, inProgram('TAKE')), isNotEmpty);
+    });
+
+    testWidgets('and nothing moves when they go', (tester) async {
+      await boot(tester);
+      final before = tester.getRect(rowContainerFor(inProgram('TAKE')));
+
+      await tester.tap(find.text('SHADOWS ON'));
+      await tester.pumpAndSettle();
+
+      // A shadow paints outside the box and takes no space, so the comparison
+      // is honest either way round.
+      expect(tester.getRect(rowContainerFor(inProgram('TAKE'))), before);
+    });
+  });
+
   group('the margin', () {
     testWidgets('the program starts to the right of the margin line', (
       tester,
@@ -1007,7 +1081,7 @@ void main() {
             .at(1),
       );
 
-      expect(block.left - pane.left, closeTo(W.paperGutter, 0.5));
+      expect(block.left - pane.left, closeTo(W.paperGutter, tiltSlack));
       expect(
         block.left - pane.left,
         greaterThan(W.paperMarginInset),
@@ -1055,12 +1129,15 @@ void main() {
       await boot(tester);
       final tray = tester.getRect(find.byType(CommandTray));
 
+      // Rounded to the nearest tiltSlack: a tilted button's bounding box starts
+      // a dp or two above or below its neighbour's, so exact tops no longer
+      // group into rows.
       final tops = <double>{};
       for (final spec in commandCatalogue) {
         final button = tester.getRect(
           rowContainerFor(trayCommand(spec.trayLabel)),
         );
-        tops.add(button.top.roundToDouble());
+        tops.add((button.top / (tiltSlack * 2)).roundToDouble());
 
         expect(
           button.left,
@@ -1207,10 +1284,16 @@ void main() {
       // pane, which jumped every row at exactly the moment you want to be
       // watching them.
       expect(tester.getRect(find.byType(ProgramPane)), before);
-      expect(tester.getRect(rowContainerFor(inProgram('TAKE'))), rowBefore);
+      expect(
+        tester.getRect(rowContainerFor(inProgram('TAKE'))).top,
+        closeTo(rowBefore.top, tiltSlack),
+      );
 
       await start(tester); // STOP
-      expect(tester.getRect(rowContainerFor(inProgram('TAKE'))), rowBefore);
+      expect(
+        tester.getRect(rowContainerFor(inProgram('TAKE'))).top,
+        closeTo(rowBefore.top, tiltSlack),
+      );
     });
 
     testWidgets('and the page runs under the tray, not up to it', (
@@ -1243,10 +1326,10 @@ void main() {
 
       // Exactly one spacer between two siblings - no card margin on top of it,
       // which would be a second spacing system that means nothing.
-      expect(ifRow.top - take.bottom, closeTo(W.indentPerDepth, 0.5));
+      expect(ifRow.top - take.bottom, closeTo(W.indentPerDepth, tiltSlack));
 
       // A block header sits at its parent indent; only the body steps in.
-      expect(ifRow.left, take.left);
+      expect(ifRow.left, closeTo(take.left, tiltSlack));
       final ship = tester.getRect(rowContainerFor(inProgram('SHIP')));
       expect(ship.left, greaterThan(ifRow.left));
     });
@@ -1478,7 +1561,10 @@ void main() {
       // A horizontal drag is a swipe gesture on a row, not a pan of the program:
       // it deletes the row it started on, and nothing else moves sideways.
       expect(inProgram('TAKE'), findsNothing);
-      expect(tester.getRect(inProgram('IF')).left, before.left);
+      expect(
+        tester.getRect(inProgram('IF')).left,
+        closeTo(before.left, tiltSlack),
+      );
       expect(tester.takeException(), isNull);
     });
   });
@@ -1555,8 +1641,8 @@ void main() {
       // only thing that can say the container is unfinished. At 18dp it read as
       // ordinary spacing between siblings that are not there.
       final heights = gaps(tester);
-      expect(heights[0], closeTo(W.indentPerDepth, 0.5));
-      expect(heights[body], closeTo(W.openSlotHeight, 0.5));
+      expect(heights[0], closeTo(W.indentPerDepth, tiltSlack));
+      expect(heights[body], closeTo(W.openSlotHeight, tiltSlack));
     });
 
     testWidgets('reserves a whole row and the gap that follows it', (
@@ -1571,7 +1657,8 @@ void main() {
       // should look like it is holding one instruction that is not there yet.
       final take = tester.getRect(rowContainerFor(inProgram('TAKE')));
       final well = gaps(tester).fold<double>(0, (a, b) => a > b ? a : b);
-      expect(well, closeTo(take.height + W.indentPerDepth * 2, 1));
+      // Two rotated boxes compared with each other, so twice the slack.
+      expect(well, closeTo(take.height + W.indentPerDepth * 2, tiltSlack * 2));
     });
 
     testWidgets('the drop shape appears where the row will be, gap and all', (
@@ -1592,12 +1679,12 @@ void main() {
       final outline = tester.getRect(find.byType(DottedOutline));
       expect(
         slot.bottom - outline.bottom,
-        closeTo(W.indentPerDepth + 2, 1.5),
+        closeTo(W.indentPerDepth + 2, tiltSlack),
         reason: 'the outline keeps the bottom gap a command would have',
       );
       expect(
         outline.top - slot.top,
-        closeTo(W.indentPerDepth + 2, 1.5),
+        closeTo(W.indentPerDepth + 2, tiltSlack),
         reason: 'and the top gap too',
       );
 
@@ -1640,13 +1727,18 @@ void main() {
 
       // The IF is the only empty block now. It sits at depth 1, so its own
       // reserved row steps back to the unlightened colour.
-      final wide = innerSpacers().indexWhere(
-        (e) =>
-            (tester.getRect(find.byWidget(e.widget)).height - W.openSlotHeight)
-                .abs() <
-            0.5,
+      //
+      // Found as the tallest gap rather than by matching a token: every measured
+      // box is a rotated bounding box now, so exact heights are gone.
+      final heights = innerSpacers()
+          .map((e) => tester.getRect(find.byWidget(e.widget)).height)
+          .toList();
+      final wide = heights.indexOf(heights.reduce((a, b) => a > b ? a : b));
+      expect(
+        heights[wide],
+        greaterThan(W.openSlotHeight - tiltSlack),
+        reason: 'the empty body should be the tallest gap',
       );
-      expect(wide, isNot(-1));
 
       final ifColour = specFor('ifCond').colour;
       expect(ghostFill(tester, wide), W.blockFill(ifColour, 2));
@@ -1663,7 +1755,7 @@ void main() {
 
       expect(inProgram('TAKE'), findsOneWidget);
       for (final h in gaps(tester)) {
-        expect(h, closeTo(W.indentPerDepth, 0.5));
+        expect(h, closeTo(W.indentPerDepth, tiltSlack));
       }
     });
 
@@ -1677,7 +1769,7 @@ void main() {
       // thick gap, however deep it sits.
       final thick = gaps(
         tester,
-      ).where((h) => (h - W.openSlotHeight).abs() < 0.5);
+      ).where((h) => (h - W.openSlotHeight).abs() < tiltSlack);
       expect(thick, hasLength(1));
       expect(inProgram('IF'), findsOneWidget);
     });
@@ -2034,7 +2126,7 @@ void main() {
         final face = faceRect(tester, spec.trayLabel);
         expect(
           face.height,
-          closeTo(take.height, 0.5),
+          closeTo(take.height, tiltSlack),
           reason: '${spec.trayLabel} should be the same height as TAKE',
         );
       }
@@ -2127,7 +2219,7 @@ void main() {
       expect(dropped.top, greaterThan(block.top));
       expect(
         dropped.left,
-        closeTo(block.left, 0.5),
+        closeTo(block.left, tiltSlack),
         reason: 'appended at the root, not into the block it was dropped past',
       );
     });
@@ -2164,7 +2256,7 @@ void main() {
       final dropped = tester.getRect(rowContainerFor(inProgram('SHIP').last));
       final block = tester.getRect(rowContainerFor(inProgram('REPEAT')));
       expect(dropped.top, greaterThan(block.top));
-      expect(dropped.left, closeTo(block.left, 0.5));
+      expect(dropped.left, closeTo(block.left, tiltSlack));
     });
 
     testWidgets('an empty program is one big drop target', (tester) async {

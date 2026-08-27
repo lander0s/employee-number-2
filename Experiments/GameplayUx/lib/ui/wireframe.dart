@@ -35,6 +35,28 @@ abstract final class W {
   /// full width; only what is written on it respects the margin.
   static const paperGutter = 34.0;
 
+  /// Commands are tilted a fraction of a degree, like stickers pressed onto the
+  /// page by hand. Deterministic per command, never random: a fresh angle on
+  /// every rebuild would make the whole program twitch every time anything
+  /// changed.
+  ///
+  /// Tiny on purpose. A row is ~400dp wide, so even this lifts its far corner
+  /// about 2dp - enough to read as placed rather than printed, small enough that
+  /// nothing looks broken.
+  static const stickerTilt = 0.0075;
+
+  /// A stable angle in [-stickerTilt, stickerTilt] for a given seed.
+  ///
+  /// Seeded on the *command*, not on the instance. Per-instance angles looked
+  /// marginally more hand-made and were a menace: node ids are generated, so
+  /// every command drew a different angle on every run, which made the geometry
+  /// of the whole program unreproducible - layout tests passed or failed
+  /// depending on how many nodes had been created before them. Per command it is
+  /// stable across runs, stable across edits, and reads as a sticker sheet where
+  /// every TAKE was cut the same way.
+  static double tiltFor(String seed) =>
+      ((seed.hashCode % 1000) / 500 - 1) * stickerTilt;
+
   /// How much empty page the program keeps below its last row, as a fraction of
   /// the pane. It is what makes a short program scrollable at all - without it
   /// the content ends exactly at the viewport, so the end of the program is
@@ -54,7 +76,7 @@ abstract final class W {
   ///
   /// Dark enough that the dark ink on the buttons still has a surface to sit
   /// against, light enough that the rules read through the gaps between them.
-  static const trayScrim = Color(0x991C1C1C);
+  static const trayScrim = Color(0x661C1C1C);
   static const line = Color(0xFF505050);
   static const lineSoft = Color(0xFF3F3F3F);
   static const button = Color(0xFF454545);
@@ -117,7 +139,10 @@ abstract final class W {
   /// blocks of similar colour is the difference between reading the structure
   /// and squinting at it. The rest was decoration on a screen that already has
   /// nine colours and four depths of nesting to communicate.
-  static List<BoxShadow> plastic(Color base) => const [
+  /// Empty when off, so the toggle costs nothing to paint.
+  static List<BoxShadow> shadowIf(bool on) => on ? shadow : const [];
+
+  static const shadow = <BoxShadow>[
     BoxShadow(color: Color(0x59000000), offset: Offset(0, 5), blurRadius: 9),
   ];
 

@@ -58,6 +58,9 @@ class _GameplayScreenState extends State<GameplayScreen> {
   double _floorFraction = _programFocused;
   bool _draggingDivider = false;
 
+  /// Scaffolding: shadows on the commands, on or off, to be judged by eye.
+  bool _shadows = true;
+
   /// Fake, for the moment: the button flips state so the two labels can be felt.
   /// Nothing executes.
   bool _running = false;
@@ -135,8 +138,9 @@ class _GameplayScreenState extends State<GameplayScreen> {
                                   _doc.clear();
                                   _refresh();
                                 },
-                                rows: _doc.rowCount,
-                                depth: _doc.maxDepth,
+                                shadows: _shadows,
+                                onToggleShadows: () =>
+                                    setState(() => _shadows = !_shadows),
                               )
                             : const SizedBox.shrink(),
                       ),
@@ -175,6 +179,7 @@ class _GameplayScreenState extends State<GameplayScreen> {
                                 onChanged: _refresh,
                                 running: _running,
                                 bottomInset: _trayHeight,
+                                shadows: _shadows,
                               ),
                             ),
                             if (!_running)
@@ -185,6 +190,7 @@ class _GameplayScreenState extends State<GameplayScreen> {
                                 child: Chrome(
                                   child: CommandTray(
                                     key: _trayKey,
+                                    shadows: _shadows,
                                     // A command carried up from the tray
                                     // scrolls the program when it reaches an
                                     // edge, exactly as a row being moved does.

@@ -37,7 +37,16 @@ import '../model/program.dart';
 import 'wireframe.dart';
 
 class CommandTray extends StatefulWidget {
-  const CommandTray({super.key, this.onDragUpdate, this.onDragEnd});
+  const CommandTray({
+    super.key,
+    this.onDragUpdate,
+    this.onDragEnd,
+    this.shadows = true,
+  });
+
+  /// Scaffolding switch: whether the buttons cast a shadow, like the commands
+  /// in the program do.
+  final bool shadows;
 
   /// Where the finger is while a command is being carried out of the tray, in
   /// global coordinates. The program pane uses it to scroll itself when the
@@ -89,6 +98,7 @@ class _CommandTrayState extends State<CommandTray> {
                     Expanded(
                       child: _TrayButton(
                         spec: specFor(id),
+                        shadows: widget.shadows,
                         onDragUpdate: widget.onDragUpdate,
                         onDragEnd: widget.onDragEnd,
                       ),
@@ -105,15 +115,25 @@ class _CommandTrayState extends State<CommandTray> {
 }
 
 class _TrayButton extends StatelessWidget {
-  const _TrayButton({required this.spec, this.onDragUpdate, this.onDragEnd});
+  const _TrayButton({
+    required this.spec,
+    required this.shadows,
+    this.onDragUpdate,
+    this.onDragEnd,
+  });
 
   final CommandSpec spec;
+  final bool shadows;
   final ValueChanged<Offset>? onDragUpdate;
   final VoidCallback? onDragEnd;
 
   @override
   Widget build(BuildContext context) {
-    final button = _Face(spec: spec);
+    // Tilted like the commands on the page: the same hand pressed them on.
+    final button = Transform.rotate(
+      angle: W.tiltFor(spec.id),
+      child: _Face(spec: spec, shadows: shadows),
+    );
 
     return Semantics(
       button: true,
@@ -131,7 +151,7 @@ class _TrayButton extends StatelessWidget {
         onDraggableCanceled: (_, _) => onDragEnd?.call(),
         // No long press: the tray exists to be picked from, so a command should
         // come away on the first movement rather than after a hold.
-        feedback: _Feedback(spec: spec),
+        feedback: _Feedback(spec: spec, shadows: shadows),
         // The tray keeps its full row of commands while one is in the air - a
         // gap opening in the shelf would be a second thing moving at once.
         childWhenDragging: Opacity(opacity: 0.4, child: button),
@@ -143,9 +163,10 @@ class _TrayButton extends StatelessWidget {
 
 /// The button as it sits in the tray.
 class _Face extends StatelessWidget {
-  const _Face({required this.spec});
+  const _Face({required this.spec, this.shadows = true});
 
   final CommandSpec spec;
+  final bool shadows;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -163,7 +184,7 @@ class _Face extends StatelessWidget {
       color: spec.colour,
       border: Border.all(color: W.chipEdge(spec.colour)),
       borderRadius: BorderRadius.circular(W.rowRadius),
-      boxShadow: W.plastic(spec.colour),
+      boxShadow: W.shadowIf(shadows),
     ),
     // Every command wears the same face here, block or not. A `┐` hint and an
     // `_` argument slot used to make REPEAT and IF look like different kinds of
@@ -201,16 +222,17 @@ class _Face extends StatelessWidget {
 /// so REPEAT flew as bare floating letters, and IF carried its condition chips
 /// with nothing behind them. The row is a row once it lands somewhere.
 class _Feedback extends StatelessWidget {
-  const _Feedback({required this.spec});
+  const _Feedback({required this.spec, required this.shadows});
 
   final CommandSpec spec;
+  final bool shadows;
 
   @override
   Widget build(BuildContext context) => Opacity(
     opacity: 0.92,
     child: Material(
       color: Colors.transparent,
-      child: _Face(spec: spec),
+      child: _Face(spec: spec, shadows: shadows),
     ),
   );
 }

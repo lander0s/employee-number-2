@@ -26,12 +26,16 @@ class ProgramRow extends StatelessWidget {
     super.key,
     required this.row,
     required this.onCycleArg,
+    this.shadows = true,
     this.dragging = false,
     this.interactive = true,
   });
 
   final DisplayRow row;
   final ValueChanged<ArgSlot> onCycleArg;
+
+  /// Scaffolding switch: whether the row casts a shadow.
+  final bool shadows;
 
   /// True while this row is the source of an active drag.
   final bool dragging;
@@ -66,7 +70,7 @@ class ProgramRow extends StatelessWidget {
         RowKind.command => BoxDecoration(
           color: tone,
           borderRadius: BorderRadius.circular(W.rowRadius),
-          boxShadow: W.plastic(tone),
+          boxShadow: W.shadowIf(shadows),
         ),
         // A block header takes the container's fill and the container's rounding
         // at the top, so at rest the two are indistinguishable - one shape, not
