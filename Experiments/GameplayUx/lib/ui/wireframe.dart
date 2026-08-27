@@ -67,6 +67,37 @@ abstract final class W {
   static Color chipFill(Color base) => Color.lerp(base, Colors.white, 0.24)!;
   static Color chipEdge(Color base) => Color.lerp(base, Colors.black, 0.30)!;
 
+  /// Commands are moulded plastic rather than flat cards. Three things do it,
+  /// and the first is the one that matters:
+  ///
+  /// The **lip** is a hard, unblurred shadow in a darker shade of the row's own
+  /// colour. That is the moulded edge, and it is what reads as thickness - a
+  /// blurred shadow on its own just reads as paper floating above the page.
+  ///
+  /// The **ambient shadow** underneath lifts the row off the pane, and the
+  /// **gloss** is a short band of white across the top, fading out. Both are
+  /// deliberately subtle: at full strength the row looks wet.
+  static const lipDepth = 3.0;
+  static const glossHeight = 20.0;
+
+  static const gloss = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0x40FFFFFF), Color(0x00FFFFFF)],
+  );
+
+  static List<BoxShadow> plastic(Color base) => [
+    BoxShadow(
+      color: Color.lerp(base, Colors.black, 0.38)!,
+      offset: const Offset(0, lipDepth),
+    ),
+    const BoxShadow(
+      color: Color(0x59000000),
+      offset: Offset(0, 5),
+      blurRadius: 9,
+    ),
+  ];
+
   /// Hairline between two adjacent rows. Invisible where colours differ, and
   /// just enough where two of the same command sit together.
   static Color rowEdge(Color base) => Color.lerp(base, Colors.black, 0.18)!;
@@ -124,8 +155,22 @@ abstract final class W {
   static const chromeMaxTextScale = 1.3;
 
   // Type. 7.3: instruction rows 20 semibold, nothing functional under 17.
-  static const rowFamily = 'Consolas';
-  static const rowFallback = <String>['Courier New', 'monospace'];
+  /// Instructions are set in Luckiest Guy: a single-weight, all-caps display
+  /// face, vendored in assets/fonts. It is the one place in the app with any
+  /// character - the chrome around it stays plain - and it suits commands that
+  /// are always shouted in capitals anyway.
+  ///
+  /// Single weight matters: asking for w800 gets you the 400 face, so weight
+  /// cannot be used to separate a keyword from an argument the way it did with
+  /// the monospace it replaced. The argument chips carry that distinction on
+  /// their own, with a fill and an edge.
+  static const rowFamily = 'LuckiestGuy';
+  static const rowFallback = <String>['Consolas', 'Courier New', 'monospace'];
+
+  /// Luckiest Guy sets tight by default - the letters lean on each other, which
+  /// is fine for a logo and hard work for a word you are scanning for. A little
+  /// air lets each one be read on its own.
+  static const rowLetterSpacing = 0.8;
 
   /// Command words are extra bold. They are the fixed part of every sentence,
   /// and the weight is half of what separates them from the cyclable values,
@@ -135,6 +180,7 @@ abstract final class W {
     fontFamilyFallback: rowFallback,
     fontSize: 20,
     fontWeight: FontWeight.w800,
+    letterSpacing: rowLetterSpacing,
     color: text,
     height: 1.1,
   );
@@ -144,6 +190,7 @@ abstract final class W {
     fontFamilyFallback: rowFallback,
     fontSize: 20,
     fontWeight: FontWeight.w400,
+    letterSpacing: rowLetterSpacing,
     color: textDim,
     height: 1.1,
   );

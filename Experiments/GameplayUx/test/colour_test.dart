@@ -119,30 +119,40 @@ void main() {
     }
   });
 
-  test('there is headroom to saturate for the executing row', () {
-    // CLOCK OUT is deliberately a near-grey, so it has no hue to intensify; it
-    // will need a different highlight treatment.
-    for (final spec in commandCatalogue.where((c) => c.id != 'clockOut')) {
+  test('the palette is saturated, and what that costs', () {
+    // The colours were desaturated a little so the executing row could be shown
+    // by *saturating* it: same colour, more of it. At full saturation that
+    // headroom is gone, and nothing in the other direction replaces it - a
+    // lightness step big enough to read (deltaE >= 8 on every command) drops
+    // PICK FROM's ink contrast to about 4.1, and a step gentle enough to stay
+    // readable leaves STRIP BY at deltaE 3.3, which nobody would notice.
+    //
+    // So the executing row needs a mechanism that is not the fill: an outline, a
+    // shadow, a nudge in position. This test records the constraint rather than
+    // pretending the fill can still carry it.
+    for (final spec in commandCatalogue.where(
+      (c) => c.id != 'clockOut' && c.id != 'take',
+    )) {
       final hsl = HSLColor.fromColor(spec.colour);
-
       expect(
         hsl.saturation,
-        lessThan(0.8),
-        reason: '${spec.id} has no room left to brighten',
+        closeTo(1, 0.01),
+        reason: '${spec.id} is not at full saturation',
       );
-
-      final lit = hsl.withSaturation(0.95).toColor();
-
-      // The highlight is the same colour, more of it - not a different one.
-      expect(HSLColor.fromColor(lit).hue, closeTo(hsl.hue, 0.5));
-      expect(
-        deltaE(spec.colour, lit),
-        greaterThan(8),
-        reason: '${spec.id} would not visibly change when executing',
-      );
-      // And an executing row still has to be readable.
-      expect(contrast(W.ink, lit), greaterThanOrEqualTo(4.5));
     }
+
+    // TAKE is held back. At full saturation its green was the one colour that
+    // hurt to look at - a green at that lightness is the brightest thing the
+    // screen can make, and TAKE is also the command that appears most often in a
+    // program, so it was doing the most damage.
+    final take = HSLColor.fromColor(specFor('take').colour);
+    expect(take.saturation, lessThan(0.7));
+    expect(take.saturation, greaterThan(0.4));
+
+    // CLOCK OUT stays a near-grey on purpose: it is the end of the shift, not a
+    // command you reach for.
+    final clockOut = HSLColor.fromColor(specFor('clockOut').colour);
+    expect(clockOut.saturation, lessThan(0.3));
   });
 
   test('the delete backdrop reads as an alert, not as a command', () {

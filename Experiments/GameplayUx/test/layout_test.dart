@@ -1631,7 +1631,11 @@ void main() {
       await swipe(tester, inProgram('SHIP'), 400);
       expect(find.text('UNDO'), findsOneWidget);
 
-      await tester.pump(const Duration(seconds: 4));
+      // Still up half a second in, gone shortly after.
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('UNDO'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
 
       // It used to sit there until UNDO was tapped, which made a courtesy look

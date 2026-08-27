@@ -65,9 +65,10 @@ class ProgramPaneState extends State<ProgramPane> {
   Timer? _autoScroll;
   Timer? _toastLife;
 
-  /// How long the undo offer stays up. Long enough to notice and act on, short
-  /// enough that it is gone before it becomes furniture.
-  static const _toastDuration = Duration(seconds: 3);
+  /// How long the undo offer stays up. Deleting is cheap and reversible, so the
+  /// offer is a courtesy in passing rather than something to read: it goes
+  /// before it can become furniture.
+  static const _toastDuration = Duration(seconds: 1);
 
   ProgramDocument get doc => widget.doc;
 
@@ -263,6 +264,9 @@ class ProgramPaneState extends State<ProgramPane> {
         decoration: BoxDecoration(
           color: fill,
           borderRadius: BorderRadius.circular(W.blockRadius),
+          // The block is the moulded object here; its header sits flush in it,
+          // and the rows inside sit in it like keys in a tray.
+          boxShadow: W.plastic(fill),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -735,7 +739,18 @@ class _SwipeHint extends StatelessWidget {
         left: 18,
         right: end ? 18 + W.programOverhang : 18,
       ),
-      child: Text(label, style: W.meta.copyWith(color: W.text)),
+      // In the instruction face, not the chrome one: the word names what will
+      // happen to the row it is sitting behind, so it belongs to the program.
+      child: Text(
+        label,
+        style: W.meta.copyWith(
+          color: W.text,
+          fontSize: 17,
+          fontFamily: W.rowFamily,
+          fontFamilyFallback: W.rowFallback,
+          letterSpacing: W.rowLetterSpacing,
+        ),
+      ),
     );
   }
 }

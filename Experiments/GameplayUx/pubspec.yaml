@@ -57,6 +57,13 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # The instruction font. Luckiest Guy is a single-weight all-caps display face -
+  # see assets/fonts/LuckiestGuy-LICENSE.txt (SIL Open Font License).
+  fonts:
+    - family: LuckiestGuy
+      fonts:
+        - asset: assets/fonts/LuckiestGuy-Regular.ttf
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

@@ -96,13 +96,13 @@ const commandCatalogue = <CommandSpec>[
     id: 'take',
     label: 'TAKE',
     trayLabel: 'TAKE',
-    colour: Color(0xFF59C579), // green
+    colour: Color(0xFF4DCB6D), // green
   ),
   CommandSpec(
     id: 'ship',
     label: 'SHIP',
     trayLabel: 'SHIP',
-    colour: Color(0xFFE4938B), // red
+    colour: Color(0xFFFF8275), // red
   ),
 
   CommandSpec(
@@ -110,7 +110,7 @@ const commandCatalogue = <CommandSpec>[
     label: 'REPEAT',
     trayLabel: 'REPEAT',
     isBlock: true,
-    colour: Color(0xFF80ACDD), // blue
+    colour: Color(0xFF5EAAFF), // blue
   ),
   CommandSpec(
     id: 'ifCond',
@@ -118,7 +118,7 @@ const commandCatalogue = <CommandSpec>[
     trayLabel: 'IF',
     argKind: ArgKind.condition,
     isBlock: true,
-    colour: Color(0xFFE4C858), // yellow
+    colour: Color(0xFFFFD83D), // yellow
   ),
 
   CommandSpec(
@@ -126,14 +126,14 @@ const commandCatalogue = <CommandSpec>[
     label: 'STACK ON',
     trayLabel: 'STACK ON',
     argKind: ArgKind.pallet,
-    colour: Color(0xFFE0985A), // orange
+    colour: Color(0xFFFF963B), // orange
   ),
   CommandSpec(
     id: 'pickFrom',
     label: 'PICK FROM',
     trayLabel: 'PICK FROM',
     argKind: ArgKind.pallet,
-    colour: Color(0xFFBF9ADF), // purple
+    colour: Color(0xFFC98EFF), // purple
   ),
 
   CommandSpec(
@@ -141,14 +141,14 @@ const commandCatalogue = <CommandSpec>[
     label: 'MERGE WITH',
     trayLabel: 'MERGE',
     argKind: ArgKind.pallet,
-    colour: Color(0xFFE290B9), // pink
+    colour: Color(0xFFFF78BC), // pink
   ),
   CommandSpec(
     id: 'stripBy',
     label: 'STRIP BY',
     trayLabel: 'STRIP',
     argKind: ArgKind.pallet,
-    colour: Color(0xFF61C6D1), // cyan
+    colour: Color(0xFF33EBFF), // cyan
   ),
 
   CommandSpec(

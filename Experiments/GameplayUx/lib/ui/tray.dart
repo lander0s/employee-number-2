@@ -213,28 +213,51 @@ class _Face extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     constraints: const BoxConstraints(minHeight: W.minTarget),
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    alignment: Alignment.center,
-    // The same colour the command wears in the program, so the tray reads as a
-    // shelf of the very things you are about to place.
+    // The same colour the command wears in the program, and the same moulding,
+    // so the tray reads as a shelf of the very things you are about to place.
     decoration: BoxDecoration(
       color: spec.colour,
       border: Border.all(color: W.chipEdge(spec.colour)),
       borderRadius: BorderRadius.circular(W.rowRadius),
+      boxShadow: W.plastic(spec.colour),
     ),
-    // Every command wears the same face here, block or not. A `┐` hint and an
-    // `_` argument slot used to make REPEAT and IF look like different kinds of
-    // object while still in the tray; being a container is something a command
-    // becomes once it is in the program, not a property of the thing you pick
-    // up.
-    child: Text(
-      spec.trayLabel,
-      style: W.label.copyWith(
-        color: W.ink,
-        fontWeight: FontWeight.w800,
-        fontFamily: W.rowFamily,
-        fontFamilyFallback: W.rowFallback,
-      ),
+    child: Stack(
+      fit: StackFit.passthrough,
+      children: [
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: W.glossHeight,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: W.gloss,
+              borderRadius: BorderRadius.circular(W.rowRadius),
+            ),
+          ),
+        ),
+        // Every command wears the same face here, block or not. A `┐` hint and
+        // an `_` argument slot used to make REPEAT and IF look like different
+        // kinds of object while still in the tray; being a container is
+        // something a command becomes once it is in the program, not a property
+        // of the thing you pick up.
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Center(
+            widthFactor: 1,
+            child: Text(
+              spec.trayLabel,
+              style: W.label.copyWith(
+                color: W.ink,
+                fontWeight: FontWeight.w800,
+                fontFamily: W.rowFamily,
+                fontFamilyFallback: W.rowFallback,
+                letterSpacing: W.rowLetterSpacing,
+              ),
+            ),
+          ),
+        ),
+      ],
     ),
   );
 }
