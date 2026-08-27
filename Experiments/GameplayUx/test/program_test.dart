@@ -278,6 +278,44 @@ void main() {
     });
   });
 
+  group('repeat while', () {
+    test('is a block with a condition, and reads as one line', () {
+      final doc = ProgramDocument();
+      doc.insert('repeatWhile');
+      final node = doc.root.first;
+
+      expect(node.isBlock, isTrue);
+      expect(node.children, isEmpty);
+      expect(node.text, 'REPEAT WHILE EQUALS ZERO');
+      expect(render(doc), 'REPEAT WHILE EQUALS ZERO\nEND');
+    });
+
+    test('cycles its comparison exactly as an IF does', () {
+      final doc = ProgramDocument();
+      doc.insert('repeatWhile');
+      final node = doc.root.first;
+
+      doc.cycleArg(node.id, ArgSlot.comparator);
+      expect(node.text, 'REPEAT WHILE GREATER THAN ZERO');
+
+      doc.cycleArg(node.id, ArgSlot.comparator);
+      doc.cycleArg(node.id, ArgSlot.comparator);
+      expect(node.text, 'REPEAT WHILE EQUALS ZERO', reason: 'wraps');
+    });
+
+    test('holds a body like any other block', () {
+      final doc = ProgramDocument();
+      doc.insert('repeatWhile');
+      final loop = doc.root.first;
+
+      doc.insertAt('take', Slot(loop.id, 0, 1));
+      doc.insertAt('ship', Slot(loop.id, 1, 1));
+
+      expect(render(doc), 'REPEAT WHILE EQUALS ZERO\n  TAKE\n  SHIP\nEND');
+      expect(doc.size, 3, reason: 'the closer is free, the header is not');
+    });
+  });
+
   group('no else branch', () {
     test('a block has exactly one body', () {
       final doc = ProgramDocument();

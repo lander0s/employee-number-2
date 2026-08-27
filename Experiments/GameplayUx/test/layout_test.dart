@@ -1590,6 +1590,7 @@ void main() {
       await boot(tester);
       final pane = tester.getRect(find.byType(ProgramPane));
       await dropAt(tester, 'REPEAT', pane.center);
+      await revealInTray(tester, 'IF');
       await dragIntoSpacer(tester, 'IF', body);
 
       // The IF is the only empty block now. It sits at depth 1, so its own
@@ -1625,6 +1626,7 @@ void main() {
       await boot(tester);
       final pane = tester.getRect(find.byType(ProgramPane));
       await dropAt(tester, 'REPEAT', pane.center);
+      await revealInTray(tester, 'IF');
       await dragIntoSpacer(tester, 'IF', body);
 
       // The outer block holds the IF now, so only the inner body is empty - one

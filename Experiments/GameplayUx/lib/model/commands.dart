@@ -81,7 +81,8 @@ const palletCount = 6;
 
 // ---------------------------------------------------------- condition grammar
 
-/// The comparison an IF makes against zero, and the only cyclable part of it.
+/// The comparison an IF or a REPEAT WHILE makes against zero, and the only
+/// cyclable part of it.
 ///
 /// Worded so the row reads as English with `ZERO` after it. `EQUALS THAN ZERO`
 /// was the obvious first cut and is not a sentence.
@@ -105,6 +106,15 @@ const commandCatalogue = <CommandSpec>[
     id: 'repeat',
     label: 'REPEAT',
     trayLabel: 'REPEAT',
+    isBlock: true,
+    colour: _loop,
+  ),
+  CommandSpec(
+    id: 'repeatWhile',
+    label: 'REPEAT WHILE',
+    trayLabel: 'REPEAT WHILE',
+    tail: 'ZERO',
+    argKind: ArgKind.condition,
     isBlock: true,
     colour: _loop,
   ),

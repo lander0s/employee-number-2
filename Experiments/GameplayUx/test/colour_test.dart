@@ -68,7 +68,7 @@ void main() {
   const families = <String, List<String>>{
     'movement': ['take', 'ship'],
     'storage': ['copyFrom', 'copyTo'],
-    'loop': ['repeat'],
+    'loop': ['repeat', 'repeatWhile'],
     'branch': ['ifCond'],
     'arithmetic': ['sum', 'sub'],
   };

@@ -218,9 +218,27 @@ the replacement story are all unchanged — only what is written on the boxes ch
 | `SUM [n]` | sum with pallet n | held += pallet[n]. **The merge animation.** | the two-things-become-one animation |
 | `SUB [n]` | subtract pallet n | held −= pallet[n]. Can go negative. | reverse merge, pieces fly off |
 | `REPEAT … END` | repeat forever | Unconditional loop. The workhorse. | — |
+| `REPEAT WHILE <comparison> ZERO … END` | repeat while | Loop with the test at the top. Runs the body while the held package satisfies the comparison; when it stops, **execution continues after the block.** | — |
 | `IF <comparison> ZERO … END` | branch | Structured conditional, indented, always closed. | — |
 
-**Conditions:** `IF EQUALS ZERO` · `IF GREATER THAN ZERO` · `IF LESS THAN ZERO`
+**Conditions:** `EQUALS ZERO` · `GREATER THAN ZERO` · `LESS THAN ZERO`, on both `IF` and
+`REPEAT WHILE`.
+
+**Why `REPEAT WHILE` exists.** Rejecting jumps (§6.4) cost two things, and this is the one
+that mattered. Jumps let a program *leave* a loop; with only an unconditional `REPEAT`, the
+sole way out was the intake running dry and the shift ending, so nothing could ever happen
+*after* a loop. Any level shaped "process until you reach a marker, **then** report" was
+unexpressible — not hard to optimise, unexpressible. `REPEAT WHILE` closes that hole without
+reintroducing labels or arrows: it is the same block shape as `IF`, still structured, still
+closed, still one thumb.
+
+It shares `REPEAT`'s colour, because it is the same family and the word says which one.
+
+The other cost of dropping jumps is unfixed and deliberate: two branches that end the same
+way cannot share a tail, so they duplicate it. That is a real SIZE tax, and it means par
+values (§8.2) must be derived from our own reference solutions — the genre's published pars
+are for a language with jumps and do not transfer. Sharing wants real functions rather than
+jumps, which is a much larger UX commitment in portrait and is parked, not forgotten.
 
 One cyclable segment, and zero is fixed — there is nothing else worth comparing a number
 against that the player cannot build with `SUB`. "Is this package bigger than that one" is
@@ -234,6 +252,9 @@ is a hard rule, and it is the reason there is no `IF INTAKE IS EMPTY` — see §
 `SHIP`) green, the floor (`COPY TO`, `COPY FROM`) red, the loop blue, the branch yellow,
 arithmetic (`SUM`, `SUB`) purple. Colour names the family and the word names the command,
 which is one fewer thing to memorise than nine unrelated colours.
+
+Both loop forms inspect the claws like everything else, so `REPEAT WHILE` with empty claws
+is the same failure as any other command that reads them (§6.5).
 
 **Cut in this pass**, and recorded here so they are not silently forgotten: `CLOCK OUT`
 (termination is implicit when the intake runs dry), `PAD`/`TRIM`, `THROW AT`, and `ELSE`.
