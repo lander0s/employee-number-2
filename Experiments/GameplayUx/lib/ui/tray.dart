@@ -18,10 +18,16 @@
 /// it: the drop targets light up and the dragged rows follow the finger, so the
 /// words were restating what the screen already showed.
 ///
-/// Horizontal scrolling is close to undiscoverable on its own, so the tray fades
-/// out on whichever side has more commands off-screen. The fade is on both edges,
-/// not just the right: once you have scrolled, the left edge is where the rest of
-/// the vocabulary went.
+/// **Two rows, no scrolling.** The tray used to be one horizontal strip that
+/// scrolled, with a fade on whichever side had more commands off-screen. It
+/// worked, but it meant part of the vocabulary was always hidden behind a gesture
+/// nobody is told about - and the whole point of a tray is that the player can
+/// see what the language contains. Nine commands fit two rows on a phone, so
+/// they get two rows, and the fades, the scroll controller and the notification
+/// listeners that drove them are gone with the scrolling.
+///
+/// The split is by family: flow and the doors on top, the floor and arithmetic
+/// underneath.
 library;
 
 import 'package:flutter/material.dart';
@@ -45,138 +51,45 @@ class CommandTray extends StatefulWidget {
 }
 
 class _CommandTrayState extends State<CommandTray> {
-  static const _fadeWidth = 40.0;
-
-  final _scroll = ScrollController();
-  bool _moreLeft = false;
-  bool _moreRight = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // The first frame has no scroll metrics yet, so the initial state has to be
-    // read once layout exists.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshEdges());
-  }
-
-  @override
-  void dispose() {
-    _scroll.dispose();
-    super.dispose();
-  }
-
-  void _refreshEdges() {
-    if (!_scroll.hasClients) return;
-    final p = _scroll.position;
-    // A pixel of slack: exact comparisons flicker at the extremes.
-    final left = p.pixels > 1;
-    final right = p.pixels < p.maxScrollExtent - 1;
-    if (left != _moreLeft || right != _moreRight) {
-      setState(() {
-        _moreLeft = left;
-        _moreRight = right;
-      });
-    }
-  }
+  /// Which commands sit on which row. Explicit rather than flowed: a `Wrap`
+  /// would re-break by width and could land three rows on a narrow phone, and
+  /// two rows that keep families together is the point.
+  static const _rows = <List<String>>[
+    ['take', 'ship', 'repeat', 'repeatWhile', 'ifCond'],
+    ['copyFrom', 'copyTo', 'sum', 'sub'],
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: W.chrome,
-      padding: const EdgeInsets.only(top: 8, bottom: 14),
-      child: Stack(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // ScrollMetricsNotification as well as ScrollNotification: the amount
-          // of overflow changes with text scale and screen width without anyone
-          // scrolling.
-          NotificationListener<ScrollMetricsNotification>(
-            onNotification: (_) {
-              _refreshEdges();
-              return false;
-            },
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (_) {
-                _refreshEdges();
-                return false;
-              },
-              child: SingleChildScrollView(
-                controller: _scroll,
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  children: [
-                    for (final spec in commandCatalogue) ...[
-                      _TrayButton(
-                        spec: spec,
-                        onDragUpdate: widget.onDragUpdate,
-                        onDragEnd: widget.onDragEnd,
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                  ],
-                ),
-              ),
+          for (final row in _rows) ...[
+            if (row != _rows.first) const SizedBox(height: 6),
+            Row(
+              children: [
+                for (final id in row) ...[
+                  if (id != row.first) const SizedBox(width: 6),
+                  // Expanded, so the buttons divide the row exactly and both
+                  // rows end flush with the edges. Natural widths left a ragged
+                  // right margin and made SUB a smaller target than COPY FROM
+                  // for no reason a player could see. Each label is a scaleDown
+                  // FittedBox, the last resort before anything is clipped.
+                  Expanded(
+                    child: _TrayButton(
+                      spec: specFor(id),
+                      onDragUpdate: widget.onDragUpdate,
+                      onDragEnd: widget.onDragEnd,
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ),
-          _EdgeFade(
-            key: const ValueKey('tray-fade-left'),
-            visible: _moreLeft,
-            side: _FadeSide.left,
-            width: _fadeWidth,
-          ),
-          _EdgeFade(
-            key: const ValueKey('tray-fade-right'),
-            visible: _moreRight,
-            side: _FadeSide.right,
-            width: _fadeWidth,
-          ),
+          ],
         ],
-      ),
-    );
-  }
-}
-
-enum _FadeSide { left, right }
-
-/// A gradient from the tray's own background to transparent, so buttons dissolve
-/// into the edge rather than being cut off at it.
-class _EdgeFade extends StatelessWidget {
-  const _EdgeFade({
-    super.key,
-    required this.visible,
-    required this.side,
-    required this.width,
-  });
-
-  final bool visible;
-  final _FadeSide side;
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    final left = side == _FadeSide.left;
-
-    return Positioned(
-      top: 0,
-      bottom: 0,
-      left: left ? 0 : null,
-      right: left ? null : 0,
-      width: width,
-      // Never eat a tap meant for the button underneath.
-      child: IgnorePointer(
-        child: AnimatedOpacity(
-          opacity: visible ? 1 : 0,
-          duration: const Duration(milliseconds: 120),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: left ? Alignment.centerLeft : Alignment.centerRight,
-                end: left ? Alignment.centerRight : Alignment.centerLeft,
-                colors: [W.chrome, W.chrome.withValues(alpha: 0)],
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -200,10 +113,9 @@ class _TrayButton extends StatelessWidget {
       label: '${spec.label}, drag into the program',
       child: Draggable<DragPayload>(
         data: NewCommand(spec.id),
-        // Vertical affinity, or the draggable swallows the horizontal drags that
-        // scroll the tray - and with nine commands on a phone, a tray you cannot
-        // scroll is a tray you cannot use. Up picks a command out; sideways
-        // still moves the shelf.
+        // Vertical affinity is kept even though the tray no longer scrolls: a
+        // command should come away when the finger goes *up* towards the
+        // program, not when it slides along the shelf.
         affinity: Axis.vertical,
         onDragUpdate: (d) => onDragUpdate?.call(d.globalPosition),
         onDragEnd: (_) => onDragEnd?.call(),
@@ -237,43 +149,30 @@ class _Face extends StatelessWidget {
       borderRadius: BorderRadius.circular(W.rowRadius),
       boxShadow: W.plastic(spec.colour),
     ),
-    child: Stack(
-      fit: StackFit.passthrough,
-      children: [
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: W.glossHeight,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: W.gloss,
-              borderRadius: BorderRadius.circular(W.rowRadius),
+    // Every command wears the same face here, block or not. A `┐` hint and an
+    // `_` argument slot used to make REPEAT and IF look like different kinds of
+    // object while still in the tray; being a container is something a command
+    // becomes once it is in the program, not a property of the thing you pick
+    // up.
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Center(
+        widthFactor: 1,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            spec.trayLabel,
+            style: W.label.copyWith(
+              color: W.ink,
+              fontWeight: FontWeight.w700,
+              fontFamily: W.rowFamily,
+              fontFamilyFallback: W.rowFallback,
+              letterSpacing: W.rowLetterSpacing,
             ),
+            maxLines: 1,
           ),
         ),
-        // Every command wears the same face here, block or not. A `┐` hint and
-        // an `_` argument slot used to make REPEAT and IF look like different
-        // kinds of object while still in the tray; being a container is
-        // something a command becomes once it is in the program, not a property
-        // of the thing you pick up.
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Center(
-            widthFactor: 1,
-            child: Text(
-              spec.trayLabel,
-              style: W.label.copyWith(
-                color: W.ink,
-                fontWeight: FontWeight.w400,
-                fontFamily: W.rowFamily,
-                fontFamilyFallback: W.rowFallback,
-                letterSpacing: W.rowLetterSpacing,
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     ),
   );
 }

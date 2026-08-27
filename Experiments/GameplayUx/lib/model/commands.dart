@@ -124,7 +124,9 @@ const commandCatalogue = <CommandSpec>[
   CommandSpec(
     id: 'repeatWhile',
     label: 'REPEAT WHILE',
-    trayLabel: 'REPEAT WHILE',
+    // Short in the tray: the two rows have to fit a phone without scrolling, and
+    // the row itself still says REPEAT WHILE in full.
+    trayLabel: 'WHILE',
     argKind: ArgKind.condition,
     isBlock: true,
     colour: _loop,

@@ -71,20 +71,6 @@ List<Element> innerSpacers() => spacers().evaluate().toList()..removeLast();
 Finder trayCommand(String label) =>
     find.descendant(of: find.byType(CommandTray), matching: find.text(label));
 
-/// Scrolls the tray until [label] is on screen. The tray holds nine commands and
-/// a phone shows about four.
-Future<void> revealInTray(WidgetTester tester, String label) async {
-  await tester.dragUntilVisible(
-    trayCommand(label),
-    find.descendant(
-      of: find.byType(CommandTray),
-      matching: find.byType(Scrollable),
-    ),
-    const Offset(-120, 0),
-  );
-  await tester.pumpAndSettle();
-}
-
 /// Picks a command up out of the tray and holds it over a spacer, without
 /// letting go. The caller decides whether to drop or abandon it.
 Future<TestGesture> holdOverSpacer(
@@ -726,7 +712,6 @@ void main() {
       tester,
     ) async {
       await boot(tester);
-      await revealInTray(tester, 'COPY FROM');
       await dragIntoSpacer(tester, 'COPY FROM', 0);
 
       expect(inProgram('PALLET 1'), findsOneWidget);
@@ -781,7 +766,6 @@ void main() {
       tester,
     ) async {
       await boot(tester);
-      await revealInTray(tester, 'SUM');
       await dragIntoSpacer(tester, 'SUM', 0);
 
       // The old -/+ stepper put three tap targets on one row. Regression guard
@@ -1004,63 +988,76 @@ void main() {
     });
   });
 
-  group('tray edge fade', () {
-    double fadeOpacity(WidgetTester tester, String side) => tester
-        .widget<AnimatedOpacity>(
-          find.descendant(
-            of: find.byKey(ValueKey('tray-fade-$side')),
-            matching: find.byType(AnimatedOpacity),
-          ),
-        )
-        .opacity;
-
-    Finder trayScrollable() => find.descendant(
-      of: find.byType(CommandTray),
-      matching: find.byType(Scrollable),
-    );
-
-    testWidgets('points right when there are commands off-screen', (
-      tester,
-    ) async {
+  group('the tray fits without scrolling', () {
+    Future<void> boot(WidgetTester tester) async {
       tester.view.physicalSize = const Size(393, 852);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
-
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
+    }
 
-      // Horizontal scrolling is close to undiscoverable without this.
-      expect(fadeOpacity(tester, 'right'), 1);
-      expect(fadeOpacity(tester, 'left'), 0);
+    testWidgets('every command is on screen at once', (tester) async {
+      await boot(tester);
+
+      // The tray used to be one scrolling strip with a fade on the side that had
+      // more commands hidden. Part of the vocabulary was always behind a gesture
+      // nobody is told about.
+      for (final spec in commandCatalogue) {
+        expect(
+          trayCommand(spec.trayLabel),
+          findsOneWidget,
+          reason: '${spec.id} is not in the tray',
+        );
+      }
+
+      expect(
+        find.descendant(
+          of: find.byType(CommandTray),
+          matching: find.byType(Scrollable),
+        ),
+        findsNothing,
+        reason: 'nothing to scroll, so nothing that can scroll',
+      );
+      expect(find.byKey(const ValueKey('tray-fade-left')), findsNothing);
+      expect(find.byKey(const ValueKey('tray-fade-right')), findsNothing);
     });
 
-    testWidgets('swaps sides once scrolled to the end', (tester) async {
-      tester.view.physicalSize = const Size(393, 852);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
+    testWidgets('in two rows, and no button is clipped', (tester) async {
+      await boot(tester);
+      final tray = tester.getRect(find.byType(CommandTray));
 
-      await tester.pumpWidget(harness(textScale: 1.0));
-      await tester.pumpAndSettle();
+      final tops = <double>{};
+      for (final spec in commandCatalogue) {
+        final button = tester.getRect(
+          rowContainerFor(trayCommand(spec.trayLabel)),
+        );
+        tops.add(button.top.roundToDouble());
 
-      await tester.fling(trayScrollable(), const Offset(-2000, 0), 4000);
-      await tester.pumpAndSettle();
+        expect(
+          button.left,
+          greaterThanOrEqualTo(tray.left - 0.5),
+          reason: spec.id,
+        );
+        expect(
+          button.right,
+          lessThanOrEqualTo(tray.right + 0.5),
+          reason: spec.id,
+        );
+        expect(
+          button.height,
+          greaterThanOrEqualTo(W.minTarget - 0.5),
+          reason: spec.id,
+        );
+      }
 
-      expect(fadeOpacity(tester, 'right'), 0);
-      expect(fadeOpacity(tester, 'left'), 1);
+      expect(tops, hasLength(2), reason: 'two rows, not one and not three');
     });
 
-    testWidgets('does not swallow a drag started under it', (tester) async {
-      tester.view.physicalSize = const Size(393, 852);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
+    testWidgets('a command still comes away on an upward drag', (tester) async {
+      await boot(tester);
 
-      await tester.pumpWidget(harness(textScale: 1.0));
-      await tester.pumpAndSettle();
-
-      // The last command in the tray sits under the right-hand fade until the
-      // tray is scrolled. The fade must not eat the gesture that picks it up -
-      // it would make the very command the fade is advertising unreachable.
-      await revealInTray(tester, 'SUB');
+      // The bottom row is the one that used to be off-screen entirely.
       await dragIntoSpacer(tester, 'SUB', 0);
 
       expect(inProgram('SUB'), findsOneWidget);
@@ -1588,7 +1585,6 @@ void main() {
       await boot(tester);
       final pane = tester.getRect(find.byType(ProgramPane));
       await dropAt(tester, 'REPEAT', pane.center);
-      await revealInTray(tester, 'IF');
       await dragIntoSpacer(tester, 'IF', body);
 
       // The IF is the only empty block now. It sits at depth 1, so its own
@@ -1624,7 +1620,6 @@ void main() {
       await boot(tester);
       final pane = tester.getRect(find.byType(ProgramPane));
       await dropAt(tester, 'REPEAT', pane.center);
-      await revealInTray(tester, 'IF');
       await dragIntoSpacer(tester, 'IF', body);
 
       // The outer block holds the IF now, so only the inner body is empty - one
@@ -1970,7 +1965,6 @@ void main() {
 
       final take = faceRect(tester, 'TAKE');
       for (final spec in commandCatalogue) {
-        await revealInTray(tester, spec.trayLabel);
         final face = faceRect(tester, spec.trayLabel);
         expect(
           face.height,

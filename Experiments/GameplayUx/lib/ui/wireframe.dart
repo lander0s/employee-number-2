@@ -67,35 +67,17 @@ abstract final class W {
   static Color chipFill(Color base) => Color.lerp(base, Colors.white, 0.24)!;
   static Color chipEdge(Color base) => Color.lerp(base, Colors.black, 0.30)!;
 
-  /// Commands are moulded plastic rather than flat cards. Three things do it,
-  /// and the first is the one that matters:
+  /// A soft shadow under every command, and nothing else.
   ///
-  /// The **lip** is a hard, unblurred shadow in a darker shade of the row's own
-  /// colour. That is the moulded edge, and it is what reads as thickness - a
-  /// blurred shadow on its own just reads as paper floating above the page.
-  ///
-  /// The **ambient shadow** underneath lifts the row off the pane, and the
-  /// **gloss** is a short band of white across the top, fading out. Both are
-  /// deliberately subtle: at full strength the row looks wet.
-  static const lipDepth = 3.0;
-  static const glossHeight = 20.0;
-
-  static const gloss = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [Color(0x40FFFFFF), Color(0x00FFFFFF)],
-  );
-
-  static List<BoxShadow> plastic(Color base) => [
-    BoxShadow(
-      color: Color.lerp(base, Colors.black, 0.38)!,
-      offset: const Offset(0, lipDepth),
-    ),
-    const BoxShadow(
-      color: Color(0x59000000),
-      offset: Offset(0, 5),
-      blurRadius: 9,
-    ),
+  /// There was a whole plastic treatment here - a hard lip in a darker shade of
+  /// the row's own colour for the moulded edge, and a band of gloss across the
+  /// top. Both are gone. The shadow stays because it does something the others
+  /// did not: it separates a row from whatever it is sitting on, which on nested
+  /// blocks of similar colour is the difference between reading the structure
+  /// and squinting at it. The rest was decoration on a screen that already has
+  /// nine colours and four depths of nesting to communicate.
+  static List<BoxShadow> plastic(Color base) => const [
+    BoxShadow(color: Color(0x59000000), offset: Offset(0, 5), blurRadius: 9),
   ];
 
   /// Hairline between two adjacent rows. Invisible where colours differ, and
@@ -150,9 +132,15 @@ abstract final class W {
 
   /// Corner radii. Rows and tray buttons share one so a command looks the same
   /// wherever it is; a block is a touch rounder because it is the bigger shape.
-  static const rowRadius = 8.0;
-  static const blockRadius = 12.0;
-  static const chipRadius = 5.0;
+  /// Sharp. Rounded corners were tried and dropped: on a screen this dense -
+  /// blocks inside blocks, chips inside rows, a gloss band on every one - each
+  /// radius was another soft edge competing with the nesting for attention, and
+  /// the "C" of a container reads harder when its arms are curved. Kept as
+  /// tokens rather than deleted so the whole language can be re-rounded from one
+  /// place.
+  static const rowRadius = 0.0;
+  static const blockRadius = 0.0;
+  static const chipRadius = 0.0;
 
   /// How far the program is laid out past the right edge of its pane.
   ///
@@ -186,9 +174,9 @@ abstract final class W {
   /// A little air between letters, so each one can be read on its own.
   static const rowLetterSpacing = 0.8;
 
-  /// One weight for every word on a row. What separates a fixed command word
-  /// from a value you can change is the chip around the value, not the weight of
-  /// the letters.
+  /// Bold, and one weight for every word on a row: what separates a fixed
+  /// command word from a value you can change is the chip around the value, not
+  /// the weight of the letters.
   /// `leadingDistribution: even` is doing real work here. The labels are all
   /// caps, and by default the leftover line height is split the way the font
   /// declares it - most of it below the caps, in descender space nothing here
@@ -199,7 +187,7 @@ abstract final class W {
     fontFamily: rowFamily,
     fontFamilyFallback: rowFallback,
     fontSize: 20,
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w700,
     letterSpacing: rowLetterSpacing,
     leadingDistribution: TextLeadingDistribution.even,
     color: text,
@@ -210,7 +198,7 @@ abstract final class W {
     fontFamily: rowFamily,
     fontFamilyFallback: rowFallback,
     fontSize: 20,
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w700,
     letterSpacing: rowLetterSpacing,
     leadingDistribution: TextLeadingDistribution.even,
     color: textDim,

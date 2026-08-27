@@ -76,8 +76,9 @@ class ProgramRow extends StatelessWidget {
         // through: a swipe or a drag moves the header alone, and a title sliding
         // out from under its own background looked like the letters had come
         // loose from the block.
-        // No lip on a header: the block it belongs to casts that, and two
-        // moulded edges 44dp apart read as two objects.
+        //
+        // No shadow on a header: the block it belongs to casts one, and two
+        // shadows 44dp apart read as two objects rather than one container.
         RowKind.blockHeader => BoxDecoration(
           color: W.blockFill(tone, row.depth),
           borderRadius: const BorderRadius.vertical(
@@ -86,44 +87,37 @@ class ProgramRow extends StatelessWidget {
         ),
         RowKind.blockCloser => null,
       },
-      child: _Glossed(
-        radius: isHeader
-            ? const BorderRadius.vertical(top: Radius.circular(W.blockRadius))
-            : BorderRadius.circular(W.rowRadius),
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: W.rowInset,
-            right: 8,
-            top: isHeader ? W.headerTopPad : 0,
-          ),
-          child: Opacity(
-            opacity: dragging ? 0.35 : 1,
-            child: Align(
-              alignment: isHeader ? Alignment.topLeft : Alignment.centerLeft,
-              // Wrap, so a long condition runs onto a second line instead of
-              // overflowing a narrow screen. Rows are height-flexible, so growing
-              // is free.
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 6,
-                runSpacing: 4,
-                children: [
-                  _Keyword(
-                    text: row.isCloser ? 'END' : node.spec.label,
-                    dim: row.isCloser,
-                  ),
-                  if (!row.isCloser) ...[
-                    for (final chip in node.chips)
-                      _ArgWord(
-                        text: chip.text,
-                        tone: tone,
-                        onTap: interactive
-                            ? () => onCycleArg(chip.slot)
-                            : () {},
-                      ),
-                  ],
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: W.rowInset,
+          right: 8,
+          top: isHeader ? W.headerTopPad : 0,
+        ),
+        child: Opacity(
+          opacity: dragging ? 0.35 : 1,
+          child: Align(
+            alignment: isHeader ? Alignment.topLeft : Alignment.centerLeft,
+            // Wrap, so a long condition runs onto a second line instead of
+            // overflowing a narrow screen. Rows are height-flexible, so growing
+            // is free.
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                _Keyword(
+                  text: row.isCloser ? 'END' : node.spec.label,
+                  dim: row.isCloser,
+                ),
+                if (!row.isCloser) ...[
+                  for (final chip in node.chips)
+                    _ArgWord(
+                      text: chip.text,
+                      tone: tone,
+                      onTap: interactive ? () => onCycleArg(chip.slot) : () {},
+                    ),
                 ],
-              ),
+              ],
             ),
           ),
         ),
@@ -132,39 +126,6 @@ class ProgramRow extends StatelessWidget {
 
     return content;
   }
-}
-
-/// Puts a short band of light across the top of whatever it wraps.
-///
-/// Behind the content, never over it: a gloss painted on top would wash out the
-/// words and the argument chips along with the fill.
-class _Glossed extends StatelessWidget {
-  const _Glossed({required this.radius, required this.child});
-
-  final BorderRadius radius;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Stack(
-    // Passthrough, or the stack shrink-wraps the label and the row loses the
-    // minimum height that centres it.
-    fit: StackFit.passthrough,
-    children: [
-      // Fixed height rather than a fraction: the highlight is where the light
-      // hits the moulded edge, so it is the same on a one-line row and on a
-      // block header, not proportional to how tall the thing happens to be.
-      Positioned(
-        top: 0,
-        left: 0,
-        right: 0,
-        height: W.glossHeight,
-        child: DecoratedBox(
-          decoration: BoxDecoration(gradient: W.gloss, borderRadius: radius),
-        ),
-      ),
-      child,
-    ],
-  );
 }
 
 /// A fixed word: the brightest tone on the row, and not tappable.

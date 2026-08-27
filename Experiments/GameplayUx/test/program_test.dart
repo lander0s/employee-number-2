@@ -40,10 +40,7 @@ void main() {
       doc.insertAt('ifCond', Slot(repeat.id, 1, 1));
       doc.insertAt('ship', Slot(repeat.children![1].id, 0, 2));
 
-      expect(
-        render(doc),
-        'REPEAT\n  TAKE\n  IF ZERO\n    SHIP\n  END\nEND',
-      );
+      expect(render(doc), 'REPEAT\n  TAKE\n  IF ZERO\n    SHIP\n  END\nEND');
       expect(doc.maxDepth, 3);
     });
 
