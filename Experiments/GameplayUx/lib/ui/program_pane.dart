@@ -505,7 +505,6 @@ class _SlotWidgetState extends State<_SlotWidget> {
         if (widget.fill) {
           return Container(
             constraints: const BoxConstraints(minHeight: W.indentPerDepth),
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             alignment: Alignment.topLeft,
             child: open
                 ? Padding(
@@ -537,11 +536,12 @@ class _SlotWidgetState extends State<_SlotWidget> {
                 // A minimum, not a height: the outline grows with text scale like
                 // the row it is standing in for.
                 constraints: const BoxConstraints(minHeight: W.openSlotHeight),
-                padding: const EdgeInsets.fromLTRB(
-                  4,
-                  W.indentPerDepth + 2,
-                  4,
-                  W.indentPerDepth + 2,
+                // No horizontal inset: this box stands in for a row, so it
+                // starts and ends exactly where a row does. Inset by 4 it was
+                // subtly narrower, and its label sat 8dp inside its own edge
+                // where a command's sits 12dp inside its own.
+                padding: const EdgeInsets.symmetric(
+                  vertical: W.indentPerDepth + 2,
                 ),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -553,10 +553,7 @@ class _SlotWidgetState extends State<_SlotWidget> {
                       : const SizedBox.shrink(),
                 ),
               )
-            : Container(
-                height: W.indentPerDepth,
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              );
+            : const SizedBox(height: W.indentPerDepth);
 
         if (!animate) return box;
 
@@ -590,7 +587,9 @@ class _OpenGap extends StatelessWidget {
       child: Align(
         alignment: Alignment.centerLeft,
         child: Padding(
-          padding: const EdgeInsets.only(left: W.rowInset - 4, right: 10),
+          // The same inset a command's first word has, measured from the same
+          // edge - this box is the row that is about to be here.
+          padding: const EdgeInsets.only(left: W.rowInset, right: 10),
           child: Text(
             'DROP HERE',
             style: W.row.copyWith(color: colour, fontWeight: FontWeight.w600),

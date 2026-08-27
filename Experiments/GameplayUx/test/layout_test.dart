@@ -465,6 +465,30 @@ void main() {
       await tester.pumpAndSettle();
     });
 
+    testWidgets('an open gap starts where a row starts, inside and out', (
+      tester,
+    ) async {
+      await boot(tester);
+
+      // Spacer 1 is inside the REPEAT body, alongside TAKE.
+      final row = tester.getRect(rowContainerFor(inProgram('TAKE').first));
+      final label = tester.getRect(inProgram('TAKE').first);
+
+      final gesture = await holdOverSpacer(tester, 'SHIP', 1);
+
+      // The box was inset 4dp from where a row's box begins, which left its
+      // label 8dp inside its own edge against a command's 12dp.
+      final outline = tester.getRect(find.byType(DottedOutline));
+      expect(outline.left, closeTo(row.left, 0.5));
+      expect(
+        tester.getRect(find.text('DROP HERE')).left - outline.left,
+        closeTo(label.left - row.left, 0.5),
+      );
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('so the rows below it do not move when the drop lands', (
       tester,
     ) async {
