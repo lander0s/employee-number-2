@@ -30,6 +30,11 @@ abstract final class W {
   static const paperMargin = Color(0x4DD2504A);
   static const paperMarginInset = 26.0;
 
+  /// Where the program starts: to the right of the margin line, the way writing
+  /// in a real notebook does. The rules and the margin are the page and run the
+  /// full width; only what is written on it respects the margin.
+  static const paperGutter = 34.0;
+
   /// How much empty page the program keeps below its last row, as a fraction of
   /// the pane. It is what makes a short program scrollable at all - without it
   /// the content ends exactly at the viewport, so the end of the program is
@@ -49,7 +54,7 @@ abstract final class W {
   ///
   /// Dark enough that the dark ink on the buttons still has a surface to sit
   /// against, light enough that the rules read through the gaps between them.
-  static const trayScrim = Color(0xD11C1C1C);
+  static const trayScrim = Color(0x991C1C1C);
   static const line = Color(0xFF505050);
   static const lineSoft = Color(0xFF3F3F3F);
   static const button = Color(0xFF454545);

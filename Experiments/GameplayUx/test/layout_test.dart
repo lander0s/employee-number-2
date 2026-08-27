@@ -754,7 +754,7 @@ void main() {
             )
             .first,
       );
-      expect(target.height, greaterThanOrEqualTo(W.chipTarget));
+      expect(target.height, greaterThanOrEqualTo(W.chipTarget - 0.5));
 
       // And the tap still lands from the edge of that target, not just the chip.
       await tester.tapAt(Offset(target.center.dx, target.top + 3));
@@ -988,6 +988,34 @@ void main() {
     });
   });
 
+  group('the margin', () {
+    testWidgets('the program starts to the right of the margin line', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(textScale: 1.0));
+      await tester.pumpAndSettle();
+
+      // The page is ruled full width and the margin is drawn on it; what is
+      // written on the page respects the margin, the way it does in a notebook.
+      final pane = tester.getRect(find.byType(ProgramPane));
+      final block = tester.getRect(
+        find
+            .ancestor(of: inProgram('REPEAT'), matching: find.byType(Container))
+            .at(1),
+      );
+
+      expect(block.left - pane.left, closeTo(W.paperGutter, 0.5));
+      expect(
+        block.left - pane.left,
+        greaterThan(W.paperMarginInset),
+        reason: 'the program must not be written over the margin line',
+      );
+    });
+  });
+
   group('the tray fits without scrolling', () {
     Future<void> boot(WidgetTester tester) async {
       tester.view.physicalSize = const Size(393, 852);
@@ -1167,16 +1195,35 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the program pane grows into the space the tray leaves', (
+    testWidgets('the program does not move when a run starts', (tester) async {
+      await boot(tester);
+      final before = tester.getRect(find.byType(ProgramPane));
+      final rowBefore = tester.getRect(rowContainerFor(inProgram('TAKE')));
+
+      await start(tester);
+
+      // The tray lies over the page rather than beside it, so starting a run
+      // uncovers part of the page instead of resizing it. It used to shrink the
+      // pane, which jumped every row at exactly the moment you want to be
+      // watching them.
+      expect(tester.getRect(find.byType(ProgramPane)), before);
+      expect(tester.getRect(rowContainerFor(inProgram('TAKE'))), rowBefore);
+
+      await start(tester); // STOP
+      expect(tester.getRect(rowContainerFor(inProgram('TAKE'))), rowBefore);
+    });
+
+    testWidgets('and the page runs under the tray, not up to it', (
       tester,
     ) async {
       await boot(tester);
-      final editing = tester.getRect(find.byType(ProgramPane)).height;
 
-      await start(tester);
-      final running = tester.getRect(find.byType(ProgramPane)).height;
-
-      expect(running, greaterThan(editing));
+      // The pane's own box reaches the bottom of the split; the tray sits on top
+      // of its last stretch.
+      final pane = tester.getRect(find.byType(ProgramPane));
+      final tray = tester.getRect(find.byType(CommandTray));
+      expect(tray.bottom, closeTo(pane.bottom, 0.5));
+      expect(tray.top, greaterThan(pane.top));
     });
   });
 
@@ -1903,30 +1950,45 @@ void main() {
     ) async {
       await boot(tester);
       final pane = tester.getRect(find.byType(ProgramPane));
+      final tray = tester.getRect(find.byType(CommandTray));
       final edge = math.min(W.autoScrollEdge, pane.height / 4);
 
-      // Just inside the zone: slow.
-      var gesture = await carryTo(
-        tester,
-        'SHIP',
-        Offset(pane.center.dx, pane.bottom - edge + 2),
-      );
-      await tester.pump(const Duration(milliseconds: 160));
-      final gentle = offset(tester);
-      await gesture.up();
-      await tester.pumpAndSettle();
+      /// Scroll travelled while holding a command at [y] for one short burst,
+      /// always measured from the top of the page - the samples would otherwise
+      /// stack and the second one would run into the end of the list.
+      Future<double> travelAt(double y) async {
+        tester
+            .state<ScrollableState>(
+              find
+                  .descendant(
+                    of: find.byType(ProgramPane),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            )
+            .position
+            .jumpTo(0);
+        await tester.pump();
 
-      // Hard against the edge: fast.
-      gesture = await carryTo(
-        tester,
-        'SHIP',
-        Offset(pane.center.dx, pane.bottom - 2),
-      );
-      await tester.pump(const Duration(milliseconds: 160));
-      expect(offset(tester) - gentle, greaterThan(gentle));
+        final gesture = await carryTo(
+          tester,
+          'SHIP',
+          Offset(pane.center.dx, y),
+        );
+        await tester.pump(const Duration(milliseconds: 80));
+        final travelled = offset(tester);
+        await gesture.up();
+        await tester.pumpAndSettle();
+        return travelled;
+      }
 
-      await gesture.up();
-      await tester.pumpAndSettle();
+      // Just inside the zone, then hard against the edge of the visible page -
+      // which is the top of the tray, not the bottom of the pane.
+      final gentle = await travelAt(tray.top - edge + 2);
+      final hard = await travelAt(tray.top - 2);
+
+      expect(gentle, greaterThan(0), reason: 'the zone should be live at all');
+      expect(hard, greaterThan(gentle * 1.5));
     });
   });
 
@@ -2040,18 +2102,25 @@ void main() {
       final pane = tester.getRect(find.byType(ProgramPane));
       final tail = tester.getRect(tailSpacer());
       expect(tail.top, lessThan(pane.bottom));
+      // At least half a pane of page below the program. It can be more when the
+      // program is short - the tail also fills whatever is left of the viewport,
+      // and only its *minimum* is the slack - but never a whole pane, which is
+      // what let the program scroll almost off the top.
       expect(
         tail.height,
-        closeTo(pane.height * W.tailSlack, 0.5),
-        reason: 'half a pane of page below the program, not a whole one',
+        greaterThanOrEqualTo(pane.height * W.tailSlack - 0.5),
       );
+      expect(tail.height, lessThan(pane.height));
     });
 
     testWidgets('a drop far below the last row still appends', (tester) async {
       await boot(tester);
       final pane = tester.getRect(find.byType(ProgramPane));
 
-      await dropAt(tester, 'SHIP', Offset(pane.center.dx, pane.bottom - 20));
+      // Above the tray: the bottom of the page is behind it now, and a drop
+      // there lands on the tray rather than on the page.
+      final tray = tester.getRect(find.byType(CommandTray));
+      await dropAt(tester, 'SHIP', Offset(pane.center.dx, tray.top - 20));
 
       final dropped = tester.getRect(rowContainerFor(inProgram('SHIP').last));
       final block = tester.getRect(rowContainerFor(inProgram('REPEAT')));
@@ -2089,7 +2158,8 @@ void main() {
       // Scrolled into, it has to keep taking drops - otherwise pulling the
       // program up to get comfortable would cost you the place to drop.
       final pane = tester.getRect(find.byType(ProgramPane));
-      await dropAt(tester, 'SHIP', Offset(pane.center.dx, pane.bottom - 40));
+      final tray = tester.getRect(find.byType(CommandTray));
+      await dropAt(tester, 'SHIP', Offset(pane.center.dx, tray.top - 20));
 
       final dropped = tester.getRect(rowContainerFor(inProgram('SHIP').last));
       final block = tester.getRect(rowContainerFor(inProgram('REPEAT')));

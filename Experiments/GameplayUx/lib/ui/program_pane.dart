@@ -247,7 +247,15 @@ class ProgramPaneState extends State<ProgramPane> {
   Widget _overhang(double width, Widget child) => SingleChildScrollView(
     scrollDirection: Axis.horizontal,
     physics: const NeverScrollableScrollPhysics(),
-    child: SizedBox(width: width, child: child),
+    child: SizedBox(
+      width: width,
+      // Everything written on the page starts right of the margin line. The
+      // page itself - rules and margin - is painted full width behind this.
+      child: Padding(
+        padding: const EdgeInsets.only(left: W.paperGutter),
+        child: child,
+      ),
+    ),
   );
 
   /// One child list: a slot before every node and one after the last, so every

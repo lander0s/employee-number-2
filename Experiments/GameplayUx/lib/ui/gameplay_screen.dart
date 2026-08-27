@@ -41,22 +41,22 @@ class _GameplayScreenState extends State<GameplayScreen> {
   /// screen holds the handle that lets one talk to the other.
   final _pane = GlobalKey<ProgramPaneState>();
 
-  /// The tray floats over the page, so the page has to know how much of its
+  /// The tray lies *over* the page, so the page has to know how much of its
   /// bottom edge is covered. Measured rather than computed: the tray's height
   /// follows the OS text scale, so there is no constant to use.
   final _trayKey = GlobalKey();
   double _trayHeight = 0;
 
-  double _floorFraction = _programFocused;
-  bool _draggingDivider = false;
-
   void _measureTray() {
     final box = _trayKey.currentContext?.findRenderObject() as RenderBox?;
-    final height = box?.size.height ?? 0;
+    final height = _running ? 0.0 : (box?.size.height ?? 0);
     if (mounted && height != _trayHeight) {
       setState(() => _trayHeight = height);
     }
   }
+
+  double _floorFraction = _programFocused;
+  bool _draggingDivider = false;
 
   /// Fake, for the moment: the button flips state so the two labels can be felt.
   /// Nothing executes.
@@ -91,6 +91,9 @@ class _GameplayScreenState extends State<GameplayScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // The tray's height is only knowable once it has laid out.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureTray());
+
     // The tray's height is only knowable after it lays out.
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureTray());
 
@@ -155,11 +158,45 @@ class _GameplayScreenState extends State<GameplayScreen> {
                         onDoubleTap: _toggleSnap,
                       ),
                       Expanded(
-                        child: ProgramPane(
-                          key: _pane,
-                          doc: _doc,
-                          onChanged: _refresh,
-                          running: _running,
+                        // The tray is laid over the page rather than beside it.
+                        // Two things fall out of that, and both are the point:
+                        // the ruled sheet shows through the tray's translucency,
+                        // and pressing RUN does not resize the program - the
+                        // pane was already the full height, so the tray simply
+                        // stops covering part of it. It used to shrink the pane,
+                        // which meant every row jumped the moment a run started,
+                        // at exactly the moment you want to be watching them.
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: ProgramPane(
+                                key: _pane,
+                                doc: _doc,
+                                onChanged: _refresh,
+                                running: _running,
+                                bottomInset: _trayHeight,
+                              ),
+                            ),
+                            if (!_running)
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                child: Chrome(
+                                  child: CommandTray(
+                                    key: _trayKey,
+                                    // A command carried up from the tray
+                                    // scrolls the program when it reaches an
+                                    // edge, exactly as a row being moved does.
+                                    onDragUpdate: (position) => _pane
+                                        .currentState
+                                        ?.autoScrollTo(position),
+                                    onDragEnd: () =>
+                                        _pane.currentState?.stopAutoScroll(),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ],
@@ -167,18 +204,6 @@ class _GameplayScreenState extends State<GameplayScreen> {
                 },
               ),
             ),
-            // The tray is hidden while running: nothing can be inserted, and
-            // the program pane gets the space back to watch the program in.
-            if (!_running)
-              Chrome(
-                child: CommandTray(
-                  // A command carried up from the tray scrolls the program when
-                  // it reaches an edge, exactly as a row being moved does.
-                  onDragUpdate: (position) =>
-                      _pane.currentState?.autoScrollTo(position),
-                  onDragEnd: () => _pane.currentState?.stopAutoScroll(),
-                ),
-              ),
           ],
         ),
       ),
