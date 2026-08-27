@@ -754,7 +754,7 @@ void main() {
             )
             .first,
       );
-      expect(target.height, greaterThanOrEqualTo(W.minTarget));
+      expect(target.height, greaterThanOrEqualTo(W.chipTarget));
 
       // And the tap still lands from the edge of that target, not just the chip.
       await tester.tapAt(Offset(target.center.dx, target.top + 3));
@@ -1220,7 +1220,9 @@ void main() {
         tester.getCenter(inProgram('TAKE')),
       );
       await tester.pump(const Duration(milliseconds: 300));
-      await gesture.moveBy(const Offset(0, 30));
+      // Just past the bottom of the row, into the spacer under it. Rows are
+      // 36 tall now, so this offset has to stay under half a row plus a spacer.
+      await gesture.moveBy(const Offset(0, 22));
       await tester.pump();
 
       // A spacer and a drop target are the same object now, so a drag lands on
@@ -2036,8 +2038,11 @@ void main() {
       final pane = tester.getRect(find.byType(ProgramPane));
       final tail = tester.getRect(tailSpacer());
       expect(tail.top, lessThan(pane.bottom));
-      expect(tail.bottom, greaterThanOrEqualTo(pane.bottom));
-      expect(tail.height, closeTo(pane.height, 0.5));
+      expect(
+        tail.height,
+        closeTo(pane.height * W.tailSlack, 0.5),
+        reason: 'half a pane of page below the program, not a whole one',
+      );
     });
 
     testWidgets('a drop far below the last row still appends', (tester) async {

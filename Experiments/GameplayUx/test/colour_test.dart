@@ -179,6 +179,34 @@ void main() {
     }
   });
 
+  test('the paper is legible, and the commands still sit on it', () {
+    // The program surface went from a dark pane to a light sheet, which changes
+    // what has to be checked: ink on paper for the pane's own text, and the
+    // command colours no longer disappearing into their background.
+    expect(contrast(W.ink, W.paper), greaterThanOrEqualTo(7));
+
+    for (final spec in commandCatalogue) {
+      expect(
+        deltaE(W.paper, spec.colour),
+        greaterThan(20),
+        reason: '${spec.id} is too close to the paper to read as a card on it',
+      );
+    }
+
+    // The rules are a hint, not a grid to read: faint against the sheet, and
+    // never competing with a word written over them. Measured composited, since
+    // they are painted at low alpha - the raw colour is a strong blue and says
+    // nothing about what lands on the page.
+    expect(
+      contrast(W.paper, Color.alphaBlend(W.paperRule, W.paper)),
+      lessThan(2),
+    );
+    expect(
+      contrast(W.paper, Color.alphaBlend(W.paperMargin, W.paper)),
+      lessThan(3),
+    );
+  });
+
   test('the delete backdrop reads as an alert, not as a command', () {
     // Near-white on it, like the rest of the app's furniture - the dark ink is
     // for coloured rows.

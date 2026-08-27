@@ -476,6 +476,19 @@ lives in the top 15% of the screen except the Task Card, which is display-only.
 ### 7.3 Readability spec (P2, enforced)
 - Minimum functional text size **17pt**, instruction rows **20pt semibold**, and everything
   scales with the OS accessibility text setting up to 200% without clipping.
+- **Rows are 36dp, not 56–64.** An earlier draft of this spec set a 56–64 row and it was
+  wrong for the wrong reason: it protected the *text*, which needs 20pt and gets it, by
+  buying air around it, which nothing needs. A 20pt word is about 14dp of actual capital, so
+  a 56dp row wrapped it in 40dp of nothing — and a program is mostly rows, so that was the
+  single biggest consumer of a screen whose whole argument (§7.1) is how much program you can
+  see at once.
+- **Targets, honestly.** 36dp is under the usual 48dp guidance and it is a deliberate
+  exception, not an oversight. A row is not a tap target: its gestures are a horizontal swipe
+  and a long-press drag, neither of which needs a fingertip-sized box to acquire. The one
+  thing on a row that *is* tapped — a cyclable word — carries its own target inside the row,
+  and it is 60–120dp wide as well, which is where the accuracy actually comes from. The tray
+  buttons, which are tapped and dragged from cold, stay at 48. If playtesting shows mis-taps
+  on the cyclable words, that target is the first number to put back.
 - Contrast ≥ 7:1 for instruction text on its row; ≥ 4.5:1 for all secondary chrome.
 - Dark theme default; light theme available; both hand-tuned, not auto-inverted.
 - **No information encoded in color alone.** Every package type is shape + icon + color.

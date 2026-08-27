@@ -152,55 +152,74 @@ class ProgramPaneState extends State<ProgramPane> {
   Widget build(BuildContext context) {
     return Container(
       key: _paneKey,
-      color: W.paneProgram,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth + W.programOverhang;
-
-          return CustomScrollView(
-            controller: _scroll,
-            slivers: [
-              SliverToBoxAdapter(
-                child: _overhang(width, _buildList(doc.root, null, 0)),
-              ),
-              // The last spacer at the root owns everything below the program.
-              // As an 18-tall strip it was an invisible edge you had to hit
-              // exactly, and on an empty program there was nothing to hit at
-              // all - the pane rendered a hint and no drop target whatsoever.
-              //
-              // It is a pane tall at minimum, which is what makes a short
-              // program scrollable: without it the content ended exactly at the
-              // viewport, so the end of the program was stuck wherever it
-              // happened to fall - often right above the tray, which is the
-              // least comfortable place to be dropping things. Now any row can
-              // be pulled up to the top, and the room it opens up is still one
-              // drop target for the end of the program rather than dead space.
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: _overhang(
-                  width,
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
-                    child: _buildSlot(
-                      Slot(null, doc.root.length, 0),
-                      null,
-                      key: const ValueKey('program-tail'),
-                      fill: true,
-                      hint: doc.root.isEmpty
-                          ? Text(
-                              'Drag a command up from below.',
-                              style: W.labelDim,
-                            )
-                          : null,
-                    ),
+      color: W.paper,
+      child: Stack(
+        children: [
+          // The rules are painted behind the program and scroll with it: a fixed
+          // backdrop would slide against the instructions the moment the page
+          // moved, which is the one thing paper never does.
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: _scroll,
+                builder: (context, _) => CustomPaint(
+                  painter: _PaperPainter(
+                    offset: _scroll.hasClients ? _scroll.offset : 0,
                   ),
                 ),
               ),
-            ],
-          );
-        },
+            ),
+          ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth + W.programOverhang;
+
+              return CustomScrollView(
+                controller: _scroll,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _overhang(width, _buildList(doc.root, null, 0)),
+                  ),
+                  // The last spacer at the root owns everything below the program.
+                  // As an 18-tall strip it was an invisible edge you had to hit
+                  // exactly, and on an empty program there was nothing to hit at
+                  // all - the pane rendered a hint and no drop target whatsoever.
+                  //
+                  // It is a pane tall at minimum, which is what makes a short
+                  // program scrollable: without it the content ended exactly at the
+                  // viewport, so the end of the program was stuck wherever it
+                  // happened to fall - often right above the tray, which is the
+                  // least comfortable place to be dropping things. Now any row can
+                  // be pulled up to the top, and the room it opens up is still one
+                  // drop target for the end of the program rather than dead space.
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _overhang(
+                      width,
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight * W.tailSlack,
+                        ),
+                        child: _buildSlot(
+                          Slot(null, doc.root.length, 0),
+                          null,
+                          key: const ValueKey('program-tail'),
+                          fill: true,
+                          hint: doc.root.isEmpty
+                              ? Text(
+                                  'Drag a command up from below.',
+                                  style: W.onPaperDim,
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -315,7 +334,7 @@ class ProgramPaneState extends State<ProgramPane> {
             // An empty body needs no special minimum either: one spacer is the
             // body, and it is exactly the right height already.
             Padding(
-              padding: const EdgeInsets.only(left: W.indentPerDepth, right: 4),
+              padding: const EdgeInsets.only(left: W.indentPerDepth, right: 3),
               child: body,
             ),
           ],
@@ -448,6 +467,43 @@ class ProgramPaneState extends State<ProgramPane> {
   }
 }
 
+/// Ruled paper: horizontal lines at a row's pitch and a margin down the left.
+///
+/// [offset] is the program's scroll position, so the rules move with the text
+/// written on them. The phase is all that changes - the lines are identical, so
+/// only the remainder matters and the paper is endless.
+class _PaperPainter extends CustomPainter {
+  const _PaperPainter({required this.offset});
+
+  final double offset;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rule = Paint()
+      ..color = W.paperRule
+      ..strokeWidth = 1;
+
+    for (
+      var y = W.rowHeight - offset % W.rowHeight;
+      y < size.height;
+      y += W.rowHeight
+    ) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), rule);
+    }
+
+    canvas.drawLine(
+      const Offset(W.paperMarginInset, 0),
+      Offset(W.paperMarginInset, size.height),
+      Paint()
+        ..color = W.paperMargin
+        ..strokeWidth = 1.5,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PaperPainter old) => old.offset != offset;
+}
+
 /// An insertion point. Doubles as the caret when idle and as a drop target
 /// during a drag.
 class _SlotWidget extends StatefulWidget {
@@ -515,9 +571,8 @@ class _SlotWidgetState extends State<_SlotWidget> {
         // Expanded only while something is held over it.
         final open = _hovering || candidate.isNotEmpty;
 
-        // On a bright block this is drawn in ink; on the dark pane, in the pale
-        // theme colour.
-        final markColour = widget.on != null ? W.ink : W.caret;
+        // Ink, wherever it lands: on a bright block, and on the paper too.
+        const markColour = W.ink;
 
         // Closing after a drop is instant. The row that lands takes exactly the
         // space the open gap was holding, so animating the gap shut would push
@@ -618,7 +673,7 @@ class _OpenGap extends StatelessWidget {
         child: Padding(
           // The same inset a command's first word has, measured from the same
           // edge - this box is the row that is about to be here.
-          padding: const EdgeInsets.only(left: W.rowInset, right: 10),
+          padding: const EdgeInsets.only(left: W.rowInset, right: 8),
           child: Text(
             'DROP HERE',
             style: W.row.copyWith(color: colour, fontWeight: FontWeight.w600),
@@ -724,7 +779,7 @@ class _DragFeedback extends StatelessWidget {
         children: [
           row(RowKind.blockHeader),
           Padding(
-            padding: const EdgeInsets.only(left: W.indentPerDepth, right: 4),
+            padding: const EdgeInsets.only(left: W.indentPerDepth, right: 3),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,

@@ -63,16 +63,16 @@ class _CommandTrayState extends State<CommandTray> {
   Widget build(BuildContext context) {
     return Container(
       color: W.chrome,
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
+      padding: const EdgeInsets.fromLTRB(6, 6, 6, 10),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           for (final row in _rows) ...[
-            if (row != _rows.first) const SizedBox(height: 6),
+            if (row != _rows.first) const SizedBox(height: 4),
             Row(
               children: [
                 for (final id in row) ...[
-                  if (id != row.first) const SizedBox(width: 6),
+                  if (id != row.first) const SizedBox(width: 4),
                   // Expanded, so the buttons divide the row exactly and both
                   // rows end flush with the edges. Natural widths left a ragged
                   // right margin and made SUB a smaller target than COPY FROM
@@ -155,7 +155,7 @@ class _Face extends StatelessWidget {
     // becomes once it is in the program, not a property of the thing you pick
     // up.
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Center(
         widthFactor: 1,
         child: FittedBox(

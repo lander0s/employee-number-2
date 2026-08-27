@@ -12,7 +12,34 @@ abstract final class W {
   // Greys, light to dark.
   static const page = Color(0xFF2B2B2B);
   static const paneFloor = Color(0xFF3A3A3A);
-  static const paneProgram = Color(0xFF232323);
+
+  /// The program is written on a sheet of paper. It was a dark grey pane, which
+  /// was honest about being a text editor and said nothing about what the game
+  /// is: the fiction is a person writing instructions for a machine on the job,
+  /// and a ruled notebook says that before a word of dialogue does. It also
+  /// flips the whole surface to light, which is what the bright command colours
+  /// and their dark ink were always designed for.
+  static const paneProgram = paper;
+
+  static const paper = Color(0xFFF6F1E4);
+
+  /// Faint blue rules at exactly [rowHeight], so instructions sit on the lines
+  /// rather than floating between them, and a red margin down the left like
+  /// every school notebook.
+  static const paperRule = Color(0x332F6FA8);
+  static const paperMargin = Color(0x4DD2504A);
+  static const paperMarginInset = 26.0;
+
+  /// How much empty page the program keeps below its last row, as a fraction of
+  /// the pane. It is what makes a short program scrollable at all - without it
+  /// the content ends exactly at the viewport, so the end of the program is
+  /// stuck wherever it happens to fall, often right above the tray.
+  ///
+  /// A whole pane was too much: it let the program scroll almost entirely off
+  /// the top, and the page looked abandoned. Half brings the last row to the
+  /// middle of the screen, which is as far as anyone needs to pull it to be
+  /// comfortable adding to the end.
+  static const tailSlack = 0.5;
   static const chrome = Color(0xFF1C1C1C);
   static const line = Color(0xFF505050);
   static const lineSoft = Color(0xFF3F3F3F);
@@ -85,9 +112,22 @@ abstract final class W {
   static Color rowEdge(Color base) => Color.lerp(base, Colors.black, 0.18)!;
 
   // Dimensions. 7.3: rows 56-64, targets >= 48, indent must be legible.
-  static const rowHeight = 60.0;
+  // Tightened once the language settled. The text stays at 20pt - it is the one
+  // thing 7.3 will not trade - and everything around it came in.
+  //
+  // 36 is under the 48dp target guidance, deliberately. A 20pt word is about
+  // 14dp of actual capital, so a 48dp row wrapped it in 34dp of air, and a
+  // program is mostly rows: that air was the single biggest consumer of a screen
+  // whose whole argument (7.1) is how much program you can see at once.
+  //
+  // What makes it affordable is that a row is not a tap target. Its gestures are
+  // a horizontal swipe and a long-press drag, neither of which needs a
+  // fingertip-sized box to acquire. The one thing on a row you actually tap - a
+  // cyclable word - keeps its own target ([chipTarget]), and it is wide as well
+  // as tall, which is where the accuracy really comes from.
+  static const rowHeight = 36.0;
   static const closerRowHeight = 44.0;
-  static const indentPerDepth = 18.0;
+  static const indentPerDepth = 12.0;
 
   /// A spacer standing in for a row: a command's worth of space with the gap a
   /// real row has above and below it.
@@ -116,19 +156,25 @@ abstract final class W {
   static const autoScrollFast = 16.0;
   static const minTarget = 48.0;
 
-  /// A chip hugs its word. The thumb target it needs is carried by transparent
-  /// space around it - see _ArgWord - so the padding here can be the least that
-  /// still reads as a button.
-  static const chipPadH = 10.0;
-  static const chipPadV = 3.0;
+  /// A chip hugs its word. The target it needs is carried by transparent space
+  /// around it - see _ArgWord - so the padding here can be the least that still
+  /// reads as a button.
+  static const chipPadH = 8.0;
+  static const chipPadV = 2.0;
+
+  /// The tappable box around a cyclable word. Smaller than [minTarget], which
+  /// stays 48 for the tray buttons: a chip is also 60-120dp wide, and a target
+  /// that wide is easy to hit at 36 tall. If playtesting shows mis-taps this is
+  /// the first number to put back.
+  static const chipTarget = 36.0;
 
   /// Left inset for every row and slot, replacing the old line-number gutter.
-  static const rowInset = 12.0;
+  static const rowInset = 10.0;
 
   /// A block header's only vertical padding, above the title. There is none
   /// below it: the spacer between the title and the first child does that job,
   /// and unlike padding it answers a tap.
-  static const headerTopPad = 12.0;
+  static const headerTopPad = 7.0;
 
   /// Corner radii. Rows and tray buttons share one so a command looks the same
   /// wherever it is; a block is a touch rounder because it is the bigger shape.
@@ -212,6 +258,9 @@ abstract final class W {
   );
 
   static const TextStyle labelDim = TextStyle(fontSize: 17, color: textDim);
+
+  /// The same, for text sitting on the paper rather than on the app's chrome.
+  static const TextStyle onPaperDim = TextStyle(fontSize: 17, color: inkDim);
 
   /// Below the 17pt functional floor on purpose: this is scaffolding for the
   /// experiment (readouts, hints to the person testing), not game UI.
