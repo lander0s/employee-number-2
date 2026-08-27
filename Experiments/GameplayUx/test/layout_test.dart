@@ -742,10 +742,10 @@ void main() {
     ) async {
       await boot(tester);
 
-      expect(inProgram('GREATER THAN'), findsOneWidget);
-      await tester.tap(inProgram('GREATER THAN'));
+      expect(inProgram('POSITIVE'), findsOneWidget);
+      await tester.tap(inProgram('POSITIVE'));
       await tester.pumpAndSettle();
-      expect(inProgram('LESS THAN'), findsOneWidget);
+      expect(inProgram('NOT POSITIVE'), findsOneWidget);
     });
 
     testWidgets('a chip hugs its word but stays a thumb target', (
@@ -756,15 +756,15 @@ void main() {
       // Painted: tight around the text. The chip used to be padded to 48dp
       // itself, which made a three-word condition look like a row of form
       // fields.
-      final word = tester.getRect(inProgram('GREATER THAN'));
-      final chip = tester.getRect(rowContainerFor(inProgram('GREATER THAN')));
+      final word = tester.getRect(inProgram('POSITIVE'));
+      final chip = tester.getRect(rowContainerFor(inProgram('POSITIVE')));
       expect(chip.height - word.height, lessThan(12));
 
       // Tappable: still 48, carried by transparent space around the chip.
       final target = tester.getRect(
         find
             .ancestor(
-              of: inProgram('GREATER THAN'),
+              of: inProgram('POSITIVE'),
               matching: find.byType(ConstrainedBox),
             )
             .first,
@@ -774,7 +774,7 @@ void main() {
       // And the tap still lands from the edge of that target, not just the chip.
       await tester.tapAt(Offset(target.center.dx, target.top + 3));
       await tester.pumpAndSettle();
-      expect(inProgram('LESS THAN'), findsOneWidget);
+      expect(inProgram('NOT POSITIVE'), findsOneWidget);
     });
 
     testWidgets('a row carries one argument control, not a stepper', (
@@ -811,7 +811,7 @@ void main() {
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
 
-      final words = ['IF', 'GREATER THAN', 'ZERO'];
+      final words = ['IF', 'POSITIVE'];
       final tops = <double>[
         for (final w in words) tester.getRect(inProgram(w)).top,
       ];
@@ -855,16 +855,14 @@ void main() {
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
 
-      await tester.tap(inProgram('GREATER THAN'));
+      await tester.tap(inProgram('POSITIVE'));
       await tester.pumpAndSettle();
-      expect(inProgram('LESS THAN'), findsOneWidget);
+      expect(inProgram('NOT POSITIVE'), findsOneWidget);
 
-      // ZERO is a keyword, not a chip: it is the only thing a condition ever
-      // compares against, so there is nothing to cycle it to.
-      await tester.tap(inProgram('ZERO'));
-      await tester.pumpAndSettle();
-      expect(inProgram('LESS THAN'), findsOneWidget);
-      expect(inProgram('ZERO'), findsOneWidget);
+      // The whole condition is the one chip now. Zero used to be spelled out
+      // after it as a fixed word; naming the point of reference in every row was
+      // ceremony, since it is the only thing a condition ever compares against.
+      expect(inProgram('ZERO'), findsNothing);
     });
 
     testWidgets('there is no ELSE anywhere in the UI', (tester) async {
@@ -1143,7 +1141,7 @@ void main() {
 
       expect(inProgram('REPEAT'), findsOneWidget);
       expect(inProgram('IF'), findsOneWidget);
-      expect(inProgram('ZERO'), findsOneWidget);
+      expect(inProgram('POSITIVE'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -1153,10 +1151,10 @@ void main() {
 
       // The words still render, so they still look like part of the sentence -
       // they just do not answer a tap.
-      await tester.tap(inProgram('GREATER THAN'));
+      await tester.tap(inProgram('POSITIVE'));
       await tester.pumpAndSettle();
-      expect(inProgram('GREATER THAN'), findsOneWidget);
-      expect(inProgram('LESS THAN'), findsNothing);
+      expect(inProgram('POSITIVE'), findsOneWidget);
+      expect(inProgram('NOT POSITIVE'), findsNothing);
     });
 
     testWidgets('a row cannot be swipe-deleted while running', (tester) async {
@@ -1405,7 +1403,7 @@ void main() {
 
       final pane = tester.getRect(find.byType(ProgramPane));
       // Rows are left-aligned, so every word still lands inside the viewport.
-      for (final word in ['REPEAT', 'TAKE', 'IF', 'GREATER THAN', 'ZERO']) {
+      for (final word in ['REPEAT', 'TAKE', 'IF', 'POSITIVE']) {
         expect(
           tester.getRect(inProgram(word)).right,
           lessThanOrEqualTo(pane.right),
@@ -1472,9 +1470,9 @@ void main() {
       await boot(tester);
 
       // The one thing on a row that is still tappable.
-      await tester.tap(inProgram('GREATER THAN'));
+      await tester.tap(inProgram('POSITIVE'));
       await tester.pumpAndSettle();
-      expect(inProgram('LESS THAN'), findsOneWidget);
+      expect(inProgram('NOT POSITIVE'), findsOneWidget);
     });
   });
 
@@ -2015,7 +2013,7 @@ void main() {
 
       final chips = find.descendant(
         of: find.byWidgetPredicate((w) => w is Opacity && w.opacity == 0.92),
-        matching: find.text('GREATER THAN'),
+        matching: find.text('POSITIVE'),
       );
       expect(chips, findsNothing, reason: 'no arguments in flight either');
 

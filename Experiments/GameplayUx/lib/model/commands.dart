@@ -41,7 +41,6 @@ class CommandSpec {
     required this.label,
     required this.trayLabel,
     required this.colour,
-    this.tail,
     this.argKind = ArgKind.none,
     this.isBlock = false,
   });
@@ -51,12 +50,6 @@ class CommandSpec {
   /// The fixed part of the row, e.g. `COPY FROM`. Cyclable values are appended
   /// by the row widget.
   final String label;
-
-  /// A fixed word *after* the cyclable value, for rows that read as a sentence
-  /// around their argument: `IF [GREATER THAN] ZERO`. Zero is the only thing a
-  /// condition ever compares against, so it is a keyword and not a chip - there
-  /// is nothing to cycle it to.
-  final String? tail;
 
   /// Shorter form for the tray button, where horizontal space is scarce.
   final String trayLabel;
@@ -81,12 +74,31 @@ const palletCount = 6;
 
 // ---------------------------------------------------------- condition grammar
 
-/// The comparison an IF or a REPEAT WHILE makes against zero, and the only
-/// cyclable part of it.
+/// What an IF or a REPEAT WHILE asks about the package in the claws.
 ///
-/// Worded so the row reads as English with `ZERO` after it. `EQUALS THAN ZERO`
-/// was the obvious first cut and is not a sentence.
-const comparators = <String>['EQUALS', 'GREATER THAN', 'LESS THAN'];
+/// The point of reference is always zero, so naming it in every row was two
+/// words of ceremony: `GREATER OR EQUAL ZERO` says what `NOT NEGATIVE` says, at
+/// twice the length and in a register the audience does not speak. There is also
+/// no `IS`, because *if what is positive* has one answer in this game and it is
+/// always the same one.
+///
+/// Six, not four. Every comparison has its complement one tap away, which is
+/// what makes an absent `ELSE` survivable: acting on the other side of a
+/// condition has to cost one row, not a duplicated block. Ordered in those
+/// pairs, so the negation of what you are looking at is always the next tap.
+///
+/// **Zero is not positive.** Standard, and worth a deliberate teaching beat: the
+/// first level that uses `POSITIVE` should have a zero in its shipment set, so
+/// that the reading of "positive" as "not negative" surfaces in the first
+/// minute rather than in Act 3.
+const comparators = <String>[
+  'ZERO',
+  'NOT ZERO',
+  'POSITIVE',
+  'NOT POSITIVE',
+  'NEGATIVE',
+  'NOT NEGATIVE',
+];
 
 // ------------------------------------------------------------------- families
 
@@ -113,7 +125,6 @@ const commandCatalogue = <CommandSpec>[
     id: 'repeatWhile',
     label: 'REPEAT WHILE',
     trayLabel: 'REPEAT WHILE',
-    tail: 'ZERO',
     argKind: ArgKind.condition,
     isBlock: true,
     colour: _loop,
@@ -122,7 +133,6 @@ const commandCatalogue = <CommandSpec>[
     id: 'ifCond',
     label: 'IF',
     trayLabel: 'IF',
-    tail: 'ZERO',
     argKind: ArgKind.condition,
     isBlock: true,
     colour: _branch,

@@ -218,11 +218,36 @@ the replacement story are all unchanged — only what is written on the boxes ch
 | `SUM [n]` | sum with pallet n | held += pallet[n]. **The merge animation.** | the two-things-become-one animation |
 | `SUB [n]` | subtract pallet n | held −= pallet[n]. Can go negative. | reverse merge, pieces fly off |
 | `REPEAT … END` | repeat forever | Unconditional loop. The workhorse. | — |
-| `REPEAT WHILE <comparison> ZERO … END` | repeat while | Loop with the test at the top. Runs the body while the held package satisfies the comparison; when it stops, **execution continues after the block.** | — |
-| `IF <comparison> ZERO … END` | branch | Structured conditional, indented, always closed. | — |
+| `REPEAT WHILE <condition> … END` | repeat while | Loop with the test at the top. Runs the body while the held package satisfies the comparison; when it stops, **execution continues after the block.** | — |
+| `IF <condition> … END` | branch | Structured conditional, indented, always closed. | — |
 
-**Conditions:** `EQUALS ZERO` · `GREATER THAN ZERO` · `LESS THAN ZERO`, on both `IF` and
-`REPEAT WHILE`.
+**Conditions:** `ZERO` · `NOT ZERO` · `POSITIVE` · `NOT POSITIVE` · `NEGATIVE` ·
+`NOT NEGATIVE`, on both `IF` and `REPEAT WHILE`. A row reads `IF POSITIVE` or
+`REPEAT WHILE NOT ZERO`.
+
+One cyclable segment, and it is the whole condition. The point of reference is always zero,
+so naming it in every row was ceremony: `GREATER OR EQUAL ZERO` says what `NOT NEGATIVE`
+says, at twice the length and in a register the audience does not speak. There is no `IS`
+either — *if what is positive* has one answer in this game, and it is always the same one:
+the package in UNIT-02's claws.
+
+Zero is the only thing worth comparing against that the player cannot build with `SUB`. "Is
+this package bigger than that one" is `SUB [n]` then `IF POSITIVE`, which is a *puzzle*, and
+handing it over as a primitive would be handing over the answer.
+
+**Six, not four.** `ZERO`, `POSITIVE` and `NEGATIVE` already partition the number line, so
+the three negations are strictly redundant — and they are in anyway, because with no `ELSE`
+the only way to act on the other side of a condition is to name it. Without `NOT NEGATIVE`,
+"ship everything that isn't negative" is two IFs with the same body copied into both, and
+that duplication is the one cost of dropping jumps that we cannot fix (see below). The set is
+closed under negation, and the cycle is ordered in those pairs, so the opposite of what you
+are looking at is always the next tap.
+
+**Zero is not positive.** Standard, but plenty of people read "positive" as "not negative",
+where `GREATER THAN ZERO` was unambiguous. This is a teaching problem rather than a design
+flaw — the floor shows the actual number — and it costs nothing if the first level that uses
+`POSITIVE` has a zero in its shipment set, so the misreading surfaces in the first minute
+instead of in Act 3.
 
 **Why `REPEAT WHILE` exists.** Rejecting jumps (§6.4) cost two things, and this is the one
 that mattered. Jumps let a program *leave* a loop; with only an unconditional `REPEAT`, the
@@ -242,7 +267,7 @@ jumps, which is a much larger UX commitment in portrait and is parked, not forgo
 
 One cyclable segment, and zero is fixed — there is nothing else worth comparing a number
 against that the player cannot build with `SUB`. "Is this package bigger than that one" is
-`SUB [n]` then `IF GREATER THAN ZERO`, which is a *puzzle*, and handing it over as a
+`SUB [n]` then `IF POSITIVE`, which is a *puzzle*, and handing it over as a
 primitive would be handing over the answer.
 
 **Every condition inspects the package in UNIT-02's claws.** Nothing inspects the world. This

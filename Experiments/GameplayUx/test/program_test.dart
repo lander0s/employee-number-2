@@ -42,7 +42,7 @@ void main() {
 
       expect(
         render(doc),
-        'REPEAT\n  TAKE\n  IF EQUALS ZERO\n    SHIP\n  END\nEND',
+        'REPEAT\n  TAKE\n  IF ZERO\n    SHIP\n  END\nEND',
       );
       expect(doc.maxDepth, 3);
     });
@@ -73,10 +73,7 @@ void main() {
       final ok = doc.move(ifNode.id, Slot(null, 1, 0));
 
       expect(ok, isTrue);
-      expect(
-        render(doc),
-        'REPEAT\n  TAKE\nEND\nIF GREATER THAN ZERO\n  SHIP\nEND',
-      );
+      expect(render(doc), 'REPEAT\n  TAKE\nEND\nIF POSITIVE\n  SHIP\nEND');
     });
 
     test('a block cannot be dropped inside its own body', () {
@@ -125,7 +122,7 @@ void main() {
     test('keepContents splices the body into the block position', () {
       final doc = ProgramDocument()..loadSample();
       doc.delete(doc.root.first.id, keepContents: true);
-      expect(render(doc), 'TAKE\nIF GREATER THAN ZERO\n  SHIP\nEND');
+      expect(render(doc), 'TAKE\nIF POSITIVE\n  SHIP\nEND');
     });
   });
 
@@ -244,16 +241,22 @@ void main() {
       // ask about. A package is a number now, so the only question worth asking
       // is how it stands against zero.
       expect(node.chips, hasLength(1));
-      expect(node.text, 'IF EQUALS ZERO');
+      expect(node.text, 'IF ZERO');
 
-      doc.cycleArg(node.id, ArgSlot.comparator);
-      expect(node.text, 'IF GREATER THAN ZERO');
-
-      doc.cycleArg(node.id, ArgSlot.comparator);
-      expect(node.text, 'IF LESS THAN ZERO');
-
-      doc.cycleArg(node.id, ArgSlot.comparator);
-      expect(node.text, 'IF EQUALS ZERO', reason: 'wraps');
+      // The cycle runs in complement pairs, so the negation of what you are
+      // looking at is always the next tap.
+      const expected = [
+        'IF NOT ZERO',
+        'IF POSITIVE',
+        'IF NOT POSITIVE',
+        'IF NEGATIVE',
+        'IF NOT NEGATIVE',
+        'IF ZERO',
+      ];
+      for (final text in expected) {
+        doc.cycleArg(node.id, ArgSlot.comparator);
+        expect(node.text, text);
+      }
     });
 
     test('every comparison renders a legal sentence', () {
@@ -264,18 +267,29 @@ void main() {
       for (var i = 0; i < comparators.length; i++) {
         expect(comparators, contains(node.comparator));
         expect(node.text, startsWith('IF '));
-        expect(node.text, endsWith(' ZERO'));
+        expect(node.text.split(' ').length, lessThanOrEqualTo(3));
         doc.cycleArg(node.id, ArgSlot.comparator);
       }
     });
 
-    test('the three comparisons cover the branch an ELSE was for', () {
-      // Without an else, acting on the complement of a condition has to be
-      // expressible. Equal, greater and less partition the number line, so it
-      // always is.
-      expect(comparators, hasLength(3));
-      expect(comparators, containsAll(['EQUALS', 'GREATER THAN', 'LESS THAN']));
-    });
+    test(
+      'every comparison has its complement, which is what replaces ELSE',
+      () {
+        // With no else, acting on the other side of a condition has to cost one
+        // row rather than a duplicated block - so the set is closed under
+        // negation, and each pair sits together in the cycle.
+        expect(comparators, hasLength(6));
+        for (final positive in ['ZERO', 'POSITIVE', 'NEGATIVE']) {
+          final i = comparators.indexOf(positive);
+          expect(i, isNot(-1), reason: positive);
+          expect(
+            comparators[i + 1],
+            'NOT $positive',
+            reason: '$positive should be one tap from its negation',
+          );
+        }
+      },
+    );
   });
 
   group('repeat while', () {
@@ -286,8 +300,8 @@ void main() {
 
       expect(node.isBlock, isTrue);
       expect(node.children, isEmpty);
-      expect(node.text, 'REPEAT WHILE EQUALS ZERO');
-      expect(render(doc), 'REPEAT WHILE EQUALS ZERO\nEND');
+      expect(node.text, 'REPEAT WHILE ZERO');
+      expect(render(doc), 'REPEAT WHILE ZERO\nEND');
     });
 
     test('cycles its comparison exactly as an IF does', () {
@@ -296,11 +310,12 @@ void main() {
       final node = doc.root.first;
 
       doc.cycleArg(node.id, ArgSlot.comparator);
-      expect(node.text, 'REPEAT WHILE GREATER THAN ZERO');
+      expect(node.text, 'REPEAT WHILE NOT ZERO');
 
-      doc.cycleArg(node.id, ArgSlot.comparator);
-      doc.cycleArg(node.id, ArgSlot.comparator);
-      expect(node.text, 'REPEAT WHILE EQUALS ZERO', reason: 'wraps');
+      for (var i = 1; i < comparators.length; i++) {
+        doc.cycleArg(node.id, ArgSlot.comparator);
+      }
+      expect(node.text, 'REPEAT WHILE ZERO', reason: 'wraps');
     });
 
     test('holds a body like any other block', () {
@@ -311,7 +326,7 @@ void main() {
       doc.insertAt('take', Slot(loop.id, 0, 1));
       doc.insertAt('ship', Slot(loop.id, 1, 1));
 
-      expect(render(doc), 'REPEAT WHILE EQUALS ZERO\n  TAKE\n  SHIP\nEND');
+      expect(render(doc), 'REPEAT WHILE ZERO\n  TAKE\n  SHIP\nEND');
       expect(doc.size, 3, reason: 'the closer is free, the header is not');
     });
   });

@@ -51,7 +51,7 @@ class Node {
     required this.commandId,
     String? id,
     this.palletArg = 1,
-    this.comparator = 'EQUALS',
+    this.comparator = 'ZERO',
     List<Node>? children,
   }) : id = id ?? _newId(),
        children = children ?? (specFor(commandId).isBlock ? <Node>[] : null);
@@ -88,8 +88,7 @@ class Node {
   };
 
   /// The whole row as one line of text. For traces and tests.
-  String get text =>
-      [spec.label, ...chips.map((c) => c.text), ?spec.tail].join(' ');
+  String get text => [spec.label, ...chips.map((c) => c.text)].join(' ');
 }
 
 /// Which slot a row occupies. Closers are rendered but are not commands: they
@@ -396,7 +395,7 @@ class ProgramDocument {
     _push();
     final ifNode = Node(
       commandId: 'ifCond',
-      comparator: 'GREATER THAN',
+      comparator: 'POSITIVE',
       children: [Node(commandId: 'ship')],
     );
     root = <Node>[
