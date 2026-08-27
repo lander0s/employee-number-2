@@ -42,7 +42,7 @@ void main() {
 
       expect(
         render(doc),
-        'REPEAT\n  TAKE\n  IF TYPE IS BLUE\n    SHIP\n  END\nEND',
+        'REPEAT\n  TAKE\n  IF EQUALS ZERO\n    SHIP\n  END\nEND',
       );
       expect(doc.maxDepth, 3);
     });
@@ -73,7 +73,10 @@ void main() {
       final ok = doc.move(ifNode.id, Slot(null, 1, 0));
 
       expect(ok, isTrue);
-      expect(render(doc), 'REPEAT\n  TAKE\nEND\nIF TYPE IS BLUE\n  SHIP\nEND');
+      expect(
+        render(doc),
+        'REPEAT\n  TAKE\nEND\nIF GREATER THAN ZERO\n  SHIP\nEND',
+      );
     });
 
     test('a block cannot be dropped inside its own body', () {
@@ -91,13 +94,13 @@ void main() {
       final doc = ProgramDocument();
       doc.insert('take');
       doc.insert('ship');
-      doc.insert('clockOut');
-      expect(render(doc), 'TAKE\nSHIP\nCLOCK OUT');
+      doc.insert('sum');
+      expect(render(doc), 'TAKE\nSHIP\nSUM PALLET 1');
 
       // Move the first row to the end.
       final take = doc.root.first;
       doc.move(take.id, const Slot(null, 3, 0));
-      expect(render(doc), 'SHIP\nCLOCK OUT\nTAKE');
+      expect(render(doc), 'SHIP\nSUM PALLET 1\nTAKE');
     });
 
     test('moving into an empty block body works', () {
@@ -122,7 +125,7 @@ void main() {
     test('keepContents splices the body into the block position', () {
       final doc = ProgramDocument()..loadSample();
       doc.delete(doc.root.first.id, keepContents: true);
-      expect(render(doc), 'TAKE\nIF TYPE IS BLUE\n  SHIP\nEND');
+      expect(render(doc), 'TAKE\nIF GREATER THAN ZERO\n  SHIP\nEND');
     });
   });
 
@@ -131,7 +134,7 @@ void main() {
       final doc = ProgramDocument()..loadSample();
       final before = render(doc);
 
-      doc.insert('mergeWith');
+      doc.insert('sub');
       expect(render(doc), isNot(before));
 
       doc.undo();
@@ -155,7 +158,7 @@ void main() {
   group('arguments', () {
     test('a new pallet command pre-fills with the last used pallet', () {
       final doc = ProgramDocument();
-      doc.insert('stackOn');
+      doc.insert('copyTo');
       final first = doc.root.first;
 
       doc.cycleArg(first.id);
@@ -163,42 +166,31 @@ void main() {
       expect(first.palletArg, 3);
       expect(doc.lastUsedPallet, 3);
 
-      doc.insert('pickFrom');
+      doc.insert('copyFrom');
       expect(doc.root[1].palletArg, 3);
     });
 
-    test('type argument cycles and wraps', () {
-      final doc = ProgramDocument();
-      doc.insert('ifCond');
-      final node = doc.root.first;
-      expect(node.typeArg, 'BLUE');
-      doc.cycleArg(node.id);
-      expect(node.typeArg, 'RED');
-      doc.cycleArg(node.id);
-      expect(node.typeArg, 'GREEN');
-      doc.cycleArg(node.id);
-      expect(node.typeArg, 'BLUE');
-    });
+    test('every command that takes a pallet cycles the same way', () {
+      // COPY TO, COPY FROM, SUM and SUB all address the same numbered floor, so
+      // they are one control with one behaviour rather than four.
+      for (final id in ['copyTo', 'copyFrom', 'sum', 'sub']) {
+        final doc = ProgramDocument();
+        doc.insert(id);
+        final node = doc.root.first;
 
-    test('pallet argument cycles and wraps, like a type does', () {
-      final doc = ProgramDocument();
-      doc.insert('pickFrom');
-      final node = doc.root.first;
-
-      // Same gesture for both argument kinds: one control, one behaviour.
-      expect(node.palletArg, 1);
-      for (var expected = 2; expected < palletCount; expected++) {
+        expect(node.palletArg, 1);
+        for (var expected = 2; expected < palletCount; expected++) {
+          doc.cycleArg(node.id);
+          expect(node.palletArg, expected, reason: id);
+        }
         doc.cycleArg(node.id);
-        expect(node.palletArg, expected);
+        expect(node.palletArg, 0, reason: '$id wraps back to the first pallet');
       }
-      doc.cycleArg(node.id);
-      expect(node.palletArg, 0, reason: 'wraps back to the first pallet');
-      expect(doc.lastUsedPallet, 0);
     });
 
     test('cycling an argument is undoable', () {
       final doc = ProgramDocument();
-      doc.insert('mergeWith');
+      doc.insert('sum');
       final node = doc.root.first;
       final before = node.palletArg;
 
@@ -242,105 +234,47 @@ void main() {
   });
 
   group('condition grammar', () {
-    Node ifNode(ProgramDocument doc) => doc.root.first;
-
-    test('every segment cycles independently', () {
+    test('the comparison cycles and wraps, and zero never moves', () {
       final doc = ProgramDocument();
       doc.insert('ifCond');
-      final node = ifNode(doc);
+      final node = doc.root.first;
 
-      expect(node.text, 'IF TYPE IS BLUE');
-
-      doc.cycleArg(node.id, ArgSlot.object);
-      expect(node.text, 'IF TYPE IS RED');
+      // One cyclable segment. The old grammar had three - a subject, a
+      // comparator and an object - because a package had a type and a weight to
+      // ask about. A package is a number now, so the only question worth asking
+      // is how it stands against zero.
+      expect(node.chips, hasLength(1));
+      expect(node.text, 'IF EQUALS ZERO');
 
       doc.cycleArg(node.id, ArgSlot.comparator);
-      expect(
-        node.text,
-        'IF TYPE IS NOT RED',
-        reason: 'IS NOT is what replaces ELSE, and it keeps the object',
-      );
+      expect(node.text, 'IF GREATER THAN ZERO');
 
-      doc.cycleArg(node.id, ArgSlot.subject);
-      expect(node.text, 'IF WEIGHT IS NOT ZERO');
+      doc.cycleArg(node.id, ArgSlot.comparator);
+      expect(node.text, 'IF LESS THAN ZERO');
+
+      doc.cycleArg(node.id, ArgSlot.comparator);
+      expect(node.text, 'IF EQUALS ZERO', reason: 'wraps');
     });
 
-    test('the comparator cycle carries the negation of every condition', () {
+    test('every comparison renders a legal sentence', () {
       final doc = ProgramDocument();
       doc.insert('ifCond');
-      final node = ifNode(doc);
+      final node = doc.root.first;
 
-      // Without an ELSE branch, `IS NOT` is the only way to act on the
-      // complement of a condition, so it has to exist for both subjects.
-      expect(comparatorsFor('TYPE'), contains('IS NOT'));
-      expect(comparatorsFor('WEIGHT'), contains('IS NOT'));
-
-      doc.cycleArg(node.id, ArgSlot.subject);
-      expect(node.subject, 'WEIGHT');
-      doc.cycleArg(node.id, ArgSlot.comparator);
-      expect(node.comparator, 'IS NOT');
-    });
-
-    test(
-      'cycling the comparator keeps the object when its kind is unchanged',
-      () {
-        final doc = ProgramDocument();
-        doc.insert('ifCond');
-        final node = ifNode(doc);
-
-        doc.cycleArg(node.id, ArgSlot.object);
-        doc.cycleArg(node.id, ArgSlot.object);
-        expect(node.typeArg, 'GREEN');
-
-        // IS -> IS NOT: still comparing against a package type.
+      for (var i = 0; i < comparators.length; i++) {
+        expect(comparators, contains(node.comparator));
+        expect(node.text, startsWith('IF '));
+        expect(node.text, endsWith(' ZERO'));
         doc.cycleArg(node.id, ArgSlot.comparator);
-        expect(node.text, 'IF TYPE IS NOT GREEN');
-      },
-    );
-
-    test('cycling into a different object kind resets the object', () {
-      final doc = ProgramDocument();
-      doc.insert('ifCond');
-      final node = ifNode(doc);
-
-      // IS -> IS NOT -> MATCHES, which compares against a pallet instead.
-      doc.cycleArg(node.id, ArgSlot.comparator);
-      doc.cycleArg(node.id, ArgSlot.comparator);
-      expect(node.comparator, 'MATCHES');
-      expect(node.objectKind, ObjectKind.pallet);
-      expect(node.text, 'IF TYPE MATCHES PALLET 1');
-    });
-
-    test('a WEIGHT condition never keeps a TYPE-only comparator', () {
-      final doc = ProgramDocument();
-      doc.insert('ifCond');
-      final node = ifNode(doc);
-
-      doc.cycleArg(node.id, ArgSlot.comparator);
-      doc.cycleArg(node.id, ArgSlot.comparator);
-      doc.cycleArg(node.id, ArgSlot.subject);
-
-      expect(comparatorsFor(node.subject), contains(node.comparator));
-    });
-
-    test('every reachable condition renders a legal sentence', () {
-      final doc = ProgramDocument();
-      doc.insert('ifCond');
-      final node = ifNode(doc);
-
-      // Walk the whole space and assert nothing renders an impossible pairing.
-      for (var s = 0; s < conditionSubjects.length; s++) {
-        for (var c = 0; c < 4; c++) {
-          for (var o = 0; o < 7; o++) {
-            expect(comparatorsFor(node.subject), contains(node.comparator));
-            expect(node.text.startsWith('IF '), isTrue);
-            expect(node.chips.length, 3);
-            doc.cycleArg(node.id, ArgSlot.object);
-          }
-          doc.cycleArg(node.id, ArgSlot.comparator);
-        }
-        doc.cycleArg(node.id, ArgSlot.subject);
       }
+    });
+
+    test('the three comparisons cover the branch an ELSE was for', () {
+      // Without an else, acting on the complement of a condition has to be
+      // expressible. Equal, greater and less partition the number line, so it
+      // always is.
+      expect(comparators, hasLength(3));
+      expect(comparators, containsAll(['EQUALS', 'GREATER THAN', 'LESS THAN']));
     });
   });
 

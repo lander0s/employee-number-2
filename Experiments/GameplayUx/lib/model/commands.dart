@@ -1,10 +1,20 @@
-/// The command catalogue for the experiment: Act 1-3 vocabulary.
+/// The command catalogue for the experiment.
 ///
-/// See GameDesign/game-design-document.md 6.3. Two deliberate departures:
+/// **A package is a number.** Nothing else. There are no types, no colours, no
+/// weights, no stacking and no merging: the vocabulary below is Human Resource
+/// Machine's, near enough, because that vocabulary is *known to make good
+/// puzzles*. Arithmetic and comparison are where the interesting levels live -
+/// sorting, counting, running totals, min and max - and a language without them
+/// can only ask the player to filter and forward.
+///
+/// The AmaCorp fiction is unchanged; only what is written on the boxes changed.
+/// Anything more inventive gets proposed on top of a game that is already fun,
+/// not instead of one.
+///
+/// Two deliberate departures from GameDesign/game-design-document.md 6.3 remain:
 ///
 /// - No `IF INTAKE IS EMPTY` (6.6): termination is implicit.
-/// - No `ELSE`. A condition carries its own negation (`IS NOT`) as one position
-///   in the comparator cycle, which covers what an else branch was for without a
+/// - No `ELSE`. The three comparisons cover the branch an else was for without a
 ///   second block body, a toggle on every IF row, or a branch dimension running
 ///   through the whole document model.
 library;
@@ -15,10 +25,11 @@ enum ArgKind {
   /// No argument.
   none,
 
-  /// A pallet index.
+  /// A pallet index: the numbered floor spots a package can be copied to or
+  /// from, and the operands of SUM and SUB.
   pallet,
 
-  /// A three-part condition: subject, comparator, object.
+  /// A comparison against zero.
   condition,
 }
 
@@ -30,15 +41,22 @@ class CommandSpec {
     required this.label,
     required this.trayLabel,
     required this.colour,
+    this.tail,
     this.argKind = ArgKind.none,
     this.isBlock = false,
   });
 
   final String id;
 
-  /// The fixed part of the row, e.g. `MERGE WITH`. Cyclable values are appended
+  /// The fixed part of the row, e.g. `COPY FROM`. Cyclable values are appended
   /// by the row widget.
   final String label;
+
+  /// A fixed word *after* the cyclable value, for rows that read as a sentence
+  /// around their argument: `IF [GREATER THAN] ZERO`. Zero is the only thing a
+  /// condition ever compares against, so it is a keyword and not a chip - there
+  /// is nothing to cycle it to.
+  final String? tail;
 
   /// Shorter form for the tray button, where horizontal space is scarce.
   final String trayLabel;
@@ -46,118 +64,88 @@ class CommandSpec {
   final ArgKind argKind;
   final bool isBlock;
 
-  /// Bright and cheerful first, then pulled back about a fifth of the way to
-  /// grey. Starting from a dark, desaturated palette produced nine tones nobody
-  /// could tell apart; starting from playdoh colours and stepping *down* leaves
-  /// them obviously distinct - no two are closer than deltaE 23 - while keeping
-  /// headroom to push saturation back up for the executing line.
+  /// **Related commands share a colour.** Colour names the family, not the
+  /// command: what a player needs at a glance is "this is a movement, that is
+  /// arithmetic", and the word says which one. Five families, five colours.
   ///
-  /// Every one clears 7.3's 7:1 floor against [W.ink], the dark text these
-  /// fills are written in.
+  /// Every one clears 7.3's 7:1 floor against the dark ink these fills are
+  /// written in, and no two families are closer than deltaE 20.
   final Color colour;
 
   bool get takesArg => argKind != ArgKind.none;
 }
 
-const packageTypes = <String>['BLUE', 'RED', 'GREEN'];
-const weightStates = <String>['ZERO', 'NEGATIVE'];
+/// The numbered floor spots. HRM calls them tiles; the warehouse calls them
+/// pallets.
 const palletCount = 6;
 
 // ---------------------------------------------------------- condition grammar
 
-/// What the condition looks at. Every condition inspects the held package
-/// (6.3) - nothing inspects the world.
-const conditionSubjects = <String>['TYPE', 'WEIGHT'];
+/// The comparison an IF makes against zero, and the only cyclable part of it.
+///
+/// Worded so the row reads as English with `ZERO` after it. `EQUALS THAN ZERO`
+/// was the obvious first cut and is not a sentence.
+const comparators = <String>['EQUALS', 'GREATER THAN', 'LESS THAN'];
 
-const _comparators = <String, List<String>>{
-  'TYPE': ['IS', 'IS NOT', 'MATCHES'],
-  'WEIGHT': ['IS', 'IS NOT', 'UNDER'],
-};
+// ------------------------------------------------------------------- families
 
-List<String> comparatorsFor(String subject) =>
-    _comparators[subject] ?? const ['IS'];
+const _movement = Color(0xFF4DCB6D); // green: in and out of the building
+const _storage = Color(0xFFFF8275); // red: the floor
+const _loop = Color(0xFF5EAAFF); // blue
+const _branch = Color(0xFFFFD83D); // yellow
+const _arithmetic = Color(0xFFC98EFF); // purple
 
-/// What the third segment holds, which depends on the first two.
-enum ObjectKind { packageType, weightState, pallet }
-
-ObjectKind objectKindFor(String subject, String comparator) {
-  // `MATCHES` and `UNDER` compare against a pallet rather than a literal.
-  if (comparator == 'MATCHES' || comparator == 'UNDER') {
-    return ObjectKind.pallet;
-  }
-  return subject == 'TYPE' ? ObjectKind.packageType : ObjectKind.weightState;
-}
-
-/// Act 1-3. Ordered by expected frequency of use, not by unlock date - the
-/// tray scrolls horizontally and the most-reached-for commands should never
-/// require a scroll.
+/// Ordered by expected frequency of use, not by unlock date - the tray scrolls
+/// horizontally and the most-reached-for commands should never require a scroll.
 const commandCatalogue = <CommandSpec>[
-  CommandSpec(
-    id: 'take',
-    label: 'TAKE',
-    trayLabel: 'TAKE',
-    colour: Color(0xFF4DCB6D), // green
-  ),
-  CommandSpec(
-    id: 'ship',
-    label: 'SHIP',
-    trayLabel: 'SHIP',
-    colour: Color(0xFFFF8275), // red
-  ),
+  CommandSpec(id: 'take', label: 'TAKE', trayLabel: 'TAKE', colour: _movement),
+  CommandSpec(id: 'ship', label: 'SHIP', trayLabel: 'SHIP', colour: _movement),
 
   CommandSpec(
     id: 'repeat',
     label: 'REPEAT',
     trayLabel: 'REPEAT',
     isBlock: true,
-    colour: Color(0xFF5EAAFF), // blue
+    colour: _loop,
   ),
   CommandSpec(
     id: 'ifCond',
     label: 'IF',
     trayLabel: 'IF',
+    tail: 'ZERO',
     argKind: ArgKind.condition,
     isBlock: true,
-    colour: Color(0xFFFFD83D), // yellow
+    colour: _branch,
   ),
 
   CommandSpec(
-    id: 'stackOn',
-    label: 'STACK ON',
-    trayLabel: 'STACK ON',
+    id: 'copyFrom',
+    label: 'COPY FROM',
+    trayLabel: 'COPY FROM',
     argKind: ArgKind.pallet,
-    colour: Color(0xFFFF963B), // orange
+    colour: _storage,
   ),
   CommandSpec(
-    id: 'pickFrom',
-    label: 'PICK FROM',
-    trayLabel: 'PICK FROM',
+    id: 'copyTo',
+    label: 'COPY TO',
+    trayLabel: 'COPY TO',
     argKind: ArgKind.pallet,
-    colour: Color(0xFFC98EFF), // purple
-  ),
-
-  CommandSpec(
-    id: 'mergeWith',
-    label: 'MERGE WITH',
-    trayLabel: 'MERGE',
-    argKind: ArgKind.pallet,
-    colour: Color(0xFFFF78BC), // pink
-  ),
-  CommandSpec(
-    id: 'stripBy',
-    label: 'STRIP BY',
-    trayLabel: 'STRIP',
-    argKind: ArgKind.pallet,
-    colour: Color(0xFF33EBFF), // cyan
+    colour: _storage,
   ),
 
   CommandSpec(
-    id: 'clockOut',
-    label: 'CLOCK OUT',
-    trayLabel: 'CLOCK OUT',
-    colour: Color(
-      0xFFBBA498,
-    ), // warm grey - the one that ends a shift stands apart
+    id: 'sum',
+    label: 'SUM',
+    trayLabel: 'SUM',
+    argKind: ArgKind.pallet,
+    colour: _arithmetic,
+  ),
+  CommandSpec(
+    id: 'sub',
+    label: 'SUB',
+    trayLabel: 'SUB',
+    argKind: ArgKind.pallet,
+    colour: _arithmetic,
   ),
 ];
 

@@ -32,8 +32,10 @@ class MoveNode extends DragPayload {
   final String id;
 }
 
-/// Which cyclable segment of a row is being addressed.
-enum ArgSlot { subject, comparator, object }
+/// Which cyclable segment of a row is being addressed. A row carries at most
+/// one of each: a condition has a comparator, everything else with an argument
+/// has an object.
+enum ArgSlot { comparator, object }
 
 /// One cyclable word in a row, in reading order.
 class ArgChip {
@@ -49,10 +51,7 @@ class Node {
     required this.commandId,
     String? id,
     this.palletArg = 1,
-    this.typeArg = 'BLUE',
-    this.weightArg = 'ZERO',
-    this.subject = 'TYPE',
-    this.comparator = 'IS',
+    this.comparator = 'EQUALS',
     List<Node>? children,
   }) : id = id ?? _newId(),
        children = children ?? (specFor(commandId).isBlock ? <Node>[] : null);
@@ -61,11 +60,8 @@ class Node {
   final String commandId;
 
   int palletArg;
-  String typeArg;
-  String weightArg;
 
-  /// Condition segments. Unused when argKind is not `condition`.
-  String subject;
+  /// The comparison an IF makes against zero. Unused by every other command.
   String comparator;
 
   /// Body of a block. Null for plain commands.
@@ -74,40 +70,26 @@ class Node {
   CommandSpec get spec => specFor(commandId);
   bool get isBlock => spec.isBlock;
 
-  ObjectKind get objectKind => objectKindFor(subject, comparator);
-
   /// Deep copy that preserves ids - used for undo snapshots, where identity has
   /// to survive so an in-flight drag still refers to a real node.
   Node cloneKeepingIds() => Node(
     id: id,
     commandId: commandId,
     palletArg: palletArg,
-    typeArg: typeArg,
-    weightArg: weightArg,
-    subject: subject,
     comparator: comparator,
     children: children?.map((c) => c.cloneKeepingIds()).toList(),
   );
-
-  String get _objectText => switch (objectKind) {
-    ObjectKind.packageType => typeArg,
-    ObjectKind.weightState => weightArg,
-    ObjectKind.pallet => 'PALLET $palletArg',
-  };
 
   /// The cyclable words this row carries, in reading order.
   List<ArgChip> get chips => switch (spec.argKind) {
     ArgKind.none => const [],
     ArgKind.pallet => [ArgChip(ArgSlot.object, 'PALLET $palletArg')],
-    ArgKind.condition => [
-      ArgChip(ArgSlot.subject, subject),
-      ArgChip(ArgSlot.comparator, comparator),
-      ArgChip(ArgSlot.object, _objectText),
-    ],
+    ArgKind.condition => [ArgChip(ArgSlot.comparator, comparator)],
   };
 
   /// The whole row as one line of text. For traces and tests.
-  String get text => [spec.label, ...chips.map((c) => c.text)].join(' ');
+  String get text =>
+      [spec.label, ...chips.map((c) => c.text), ?spec.tail].join(' ');
 }
 
 /// Which slot a row occupies. Closers are rendered but are not commands: they
@@ -355,8 +337,6 @@ class ProgramDocument {
     _push();
 
     switch (slot) {
-      case ArgSlot.subject:
-        _cycleSubject(node);
       case ArgSlot.comparator:
         _cycleComparator(node);
       case ArgSlot.object:
@@ -364,60 +344,19 @@ class ProgramDocument {
     }
   }
 
-  void _cycleSubject(Node node) {
-    if (node.spec.argKind != ArgKind.condition) return;
-    final before = node.objectKind;
-    final i = conditionSubjects.indexOf(node.subject);
-    node.subject = conditionSubjects[(i + 1) % conditionSubjects.length];
-
-    // Comparators differ per subject, so one that is no longer legal has to be
-    // pulled back before it can be read as valid.
-    final allowed = comparatorsFor(node.subject);
-    if (!allowed.contains(node.comparator)) node.comparator = allowed.first;
-
-    _resetObjectIfKindChanged(node, before);
-  }
-
   void _cycleComparator(Node node) {
     if (node.spec.argKind != ArgKind.condition) return;
-    final before = node.objectKind;
-    final allowed = comparatorsFor(node.subject);
-    final i = allowed.indexOf(node.comparator);
-    node.comparator = allowed[(i + 1) % allowed.length];
-    _resetObjectIfKindChanged(node, before);
+    final i = comparators.indexOf(node.comparator);
+    node.comparator = comparators[(i + 1) % comparators.length];
   }
 
-  /// Only reset when the object slot changed *kind*. Cycling `IS` to `IS NOT`
-  /// keeps the value, which is what the player expects.
-  void _resetObjectIfKindChanged(Node node, ObjectKind before) {
-    if (node.objectKind == before) return;
-    switch (node.objectKind) {
-      case ObjectKind.packageType:
-        node.typeArg = packageTypes.first;
-      case ObjectKind.weightState:
-        node.weightArg = weightStates.first;
-      case ObjectKind.pallet:
-        node.palletArg = lastUsedPallet;
-    }
-  }
-
+  /// The pallet an argument points at. One cycle, wrapping, for every command
+  /// that takes one - COPY TO, COPY FROM, SUM and SUB all address the same
+  /// numbered floor.
   void _cycleObject(Node node) {
-    if (node.spec.argKind == ArgKind.pallet) {
-      node.palletArg = (node.palletArg + 1) % palletCount;
-      lastUsedPallet = node.palletArg;
-      return;
-    }
-    switch (node.objectKind) {
-      case ObjectKind.packageType:
-        final i = packageTypes.indexOf(node.typeArg);
-        node.typeArg = packageTypes[(i + 1) % packageTypes.length];
-      case ObjectKind.weightState:
-        final i = weightStates.indexOf(node.weightArg);
-        node.weightArg = weightStates[(i + 1) % weightStates.length];
-      case ObjectKind.pallet:
-        node.palletArg = (node.palletArg + 1) % palletCount;
-        lastUsedPallet = node.palletArg;
-    }
+    if (node.spec.argKind != ArgKind.pallet) return;
+    node.palletArg = (node.palletArg + 1) % palletCount;
+    lastUsedPallet = node.palletArg;
   }
 
   // ------------------------------------------------------------ undo and redo
@@ -457,6 +396,7 @@ class ProgramDocument {
     _push();
     final ifNode = Node(
       commandId: 'ifCond',
+      comparator: 'GREATER THAN',
       children: [Node(commandId: 'ship')],
     );
     root = <Node>[

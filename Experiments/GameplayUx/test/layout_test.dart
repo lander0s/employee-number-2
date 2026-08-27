@@ -726,8 +726,8 @@ void main() {
       tester,
     ) async {
       await boot(tester);
-      await revealInTray(tester, 'PICK FROM');
-      await dragIntoSpacer(tester, 'PICK FROM', 0);
+      await revealInTray(tester, 'COPY FROM');
+      await dragIntoSpacer(tester, 'COPY FROM', 0);
 
       expect(inProgram('PALLET 1'), findsOneWidget);
 
@@ -737,13 +737,15 @@ void main() {
       expect(inProgram('PALLET 1'), findsNothing);
     });
 
-    testWidgets('the type argument still cycles on tap', (tester) async {
+    testWidgets('the comparison cycles on tap, like a pallet does', (
+      tester,
+    ) async {
       await boot(tester);
 
-      expect(inProgram('BLUE'), findsOneWidget);
-      await tester.tap(inProgram('BLUE'));
+      expect(inProgram('GREATER THAN'), findsOneWidget);
+      await tester.tap(inProgram('GREATER THAN'));
       await tester.pumpAndSettle();
-      expect(inProgram('RED'), findsOneWidget);
+      expect(inProgram('LESS THAN'), findsOneWidget);
     });
 
     testWidgets('a chip hugs its word but stays a thumb target', (
@@ -754,15 +756,15 @@ void main() {
       // Painted: tight around the text. The chip used to be padded to 48dp
       // itself, which made a three-word condition look like a row of form
       // fields.
-      final word = tester.getRect(inProgram('TYPE'));
-      final chip = tester.getRect(rowContainerFor(inProgram('TYPE')));
+      final word = tester.getRect(inProgram('GREATER THAN'));
+      final chip = tester.getRect(rowContainerFor(inProgram('GREATER THAN')));
       expect(chip.height - word.height, lessThan(12));
 
       // Tappable: still 48, carried by transparent space around the chip.
       final target = tester.getRect(
         find
             .ancestor(
-              of: inProgram('TYPE'),
+              of: inProgram('GREATER THAN'),
               matching: find.byType(ConstrainedBox),
             )
             .first,
@@ -772,15 +774,15 @@ void main() {
       // And the tap still lands from the edge of that target, not just the chip.
       await tester.tapAt(Offset(target.center.dx, target.top + 3));
       await tester.pumpAndSettle();
-      expect(inProgram('WEIGHT'), findsOneWidget);
+      expect(inProgram('LESS THAN'), findsOneWidget);
     });
 
     testWidgets('a row carries one argument control, not a stepper', (
       tester,
     ) async {
       await boot(tester);
-      await revealInTray(tester, 'MERGE');
-      await dragIntoSpacer(tester, 'MERGE', 0);
+      await revealInTray(tester, 'SUM');
+      await dragIntoSpacer(tester, 'SUM', 0);
 
       // The old -/+ stepper put three tap targets on one row. Regression guard
       // against it coming back.
@@ -809,7 +811,7 @@ void main() {
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
 
-      final words = ['IF', 'TYPE', 'IS', 'BLUE'];
+      final words = ['IF', 'GREATER THAN', 'ZERO'];
       final tops = <double>[
         for (final w in words) tester.getRect(inProgram(w)).top,
       ];
@@ -845,7 +847,7 @@ void main() {
       expect(conditionRow.height, lessThan(plainRow.height * 2));
     });
 
-    testWidgets('every segment cycles from the row', (tester) async {
+    testWidgets('the comparison cycles from the row', (tester) async {
       tester.view.physicalSize = const Size(393, 852);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -853,13 +855,15 @@ void main() {
       await tester.pumpWidget(harness(textScale: 1.0));
       await tester.pumpAndSettle();
 
-      await tester.tap(inProgram('IS'));
+      await tester.tap(inProgram('GREATER THAN'));
       await tester.pumpAndSettle();
-      expect(inProgram('IS NOT'), findsOneWidget);
+      expect(inProgram('LESS THAN'), findsOneWidget);
 
-      await tester.tap(inProgram('TYPE'));
+      // ZERO is a keyword, not a chip: it is the only thing a condition ever
+      // compares against, so there is nothing to cycle it to.
+      await tester.tap(inProgram('ZERO'));
       await tester.pumpAndSettle();
-      expect(inProgram('WEIGHT'), findsOneWidget);
+      expect(inProgram('LESS THAN'), findsOneWidget);
       expect(inProgram('ZERO'), findsOneWidget);
     });
 
@@ -1058,10 +1062,10 @@ void main() {
       // The last command in the tray sits under the right-hand fade until the
       // tray is scrolled. The fade must not eat the gesture that picks it up -
       // it would make the very command the fade is advertising unreachable.
-      await revealInTray(tester, 'CLOCK OUT');
-      await dragIntoSpacer(tester, 'CLOCK OUT', 0);
+      await revealInTray(tester, 'SUB');
+      await dragIntoSpacer(tester, 'SUB', 0);
 
-      expect(inProgram('CLOCK OUT'), findsOneWidget);
+      expect(inProgram('SUB'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });
@@ -1139,7 +1143,7 @@ void main() {
 
       expect(inProgram('REPEAT'), findsOneWidget);
       expect(inProgram('IF'), findsOneWidget);
-      expect(inProgram('BLUE'), findsOneWidget);
+      expect(inProgram('ZERO'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -1149,10 +1153,10 @@ void main() {
 
       // The words still render, so they still look like part of the sentence -
       // they just do not answer a tap.
-      await tester.tap(inProgram('IS'));
+      await tester.tap(inProgram('GREATER THAN'));
       await tester.pumpAndSettle();
-      expect(inProgram('IS'), findsOneWidget);
-      expect(inProgram('IS NOT'), findsNothing);
+      expect(inProgram('GREATER THAN'), findsOneWidget);
+      expect(inProgram('LESS THAN'), findsNothing);
     });
 
     testWidgets('a row cannot be swipe-deleted while running', (tester) async {
@@ -1401,7 +1405,7 @@ void main() {
 
       final pane = tester.getRect(find.byType(ProgramPane));
       // Rows are left-aligned, so every word still lands inside the viewport.
-      for (final word in ['REPEAT', 'TAKE', 'IF', 'TYPE', 'IS', 'BLUE']) {
+      for (final word in ['REPEAT', 'TAKE', 'IF', 'GREATER THAN', 'ZERO']) {
         expect(
           tester.getRect(inProgram(word)).right,
           lessThanOrEqualTo(pane.right),
@@ -1468,9 +1472,9 @@ void main() {
       await boot(tester);
 
       // The one thing on a row that is still tappable.
-      await tester.tap(inProgram('IS'));
+      await tester.tap(inProgram('GREATER THAN'));
       await tester.pumpAndSettle();
-      expect(inProgram('IS NOT'), findsOneWidget);
+      expect(inProgram('LESS THAN'), findsOneWidget);
     });
   });
 
@@ -2009,7 +2013,7 @@ void main() {
 
       final chips = find.descendant(
         of: find.byWidgetPredicate((w) => w is Opacity && w.opacity == 0.92),
-        matching: find.text('TYPE'),
+        matching: find.text('GREATER THAN'),
       );
       expect(chips, findsNothing, reason: 'no arguments in flight either');
 

@@ -112,7 +112,7 @@ class ProgramRow extends StatelessWidget {
                     text: row.isCloser ? 'END' : node.spec.label,
                     dim: row.isCloser,
                   ),
-                  if (!row.isCloser)
+                  if (!row.isCloser) ...[
                     for (final chip in node.chips)
                       _ArgWord(
                         text: chip.text,
@@ -121,6 +121,11 @@ class ProgramRow extends StatelessWidget {
                             ? () => onCycleArg(chip.slot)
                             : () {},
                       ),
+                    // A fixed word after the argument, so the row reads as a
+                    // sentence: IF [GREATER THAN] ZERO. Nothing to cycle it to,
+                    // so it is a keyword rather than a chip.
+                    if (node.spec.tail case final tail?) _Keyword(text: tail),
+                  ],
                 ],
               ),
             ),

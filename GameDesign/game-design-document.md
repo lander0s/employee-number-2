@@ -190,12 +190,22 @@ Portrait floor layout, read top to bottom:
 - **UNIT-02**: walks the floor, one thing in its claws at a time.
 
 ### 6.2 Packages
-Each package has a **TYPE** (shape + color + icon — never color alone) and a **WEIGHT**
-(an integer, printed large on the box). Early acts use TYPE only, so the first hours are
-pure logic with zero arithmetic. Weights unlock in Act 2 and the merge machinery follows.
 
-This split is a deliberate improvement over the genre standard, which mixes letters and
-numbers immediately: **learn the control flow first, then the math.**
+**A package is a number.** An integer, printed large on the box, and nothing else. No
+type, no colour, no icon, no separate weight.
+
+This replaces an earlier design in which packages had a TYPE (shape + colour + icon) and a
+WEIGHT, with the first act using TYPE only so that "the first hours are pure logic with zero
+arithmetic". That split was appealing on paper and wrong in practice: **without arithmetic
+there is no puzzle space.** A language that can only match and forward can ask the player to
+filter, and then it has run out of questions. Everything the genre is remembered for —
+sorting, counting, running totals, minimum and maximum, reversing a sequence, multiplying by
+repeated addition — needs numbers and comparison, and needs them early.
+
+So: copy the known-good vocabulary first, ship a game that is fun, and only then propose
+something more inventive on top of it. What follows is Human Resource Machine's instruction
+set, near enough, in AmaCorp's clothes. The fiction, the robot, the boss, the portrait UX and
+the replacement story are all unchanged — only what is written on the boxes changed.
 
 ### 6.3 Commands
 
@@ -203,21 +213,33 @@ numbers immediately: **learn the control flow first, then the math.**
 |---|---|---|---|
 | `TAKE` | take from intake | Grab next package from INTAKE. **Claws full → the held package is discarded** (see below). If intake is empty, the shift ends. | walk to chute, catch box |
 | `SHIP` | ship it | Put held package into OUTBOUND. Claws must be full. | walk to belt, toss box |
-| `STACK ON [n]` | stack on pallet n | Write held package onto pallet n. Robot keeps holding it (a scan/duplicate — diegetically, AmaCorp's inventory system "records" it). Overwrites pallet n. | slam onto pallet, scanner flash |
-| `PICK FROM [n]` | pick from pallet n | Receive a copy of pallet n's package. **Claws full → the held package is discarded.** Pallet n must not be empty. | lift from pallet, fabricator hum |
-| `MERGE WITH [n]` | merge with pallet n | held.weight += pallet[n].weight. **The merge animation.** | the two-things-become-one animation |
-| `STRIP BY [n]` | strip by pallet n | held.weight −= pallet[n].weight. Can go negative. | reverse merge, pieces fly off |
-| `PAD [n]` / `TRIM [n]` | add / remove padding | pallet[n].weight ±1, then pick it up. | quick tape-gun gag animation |
-| `THROW AT [n]` | throw at pallet n | Long-range `STACK ON`. Costs 1 step instead of walking. Unlocked as an optimization tool. | the throw animation |
+| `COPY TO [n]` | copy to pallet n | Write the held number onto pallet n. Robot keeps holding it — diegetically, AmaCorp's inventory system "records" it. Overwrites pallet n. | slam onto pallet, scanner flash |
+| `COPY FROM [n]` | copy from pallet n | Receive a copy of pallet n's number. **Claws full → the held package is discarded.** Pallet n must not be empty. | lift from pallet, fabricator hum |
+| `SUM [n]` | sum with pallet n | held += pallet[n]. **The merge animation.** | the two-things-become-one animation |
+| `SUB [n]` | subtract pallet n | held −= pallet[n]. Can go negative. | reverse merge, pieces fly off |
 | `REPEAT … END` | repeat forever | Unconditional loop. The workhorse. | — |
-| `IF <cond> … ELSE … END` | branch | Structured conditional, indented, always closed. | — |
-| `CLOCK OUT` | clock out | Terminate the program successfully, here. | robot waves, screen dims |
+| `IF <comparison> ZERO … END` | branch | Structured conditional, indented, always closed. | — |
 
-**Conditions:** `TYPE IS <type>` · `TYPE MATCHES PALLET [n]` · `WEIGHT IS ZERO` ·
-`WEIGHT IS NEGATIVE` · `WEIGHT UNDER PALLET [n]`
+**Conditions:** `IF EQUALS ZERO` · `IF GREATER THAN ZERO` · `IF LESS THAN ZERO`
+
+One cyclable segment, and zero is fixed — there is nothing else worth comparing a number
+against that the player cannot build with `SUB`. "Is this package bigger than that one" is
+`SUB [n]` then `IF GREATER THAN ZERO`, which is a *puzzle*, and handing it over as a
+primitive would be handing over the answer.
 
 **Every condition inspects the package in UNIT-02's claws.** Nothing inspects the world. This
 is a hard rule, and it is the reason there is no `IF INTAKE IS EMPTY` — see §6.6.
+
+**Related commands share a colour** (see §7.3): movement in and out of the building (`TAKE`,
+`SHIP`) green, the floor (`COPY TO`, `COPY FROM`) red, the loop blue, the branch yellow,
+arithmetic (`SUM`, `SUB`) purple. Colour names the family and the word names the command,
+which is one fewer thing to memorise than nine unrelated colours.
+
+**Cut in this pass**, and recorded here so they are not silently forgotten: `CLOCK OUT`
+(termination is implicit when the intake runs dry), `PAD`/`TRIM`, `THROW AT`, and `ELSE`.
+The three comparisons partition the number line, so an else branch has nothing left to
+express — and it would cost a second body on every IF, a toggle on every IF row, and a
+branch dimension running through the whole document model.
 
 **The discard rule.** UNIT-02 holds exactly one thing. Any command that puts something new
 in its claws while they are already full — `TAKE` and `PICK FROM` — **discards what it was
@@ -228,8 +250,9 @@ casual about it.
 This is load-bearing, not a convenience:
 
 - It is the **only way to throw a package away**, which makes every "ignore everything else"
-  level possible. Act 1 level 4 ships blues and discards the rest; without this rule that
-  level needs an extra `DISCARD` command taking up tray space and a tutorial beat.
+  level possible. An early level ships the positive numbers and discards the rest; without
+  this rule that level needs an extra `DISCARD` command taking up tray space and a tutorial
+  beat.
 - It keeps the claws a genuine single register — no hidden second slot, nothing off-screen.
 - It is silent and cheap, so it becomes a real optimization tool later: discarding is faster
   than routing a package you don't need.
@@ -243,6 +266,12 @@ yet know where.
 
 Conditions are introduced one per level, and each one's first appearance gets a short
 diegetic explanation from Brent rather than a tutorial popup.
+
+> **Stale below this point.** §8.3's act plan and the two level briefings
+> (`level-01-briefing.md`, `level-04-briefing.md`) were written against types and weights and
+> still talk about BLUE packages and the merge economy. The shapes of those levels survive —
+> first shift, filter-and-discard, the par goals, the shipment-set format — but the contents
+> need re-cutting against numbers.
 
 ### 6.4 Structured blocks, not jump arrows — a deliberate divergence
 

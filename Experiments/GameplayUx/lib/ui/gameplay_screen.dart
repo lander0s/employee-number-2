@@ -170,7 +170,7 @@ class _GameplayScreenState extends State<GameplayScreen> {
   void _refresh() => setState(() {});
 }
 
-const _taskText = 'Ship only the BLUE packages.';
+const _taskText = 'Ship only the positive numbers.';
 
 /// 7.1's task card: the brief, pinned, display-only, plus `[i]` to re-open it -
 /// 5 requires the brief to always be re-openable.

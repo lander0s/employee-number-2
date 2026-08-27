@@ -62,23 +62,49 @@ double deltaE(Color a, Color b) {
 }
 
 void main() {
-  test('every command has its own colour', () {
-    final colours = commandCatalogue.map((c) => c.colour).toSet();
-    expect(colours.length, commandCatalogue.length);
+  /// Commands that share a colour, by id. Colour names the family, not the
+  /// command: movement in and out of the building, the floor, the loop, the
+  /// branch, arithmetic.
+  const families = <String, List<String>>{
+    'movement': ['take', 'ship'],
+    'storage': ['copyFrom', 'copyTo'],
+    'loop': ['repeat'],
+    'branch': ['ifCond'],
+    'arithmetic': ['sum', 'sub'],
+  };
+
+  test('the catalogue is exactly these five families', () {
+    final listed = families.values.expand((ids) => ids).toSet();
+    final actual = commandCatalogue.map((c) => c.id).toSet();
+    expect(actual, listed, reason: 'a new command needs a family');
   });
 
-  test('no two commands look alike', () {
+  test('a family shares one colour', () {
+    for (final entry in families.entries) {
+      final colours = entry.value.map((id) => specFor(id).colour).toSet();
+      expect(
+        colours,
+        hasLength(1),
+        reason: '${entry.key} should be one colour, not ${colours.length}',
+      );
+    }
+  });
+
+  test('no two families look alike', () {
     // The complaint that produced this palette: TAKE and SHIP were about ten
     // degrees of hue apart and read as one colour. 20 is comfortably past "these
-    // are different"; the palette currently sits around 24.
-    for (var i = 0; i < commandCatalogue.length; i++) {
-      for (var j = i + 1; j < commandCatalogue.length; j++) {
-        final a = commandCatalogue[i];
-        final b = commandCatalogue[j];
+    // are different". Within a family that is now the point - TAKE and SHIP are
+    // deliberately identical, and the word tells them apart - so the check is
+    // between families.
+    final names = families.keys.toList();
+    for (var i = 0; i < names.length; i++) {
+      for (var j = i + 1; j < names.length; j++) {
+        final a = specFor(families[names[i]]!.first).colour;
+        final b = specFor(families[names[j]]!.first).colour;
         expect(
-          deltaE(a.colour, b.colour),
+          deltaE(a, b),
           greaterThan(20),
-          reason: '${a.id} and ${b.id} are too close to tell apart',
+          reason: '${names[i]} and ${names[j]} are too close to tell apart',
         );
       }
     }
@@ -123,15 +149,16 @@ void main() {
     // The colours were desaturated a little so the executing row could be shown
     // by *saturating* it: same colour, more of it. At full saturation that
     // headroom is gone, and nothing in the other direction replaces it - a
-    // lightness step big enough to read (deltaE >= 8 on every command) drops
-    // PICK FROM's ink contrast to about 4.1, and a step gentle enough to stay
-    // readable leaves STRIP BY at deltaE 3.3, which nobody would notice.
+    // lightness step big enough to read (deltaE >= 8 on every command) drops the
+    // purple's ink contrast to about 4.1, and a step gentle enough to stay
+    // readable leaves the cyan-ish ones invisible.
     //
     // So the executing row needs a mechanism that is not the fill: an outline, a
     // shadow, a nudge in position. This test records the constraint rather than
     // pretending the fill can still carry it.
+    const movement = ['take', 'ship'];
     for (final spec in commandCatalogue.where(
-      (c) => c.id != 'clockOut' && c.id != 'take',
+      (c) => !movement.contains(c.id),
     )) {
       final hsl = HSLColor.fromColor(spec.colour);
       expect(
@@ -141,18 +168,15 @@ void main() {
       );
     }
 
-    // TAKE is held back. At full saturation its green was the one colour that
-    // hurt to look at - a green at that lightness is the brightest thing the
-    // screen can make, and TAKE is also the command that appears most often in a
-    // program, so it was doing the most damage.
-    final take = HSLColor.fromColor(specFor('take').colour);
-    expect(take.saturation, lessThan(0.7));
-    expect(take.saturation, greaterThan(0.4));
-
-    // CLOCK OUT stays a near-grey on purpose: it is the end of the shift, not a
-    // command you reach for.
-    final clockOut = HSLColor.fromColor(specFor('clockOut').colour);
-    expect(clockOut.saturation, lessThan(0.3));
+    // The movement family is held back. At full saturation its green was the one
+    // colour that hurt to look at - a green at that lightness is the brightest
+    // thing the screen can make - and TAKE and SHIP together are most of what is
+    // on screen in any program, so it was doing the most damage.
+    for (final id in movement) {
+      final green = HSLColor.fromColor(specFor(id).colour);
+      expect(green.saturation, lessThan(0.7), reason: id);
+      expect(green.saturation, greaterThan(0.4), reason: id);
+    }
   });
 
   test('the delete backdrop reads as an alert, not as a command', () {
@@ -160,7 +184,7 @@ void main() {
     // for coloured rows.
     expect(contrast(W.text, W.danger), greaterThanOrEqualTo(7));
 
-    // And it must not be mistaken for SHIP, the one command wearing a red.
+    // And it must not be mistaken for the storage family, which wears a red.
     for (final spec in commandCatalogue) {
       expect(
         deltaE(W.danger, spec.colour),
