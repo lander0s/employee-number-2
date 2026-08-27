@@ -41,6 +41,15 @@ abstract final class W {
   /// comfortable adding to the end.
   static const tailSlack = 0.5;
   static const chrome = Color(0xFF1C1C1C);
+
+  /// The tray lies over the page rather than beside it, and lets it through:
+  /// the ruled sheet is visible under the note, which is what makes the tray
+  /// read as something resting on the program instead of a strip of app frame
+  /// bolted to the bottom of the screen.
+  ///
+  /// Dark enough that the dark ink on the buttons still has a surface to sit
+  /// against, light enough that the rules read through the gaps between them.
+  static const trayScrim = Color(0xD11C1C1C);
   static const line = Color(0xFF505050);
   static const lineSoft = Color(0xFF3F3F3F);
   static const button = Color(0xFF454545);

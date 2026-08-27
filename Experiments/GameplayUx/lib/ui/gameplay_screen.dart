@@ -40,8 +40,23 @@ class _GameplayScreenState extends State<GameplayScreen> {
   /// The pane answers drags that start in the tray as well as its own, so the
   /// screen holds the handle that lets one talk to the other.
   final _pane = GlobalKey<ProgramPaneState>();
+
+  /// The tray floats over the page, so the page has to know how much of its
+  /// bottom edge is covered. Measured rather than computed: the tray's height
+  /// follows the OS text scale, so there is no constant to use.
+  final _trayKey = GlobalKey();
+  double _trayHeight = 0;
+
   double _floorFraction = _programFocused;
   bool _draggingDivider = false;
+
+  void _measureTray() {
+    final box = _trayKey.currentContext?.findRenderObject() as RenderBox?;
+    final height = box?.size.height ?? 0;
+    if (mounted && height != _trayHeight) {
+      setState(() => _trayHeight = height);
+    }
+  }
 
   /// Fake, for the moment: the button flips state so the two labels can be felt.
   /// Nothing executes.
@@ -76,6 +91,9 @@ class _GameplayScreenState extends State<GameplayScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // The tray's height is only knowable after it lays out.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureTray());
+
     return Scaffold(
       backgroundColor: W.page,
       body: SafeArea(

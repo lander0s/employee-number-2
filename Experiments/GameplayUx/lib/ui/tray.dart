@@ -62,31 +62,40 @@ class _CommandTrayState extends State<CommandTray> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: W.chrome,
+      color: W.trayScrim,
       padding: const EdgeInsets.fromLTRB(6, 6, 6, 10),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           for (final row in _rows) ...[
             if (row != _rows.first) const SizedBox(height: 4),
-            Row(
-              children: [
-                for (final id in row) ...[
-                  if (id != row.first) const SizedBox(width: 4),
-                  // Expanded, so the buttons divide the row exactly and both
-                  // rows end flush with the edges. Natural widths left a ragged
-                  // right margin and made SUB a smaller target than COPY FROM
-                  // for no reason a player could see. Each label is a scaleDown
-                  // FittedBox, the last resort before anything is clipped.
-                  Expanded(
-                    child: _TrayButton(
-                      spec: specFor(id),
-                      onDragUpdate: widget.onDragUpdate,
-                      onDragEnd: widget.onDragEnd,
+            // IntrinsicHeight gives the row a height to stretch into: without
+            // it, stretch asks for infinity inside a Column sizing to its
+            // children. Stretch is what keeps the row even - a long label that
+            // has to scale down to fit its share of the width would otherwise
+            // sit shorter than its neighbours.
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final id in row) ...[
+                    if (id != row.first) const SizedBox(width: 4),
+                    // Expanded, so the buttons divide the row exactly and both
+                    // rows end flush with the edges. Natural widths left a
+                    // ragged right margin and made SUB a smaller target than
+                    // COPY FROM for no reason a player could see. Each label is
+                    // a scaleDown FittedBox, the last resort before anything is
+                    // clipped.
+                    Expanded(
+                      child: _TrayButton(
+                        spec: specFor(id),
+                        onDragUpdate: widget.onDragUpdate,
+                        onDragEnd: widget.onDragEnd,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ],
         ],
@@ -140,7 +149,14 @@ class _Face extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(minHeight: W.minTarget),
+    // No minimum height: the button is as tall as its word plus a hair. It used
+    // to be padded out to a 48dp target, which on a two-row tray was most of the
+    // note given over to air.
+    //
+    // That is under the target guidance, like the rows are (7.3), and for the
+    // same reason: each button is a fifth of the screen wide, and width is where
+    // the accuracy comes from.
+
     // The same colour the command wears in the program, and the same moulding,
     // so the tray reads as a shelf of the very things you are about to place.
     decoration: BoxDecoration(
@@ -155,7 +171,7 @@ class _Face extends StatelessWidget {
     // becomes once it is in the program, not a property of the thing you pick
     // up.
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Center(
         widthFactor: 1,
         child: FittedBox(

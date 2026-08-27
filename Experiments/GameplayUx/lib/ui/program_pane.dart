@@ -45,10 +45,18 @@ class ProgramPane extends StatefulWidget {
     required this.doc,
     required this.onChanged,
     required this.running,
+    this.bottomInset = 0,
   });
 
   final ProgramDocument doc;
   final VoidCallback onChanged;
+
+  /// How much of the pane's bottom edge is covered by something else. The tray
+  /// floats over the page rather than sitting beside it, so the page runs the
+  /// full height and can be seen through it - and this is what keeps the end of
+  /// the program reachable: scrollable room below it, and an auto-scroll edge
+  /// measured from where the page is actually visible.
+  final double bottomInset;
 
   /// While running, the program is read-only: no spacers, no drop targets, no
   /// gestures. A program that cannot be edited should not keep offering the
@@ -102,7 +110,9 @@ class ProgramPaneState extends State<ProgramPane> {
     final box = _paneKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return;
 
-    final height = box.size.height;
+    // Measured against the visible page, not the whole box: the bottom of the
+    // pane sits behind the tray, and an edge zone nobody can reach is not one.
+    final height = box.size.height - widget.bottomInset;
     final edge = math.min(W.autoScrollEdge, height / 4);
     final y = globalPosition.dy - box.localToGlobal(Offset.zero).dy;
 
@@ -215,6 +225,12 @@ class ProgramPaneState extends State<ProgramPane> {
                       ),
                     ),
                   ),
+                  // Scrollable room the height of whatever covers the bottom of
+                  // the page, so the last row can always be brought clear of it.
+                  if (widget.bottomInset > 0)
+                    SliverToBoxAdapter(
+                      child: SizedBox(height: widget.bottomInset),
+                    ),
                 ],
               );
             },

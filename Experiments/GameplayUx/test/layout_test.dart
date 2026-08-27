@@ -1044,11 +1044,13 @@ void main() {
           lessThanOrEqualTo(tray.right + 0.5),
           reason: spec.id,
         );
-        expect(
-          button.height,
-          greaterThanOrEqualTo(W.minTarget - 0.5),
-          reason: spec.id,
-        );
+        // Hugs its label rather than being padded out to a thumb - 7.3's target
+        // exception, the same one the rows take and for the same reason: each
+        // button is a fifth of the screen wide. Not measured against the label
+        // itself: a label that had to scale down to fit its column is smaller
+        // than the button, which is stretched to match its row.
+        expect(button.height, lessThan(W.minTarget), reason: spec.id);
+        expect(button.height, greaterThan(20), reason: spec.id);
       }
 
       expect(tops, hasLength(2), reason: 'two rows, not one and not three');
