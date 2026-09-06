@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gameplay_ux/model/commands.dart';
 import 'package:gameplay_ux/model/program.dart';
 import 'package:gameplay_ux/ui/gameplay_screen.dart';
+import 'package:gameplay_ux/ui/notebook/brief.dart';
 import 'package:gameplay_ux/ui/notebook/note.dart';
 import 'package:gameplay_ux/ui/notebook/program.dart';
 import 'package:gameplay_ux/ui/notebook/slot.dart';
@@ -22,7 +23,18 @@ import 'package:gameplay_ux/ui/notebook/tokens.dart';
 /// injected via `builder` to reach the widgets under test. Animations are off by
 /// default: a gap that animates never settles under `pumpAndSettle`, and the
 /// animation itself is tested separately with explicit pumps.
-Widget harness({double textScale = 1.0, bool animate = false}) => MaterialApp(
+/// The brief is written on the page above the program, so it sets where every
+/// row starts. Kept to one short line here: the test font draws every glyph as
+/// a full square em, so a realistic brief wraps to six lines and pushes the
+/// page tail out of the built area entirely. Tests that care about the brief
+/// pass their own.
+const testBrief = LevelBrief(task: 'Ship.');
+
+Widget harness({
+  double textScale = 1.0,
+  bool animate = false,
+  LevelBrief brief = testBrief,
+}) => MaterialApp(
   debugShowCheckedModeBanner: false,
   builder: (context, child) => MediaQuery(
     data: MediaQuery.of(context).copyWith(
@@ -31,14 +43,18 @@ Widget harness({double textScale = 1.0, bool animate = false}) => MaterialApp(
     ),
     child: child!,
   ),
-  home: const GameplayScreen(),
+  home: GameplayScreen(brief: brief),
 );
 
-Future<void> boot(WidgetTester tester, {double textScale = 1.0}) async {
+Future<void> boot(
+  WidgetTester tester, {
+  double textScale = 1.0,
+  LevelBrief brief = testBrief,
+}) async {
   tester.view.physicalSize = const Size(393, 852);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(harness(textScale: textScale));
+  await tester.pumpWidget(harness(textScale: textScale, brief: brief));
   await tester.pumpAndSettle();
 }
 
@@ -67,6 +83,31 @@ List<Element> gaps(WidgetTester tester) => find
 
 double heightOf(WidgetTester tester, Element e) =>
     tester.getRect(find.byWidget(e.widget)).height;
+
+/// Empties the program the way a player can: swipe each root row away, taking
+/// its body with it. There used to be a CLEAR button in the floor pane to do
+/// this in one tap; it was test scaffolding and it is gone, and a helper that
+/// only uses gestures the game actually has is the better trade anyway.
+///
+/// The wait at the end is load-bearing: the undo toast is laid over the bottom
+/// of the screen, exactly where the note is, and a drag started under it would
+/// grab the toast instead.
+Future<void> clearProgram(WidgetTester tester) async {
+  Finder rows() => find.descendant(
+    of: find.byType(ProgramEditor),
+    matching: find.byType(Dismissible),
+  );
+
+  for (var guard = 0; rows().evaluate().isNotEmpty; guard++) {
+    expect(guard, lessThan(20), reason: 'a swipe stopped deleting');
+    await tester.drag(rows().first, const Offset(400, 0));
+    await tester.pumpAndSettle();
+  }
+
+  await tester.pump(const Duration(seconds: 2));
+  await tester.pumpAndSettle();
+  expect(find.text('UNDO'), findsNothing);
+}
 
 /// Picks a command off the note and holds it over gap [index] without letting go.
 Future<TestGesture> carryFromNote(
@@ -246,8 +287,7 @@ void main() {
 
     testWidgets('an empty program is one big drop target', (tester) async {
       await boot(tester);
-      await tester.tap(find.text('CLEAR'));
-      await tester.pumpAndSettle();
+      await clearProgram(tester);
 
       expect(find.text('Drag a command up from below.'), findsOneWidget);
       final page = tester.getRect(find.byType(ProgramEditor));
@@ -273,8 +313,7 @@ void main() {
       await boot(tester);
       final page = tester.getRect(find.byType(ProgramEditor));
 
-      await tester.tap(find.text('CLEAR'));
-      await tester.pumpAndSettle();
+      await clearProgram(tester);
 
       final gesture = await tester.startGesture(
         tester.getCenter(onNote('REPEAT')),
@@ -476,6 +515,73 @@ void main() {
         greaterThan(Paper.marginInset),
         reason: 'nothing is written over the margin',
       );
+    });
+  });
+
+  group('the brief is written on the page, not pinned above it', () {
+    // Deliberately short: see [testBrief]. Two lines here so the detail is
+    // exercised without wrapping in the square test font.
+    const brief = LevelBrief(task: 'Ship.', detail: 'Not zero.');
+
+    testWidgets('it is on the page, above the program', (tester) async {
+      await boot(tester, brief: brief);
+
+      expect(find.text('TASK'), findsNothing, reason: 'no card above the floor');
+      expect(
+        find.descendant(
+          of: find.byType(ProgramEditor),
+          matching: find.byType(Brief),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getRect(find.byType(Brief)).bottom,
+        lessThanOrEqualTo(tester.getRect(boxOf(onPage('REPEAT'))).top),
+      );
+    });
+
+    testWidgets('and it scrolls away with the program', (tester) async {
+      await boot(tester, brief: brief);
+      final before = tester.getRect(find.byType(Brief)).top;
+
+      await tester.drag(find.byType(ProgramEditor), const Offset(0, -120));
+      await tester.pumpAndSettle();
+
+      // Not the full 120: touch slop is spent before the scroll starts.
+      expect(tester.getRect(find.byType(Brief)).top, lessThan(before - 80));
+    });
+
+    testWidgets('it takes a whole number of ruled rows', (tester) async {
+      await boot(tester, brief: brief);
+
+      // Otherwise every row of the program below it lands between the lines
+      // instead of on them, which is the tell that a page is a picture of
+      // paper rather than paper.
+      final height = tester.getRect(find.byType(Brief)).height;
+      expect(
+        (height - Paper.handDrop) % Paper.rowHeight,
+        closeTo(0, 0.5),
+        reason: 'brief is $height tall',
+      );
+    });
+
+    testWidgets('it is writing, not a row: nothing can be done to it', (
+      tester,
+    ) async {
+      await boot(tester, brief: brief);
+      final written = find.byType(Brief);
+
+      for (final gesture in <Type>[
+        Dismissible,
+        LongPressDraggable<DragPayload>,
+        DragTarget<DragPayload>,
+      ]) {
+        expect(
+          find.ancestor(of: written, matching: find.byType(gesture)),
+          findsNothing,
+          reason: '$gesture wraps the brief',
+        );
+      }
     });
   });
 

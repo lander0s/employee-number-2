@@ -20,7 +20,6 @@ class CommandNote extends StatelessWidget {
     required this.lift,
     required this.autoScroll,
     required this.onTrash,
-    this.shadows = true,
   });
 
   final LiftState lift;
@@ -28,8 +27,6 @@ class CommandNote extends StatelessWidget {
 
   /// A command dropped here is removed from the program.
   final ValueChanged<String> onTrash;
-
-  final bool shadows;
 
   /// Which commands sit on which row. Explicit rather than flowed: a `Wrap`
   /// would re-break by width and could land three rows on a narrow phone, and
@@ -89,7 +86,6 @@ class CommandNote extends StatelessWidget {
                     spec: specFor(id),
                     lift: lift,
                     autoScroll: autoScroll,
-                    shadows: shadows,
                   ),
                 ),
               ],
@@ -182,17 +178,15 @@ class _Button extends StatelessWidget {
     required this.spec,
     required this.lift,
     required this.autoScroll,
-    required this.shadows,
   });
 
   final CommandSpec spec;
   final LiftState lift;
   final AutoScroller autoScroll;
-  final bool shadows;
 
   @override
   Widget build(BuildContext context) {
-    final face = _Face(spec: spec, shadows: shadows);
+    final face = _Face(spec: spec);
 
     return Semantics(
       button: true,
@@ -232,15 +226,14 @@ class _Button extends StatelessWidget {
 /// thing it becomes, so the note reads as a shelf of exactly what you are about
 /// to place.
 class _Face extends StatelessWidget {
-  const _Face({required this.spec, required this.shadows});
+  const _Face({required this.spec});
 
   final CommandSpec spec;
-  final bool shadows;
 
   @override
   Widget build(BuildContext context) => StuckPaper(
     fill: spec.colour,
-    shadow: shadows ? Paper.tabShadow : const [],
+    shadow: Paper.tabShadow,
     folded: false,
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

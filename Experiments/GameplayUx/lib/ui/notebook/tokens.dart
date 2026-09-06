@@ -26,12 +26,6 @@ abstract final class Paper {
   /// Where writing starts: clear of the margin line, the way it does on paper.
   static const gutter = 34.0;
 
-  /// The clip holding the page down. Steel needs a dark side and a light side;
-  /// one flat grey reads as a drawing of a clip rather than a clip.
-  static const clipMetal = Color(0xFFB4B8BD);
-  static const clipShade = Color(0xFF6B7075);
-  static const clipSize = Size(22, 58);
-
   // --------------------------------------------------------------------- ink
 
   /// Commands are bright, so their text is dark. The whole palette flipped when
@@ -171,4 +165,80 @@ abstract final class Paper {
   );
 
   static const TextStyle hint = TextStyle(fontSize: 17, color: inkFaint);
+
+  // ------------------------------------------------------------- handwriting
+
+  /// The brief is not chrome. It is written at the top of the same page the
+  /// program is written on, in the player's own hand, because that is what a
+  /// person actually does with a notebook: write down what they were asked for,
+  /// then work underneath it.
+  static const handFamily = 'Schoolbell';
+
+  /// A shade darker than [ink]. The brief is the only writing on the page with
+  /// no coloured note under it to lift it off the sheet, so it has to do that
+  /// with weight alone.
+  static const handInk = Color(0xFF111111);
+  static const handInkFaint = Color(0xB3111111);
+
+  /// `height` is not a ratio anyone chose: it is [rowHeight] over the size, so
+  /// every written line lands on a printed rule. Handwriting that floats
+  /// between the lines is the tell that a page is a picture of paper.
+  /// Sized to the face, not carried over from the last one: Schoolbell sets a
+  /// good deal wider than the hand it replaced, so the 31 that fit there wraps
+  /// here - spending a whole ruled row on the word "numbers." 26 is the size
+  /// that puts the sample brief's first line back on one row.
+  ///
+  /// Where any given brief breaks is a property of its own text, so this is a
+  /// nudge away from a cliff rather than a law. Re-check it when the face
+  /// changes; it is the first thing a new one invalidates.
+  static const handSize = 26.0;
+
+  /// Schoolbell ships one face, so [FontWeight.w700] has nothing to select.
+  /// It asks the engine to embolden the outlines it has, which it does - by a
+  /// fraction of a pixel, and by however much the platform feels like.
+  ///
+  /// Use [handAt] rather than this directly: it adds the rest of the weight in
+  /// a way that does not depend on who is rendering.
+  static const TextStyle hand = TextStyle(
+    fontFamily: handFamily,
+    fontFamilyFallback: fallback,
+    fontSize: handSize,
+    fontWeight: FontWeight.w700,
+    height: rowHeight / handSize,
+    leadingDistribution: TextLeadingDistribution.even,
+    color: handInk,
+  );
+
+  /// The hand, in [colour], pressed harder.
+  ///
+  /// The extra weight is the same glyph drawn four more times a hair off
+  /// centre, behind itself. It thickens every stroke by a known amount instead
+  /// of a platform-dependent one, and it thickens the curves as much as the
+  /// stems - which is what a pen does and what a real bold face does not.
+  static TextStyle handAt(Color colour) => hand.copyWith(
+    color: colour,
+    shadows: [
+      for (final offset in const [
+        Offset(handPress, 0),
+        Offset(-handPress, 0),
+        Offset(0, handPress),
+        Offset(0, -handPress),
+      ])
+        Shadow(color: colour, offset: offset),
+    ],
+  );
+
+  /// How far off centre those copies sit. Half a pixel reads as anti-aliasing;
+  /// much past one and the counters inside `a`, `e` and `o` start to fill in.
+  ///
+  /// Lower than it was for the previous face. Schoolbell's strokes are already
+  /// heavy, so most of the weight is in the font now and this only has to
+  /// finish the job - at 0.7 it closed the counters and read as a blot.
+  static const handPress = 0.4;
+
+  /// How far the whole written block is pushed down so its first baseline sits
+  /// on the first rule rather than above it. One number, tuned once: every line
+  /// below it is a whole [rowHeight] further down and keeps the same relation.
+  static const handDrop = 6.0;
+
 }

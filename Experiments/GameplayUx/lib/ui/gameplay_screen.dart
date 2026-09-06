@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 
 import '../model/program.dart';
 import 'floor_pane.dart';
+import 'notebook/brief.dart';
 import 'notebook/lift.dart';
 import 'notebook/note.dart';
 import 'notebook/program.dart';
@@ -31,7 +32,11 @@ const _maxFloor = 1.0;
 const _minRunnableFloor = RunButton.height + 36;
 
 class GameplayScreen extends StatefulWidget {
-  const GameplayScreen({super.key});
+  const GameplayScreen({super.key, required this.brief});
+
+  /// The level's brief, written at the top of the page. Passed in rather than
+  /// held here: it is level content, and the screen is the level's frame.
+  final LevelBrief brief;
 
   @override
   State<GameplayScreen> createState() => _GameplayScreenState();
@@ -127,9 +132,6 @@ class _GameplayScreenState extends State<GameplayScreen> {
   double _floorFraction = _programFocused;
   bool _draggingDivider = false;
 
-  /// Scaffolding: shadows on the commands, on or off, to be judged by eye.
-  bool _shadows = true;
-
   /// Fake, for the moment: the button flips state so the two labels can be felt.
   /// Nothing executes.
   bool _running = false;
@@ -163,10 +165,7 @@ class _GameplayScreenState extends State<GameplayScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // The tray's height is only knowable once it has laid out.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measureNote());
-
-    // The tray's height is only knowable after it lays out.
+    // The note's height is only knowable once it has laid out.
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureNote());
 
     return Scaffold(
@@ -174,11 +173,15 @@ class _GameplayScreenState extends State<GameplayScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Chrome(child: const _TaskCard()),
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final available = constraints.maxHeight - W.dividerHitHeight;
+                  // Floored at zero before it is used as a clamp bound: on the
+                  // first frame the incoming height is 0, which made `available`
+                  // negative and `clamp(0, available)` throw. No room means no
+                  // floor, not an error.
+                  final available = (constraints.maxHeight - W.dividerHitHeight)
+                      .clamp(0.0, double.infinity);
                   final floorHeight = (available * _floorFraction).clamp(
                     0.0,
                     available,
@@ -199,17 +202,6 @@ class _GameplayScreenState extends State<GameplayScreen> {
                                 running: _running,
                                 onToggleRun: () =>
                                     setState(() => _running = !_running),
-                                onLoadSample: () {
-                                  _doc.loadSample();
-                                  _refresh();
-                                },
-                                onClear: () {
-                                  _doc.clear();
-                                  _refresh();
-                                },
-                                shadows: _shadows,
-                                onToggleShadows: () =>
-                                    setState(() => _shadows = !_shadows),
                               )
                             : const SizedBox.shrink(),
                       ),
@@ -244,6 +236,7 @@ class _GameplayScreenState extends State<GameplayScreen> {
                             Positioned.fill(
                               child: ProgramEditor(
                                 doc: _doc,
+                                brief: widget.brief,
                                 controller: _scroll,
                                 lift: _lift,
                                 autoScroll: _autoScroll,
@@ -251,7 +244,6 @@ class _GameplayScreenState extends State<GameplayScreen> {
                                 onRemove: _remove,
                                 running: _running,
                                 bottomInset: _noteHeight,
-                                shadows: _shadows,
                               ),
                             ),
                             if (!_running)
@@ -268,7 +260,6 @@ class _GameplayScreenState extends State<GameplayScreen> {
                                       final node = _doc.nodeById(id);
                                       if (node != null) _remove(node);
                                     },
-                                    shadows: _shadows,
                                   ),
                                 ),
                               ),
@@ -287,105 +278,6 @@ class _GameplayScreenState extends State<GameplayScreen> {
   }
 
   void _refresh() => setState(() {});
-}
-
-const _taskText = 'Ship only the positive numbers.';
-
-/// 7.1's task card: the brief, pinned, display-only, plus `[i]` to re-open it -
-/// 5 requires the brief to always be re-openable.
-class _TaskCard extends StatelessWidget {
-  const _TaskCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: W.chrome,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('TASK', style: W.meta),
-                const SizedBox(height: 2),
-                Text(
-                  _taskText,
-                  style: W.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Builder(
-            builder: (context) => _InfoButton(onTap: () => _showBrief(context)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showBrief(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: W.chrome,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('THE BRIEF', style: W.meta),
-            const SizedBox(height: 8),
-            Text(_taskText, style: W.label),
-            const SizedBox(height: 12),
-            Text(
-              'The boss call replays here. Not built in this experiment.',
-              style: W.labelDim,
-            ),
-            const SizedBox(height: 16),
-            WButton(
-              label: 'Back to work',
-              wide: true,
-              onTap: () => Navigator.pop(context),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoButton extends StatelessWidget {
-  const _InfoButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      container: true,
-      excludeSemantics: true,
-      label: 'Re-open the brief',
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: W.minTarget,
-          constraints: const BoxConstraints(minHeight: W.minTarget),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: W.button,
-            border: Border.all(color: W.line),
-          ),
-          child: Text('i', style: W.label.copyWith(color: W.text)),
-        ),
-      ),
-    );
-  }
 }
 
 /// The draggable divider. Its hit area is 34 tall even though the visible rule

@@ -63,6 +63,11 @@ flutter:
     - family: Sniglet
       fonts:
         - asset: assets/fonts/Sniglet-Regular.ttf
+    # The player's own handwriting: the level brief is written at the top of the
+    # page, in the same notebook the program is written in.
+    - family: Schoolbell
+      fonts:
+        - asset: assets/fonts/Schoolbell-Regular.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

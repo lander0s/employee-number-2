@@ -1,7 +1,7 @@
 /// The sheet the program is written on.
 ///
-/// Nothing but surface: ruling, margin, and the clip holding it down. What is
-/// written on it is somebody else's problem, and arrives as [child].
+/// Nothing but surface: ruling and margin. What is written on it is somebody
+/// else's problem, and arrives as [child].
 library;
 
 import 'package:flutter/material.dart';
@@ -41,14 +41,6 @@ class NotebookPage extends StatelessWidget {
             ),
           ),
           child,
-          // Over everything on the page: a clip sits on top of the sheet and of
-          // whatever is written on it. Fixed rather than scrolled - it holds the
-          // page down, it is not written on it.
-          const Positioned(
-            top: 4,
-            right: 10,
-            child: IgnorePointer(child: PaperClip()),
-          ),
         ],
       ),
     );
@@ -91,65 +83,3 @@ class _Ruling extends CustomPainter {
   bool shouldRepaint(_Ruling old) => old.offset != offset;
 }
 
-/// One length of wire, folded three times.
-///
-/// Drawn rather than shipped as an asset: it is a few arcs, and a path scales
-/// to any density without a set of PNGs.
-class PaperClip extends StatelessWidget {
-  const PaperClip({super.key});
-
-  @override
-  Widget build(BuildContext context) => Transform.rotate(
-    // Clipped on at an angle, the way anybody actually does it.
-    angle: 0.42,
-    child: CustomPaint(size: Paper.clipSize, painter: _Clip()),
-  );
-}
-
-class _Clip extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final outer = w / 2;
-    final inner = w * 0.3;
-
-    final wire = Path()
-      ..moveTo(0, h * 0.72)
-      ..lineTo(0, outer)
-      ..arcToPoint(Offset(w, outer), radius: Radius.circular(outer))
-      ..lineTo(w, h - inner)
-      ..arcToPoint(
-        Offset(w * 0.35, h - inner),
-        radius: Radius.circular(inner),
-        clockwise: false,
-      )
-      ..lineTo(w * 0.35, h * 0.28)
-      ..arcToPoint(
-        Offset(w * 0.68, h * 0.28),
-        radius: Radius.circular(inner * 0.55),
-      )
-      ..lineTo(w * 0.68, h * 0.58);
-
-    // The shaded side first, offset by a pixel, so the wire reads as round.
-    canvas.drawPath(
-      wire.shift(const Offset(1.2, 1.2)),
-      Paint()
-        ..color = Paper.clipShade
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..strokeCap = StrokeCap.round,
-    );
-    canvas.drawPath(
-      wire,
-      Paint()
-        ..color = Paper.clipMetal
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.6
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_Clip old) => false;
-}

@@ -19,7 +19,6 @@ class CommandTab extends StatelessWidget {
     this.header = false,
     this.dimmed = false,
     this.interactive = true,
-    this.shadows = true,
   });
 
   final Node node;
@@ -37,8 +36,6 @@ class CommandTab extends StatelessWidget {
   /// False while the program runs, and for the drag ghost: renders identically,
   /// answers nothing.
   final bool interactive;
-
-  final bool shadows;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +79,7 @@ class CommandTab extends StatelessWidget {
 
     return StuckPaper(
       fill: node.spec.colour,
-      shadow: shadows ? Paper.tabShadow : const [],
+      shadow: Paper.tabShadow,
       child: box,
     );
   }

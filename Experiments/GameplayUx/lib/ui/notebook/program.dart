@@ -14,6 +14,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../model/program.dart';
+import 'brief.dart';
 import 'fold.dart';
 import 'lift.dart';
 import 'page.dart';
@@ -25,6 +26,7 @@ class ProgramEditor extends StatefulWidget {
   const ProgramEditor({
     super.key,
     required this.doc,
+    required this.brief,
     required this.controller,
     required this.lift,
     required this.autoScroll,
@@ -32,10 +34,15 @@ class ProgramEditor extends StatefulWidget {
     required this.onRemove,
     this.running = false,
     this.bottomInset = 0,
-    this.shadows = true,
   });
 
   final ProgramDocument doc;
+
+  /// Written at the top of the page, above the program, in the player's own
+  /// hand. It scrolls with the program because it is on the same sheet - the
+  /// brief is not a bar pinned over the top of one.
+  final LevelBrief brief;
+
   final ScrollController controller;
   final LiftState lift;
   final AutoScroller autoScroll;
@@ -53,8 +60,6 @@ class ProgramEditor extends StatefulWidget {
 
   /// How much of the page's bottom edge the note covers.
   final double bottomInset;
-
-  final bool shadows;
 
   @override
   State<ProgramEditor> createState() => ProgramEditorState();
@@ -84,7 +89,20 @@ class ProgramEditorState extends State<ProgramEditor> {
               child: Padding(
                 // Everything written on the page starts right of the margin.
                 padding: const EdgeInsets.only(left: Paper.gutter),
-                child: _list(doc.root, null, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      // Not [Paper.rootEnd]: that inset exists to give a note's
+                      // lifted right end somewhere to fall, and writing has no
+                      // lifted end. It runs nearly to the edge of the paper,
+                      // the way writing does.
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Brief(brief: widget.brief),
+                    ),
+                    _list(doc.root, null, 0),
+                  ],
+                ),
               ),
             ),
             // The root's last gap owns the rest of the page, so a drop past the
@@ -172,7 +190,6 @@ class ProgramEditorState extends State<ProgramEditor> {
               node: node,
               dimmed: _lifted == node.id,
               interactive: !widget.running,
-              shadows: widget.shadows,
               onCycle: (slot) => _mutate(() => doc.cycleArg(node.id, slot)),
             ),
           );
@@ -190,7 +207,7 @@ class ProgramEditorState extends State<ProgramEditor> {
       opacity: _lifted == node.id ? 0.35 : 1,
       child: StuckPaper(
         fill: fill,
-        shadow: widget.shadows ? Paper.noteShadow : const [],
+        shadow: Paper.noteShadow,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

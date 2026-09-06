@@ -6,10 +6,10 @@
 /// started unless the floor is visible enough to reach it. That is intended - see
 /// the collapse threshold in gameplay_screen.dart.
 ///
-/// It also hosts the test scaffolding. Those controls and readouts are not part
-/// of the game: parked in the chrome they read as design decisions and mislead
-/// anyone looking at a screenshot, so they live inside the placeholder rectangle
-/// where nothing is real yet.
+/// It used to host test scaffolding as well - sample/clear buttons and a shadow
+/// toggle, parked inside the placeholder rectangle so they could not be mistaken
+/// for design. They are gone: the questions they were there to answer have been
+/// answered, and a screenshot of this pane should show the game.
 library;
 
 import 'package:flutter/material.dart';
@@ -21,21 +21,10 @@ class FloorPane extends StatelessWidget {
     super.key,
     required this.running,
     required this.onToggleRun,
-    required this.onLoadSample,
-    required this.onClear,
-    required this.shadows,
-    required this.onToggleShadows,
   });
 
   final bool running;
   final VoidCallback onToggleRun;
-  final VoidCallback onLoadSample;
-  final VoidCallback onClear;
-
-  /// Whether commands cast a shadow. A switch rather than a decision, for now:
-  /// it is quicker to judge with the thing in front of you.
-  final bool shadows;
-  final VoidCallback onToggleShadows;
 
   @override
   Widget build(BuildContext context) {
@@ -48,59 +37,36 @@ class FloorPane extends StatelessWidget {
           color: const Color(0xFF474747),
           border: Border.all(color: W.line),
         ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // The scaffolding is the first thing to go when the floor is dragged
-            // small: it is the least important content on screen.
-            final showScaffolding = constraints.maxHeight >= 190;
-
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: ClipRect(
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Text(
-                                'FLOOR SIMULATION\nGOES HERE',
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: W.label.copyWith(
-                                  color: W.textDim,
-                                  letterSpacing: 1.2,
-                                  height: 1.5,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: ClipRect(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      'FLOOR SIMULATION\nGOES HERE',
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: W.label.copyWith(
+                        color: W.textDim,
+                        letterSpacing: 1.2,
+                        height: 1.5,
                       ),
-                      if (showScaffolding)
-                        Chrome(
-                          child: _Scaffolding(
-                            onLoadSample: onLoadSample,
-                            onClear: onClear,
-                            shadows: shadows,
-                            onToggleShadows: onToggleShadows,
-                          ),
-                        ),
-                    ],
+                    ),
                   ),
                 ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Chrome(
-                    child: RunButton(running: running, onTap: onToggleRun),
-                  ),
-                ),
-              ],
-            );
-          },
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Chrome(
+                child: RunButton(running: running, onTap: onToggleRun),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -195,97 +161,4 @@ class _RunGlyph extends CustomPainter {
   @override
   bool shouldRepaint(_RunGlyph old) =>
       old.running != running || old.color != color;
-}
-
-class _Scaffolding extends StatelessWidget {
-  const _Scaffolding({
-    required this.onLoadSample,
-    required this.onClear,
-    required this.shadows,
-    required this.onToggleShadows,
-  });
-
-  final VoidCallback onLoadSample;
-  final VoidCallback onClear;
-  final bool shadows;
-  final VoidCallback onToggleShadows;
-
-  @override
-  Widget build(BuildContext context) {
-    final scale = MediaQuery.textScalerOf(context).scale(100) / 100;
-
-    return Container(
-      margin: const EdgeInsets.all(8),
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF3C3C3C),
-        border: Border.all(color: W.lineSoft),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'TEST SCAFFOLDING · NOT PART OF THE DESIGN',
-            style: W.meta.copyWith(color: W.textFaint),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 6),
-          // Wrap, not Row: these are diagnostics and must never be the thing
-          // that overflows a narrow screen or a large text scale.
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _MiniButton(label: 'SAMPLE', onTap: onLoadSample),
-              _MiniButton(label: 'CLEAR', onTap: onClear),
-              _MiniButton(
-                label: shadows ? 'SHADOWS ON' : 'SHADOWS OFF',
-                onTap: onToggleShadows,
-              ),
-              Text(
-                'TEXT x${scale.toStringAsFixed(2)}',
-                style: W.meta.copyWith(color: W.textDim),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MiniButton extends StatelessWidget {
-  const _MiniButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      container: true,
-      excludeSemantics: true,
-      label: label,
-      child: GestureDetector(
-        onTap: onTap,
-        // No `alignment` here: a Container with alignment expands to its
-        // incoming width constraint, and inside a Wrap that constraint is the
-        // full row - which stretched these buttons edge to edge. Without it the
-        // Container sizes to its child.
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 30),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: W.button,
-            border: Border.all(color: W.lineSoft),
-          ),
-          child: Text(label, style: W.meta.copyWith(color: W.text)),
-        ),
-      ),
-    );
-  }
 }
