@@ -16,6 +16,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gameplay_ux/model/commands.dart';
+import 'package:gameplay_ux/ui/notebook/tokens.dart';
 import 'package:gameplay_ux/ui/wireframe.dart';
 
 double _linear(double c) =>
@@ -113,7 +114,7 @@ void main() {
   test('row ink clears 7:1 on every command colour', () {
     for (final spec in commandCatalogue) {
       expect(
-        contrast(W.ink, spec.colour),
+        contrast(Paper.ink, spec.colour),
         greaterThanOrEqualTo(7),
         reason: '${spec.id} (${spec.colour}) is too dark for its ink',
       );
@@ -125,7 +126,7 @@ void main() {
     // only improve on the row's own ratio - but assert it rather than assume it.
     for (final spec in commandCatalogue.where((c) => c.takesArg)) {
       expect(
-        contrast(W.ink, W.chipFill(spec.colour)),
+        contrast(Paper.ink, Paper.chipFill(spec.colour)),
         greaterThanOrEqualTo(7),
         reason: '${spec.id} chip is too dark for its ink',
       );
@@ -134,14 +135,14 @@ void main() {
 
   test('the depth step is visible but does not change the colour', () {
     for (final spec in commandCatalogue.where((c) => c.isBlock)) {
-      final flat = W.blockFill(spec.colour, 0);
-      final stepped = W.blockFill(spec.colour, 1);
+      final flat = Paper.fillFor(spec.colour, 0);
+      final stepped = Paper.fillFor(spec.colour, 1);
 
       expect(flat, isNot(stepped), reason: '${spec.id} nested in itself');
       // A step, not a repaint: still clearly the same colour.
       expect(deltaE(flat, stepped), lessThan(16));
       // And still legible.
-      expect(contrast(W.ink, stepped), greaterThanOrEqualTo(7));
+      expect(contrast(Paper.ink, stepped), greaterThanOrEqualTo(7));
     }
   });
 
@@ -183,11 +184,11 @@ void main() {
     // The program surface went from a dark pane to a light sheet, which changes
     // what has to be checked: ink on paper for the pane's own text, and the
     // command colours no longer disappearing into their background.
-    expect(contrast(W.ink, W.paper), greaterThanOrEqualTo(7));
+    expect(contrast(Paper.ink, Paper.sheet), greaterThanOrEqualTo(7));
 
     for (final spec in commandCatalogue) {
       expect(
-        deltaE(W.paper, spec.colour),
+        deltaE(Paper.sheet, spec.colour),
         greaterThan(20),
         reason: '${spec.id} is too close to the paper to read as a card on it',
       );
@@ -198,11 +199,11 @@ void main() {
     // they are painted at low alpha - the raw colour is a strong blue and says
     // nothing about what lands on the page.
     expect(
-      contrast(W.paper, Color.alphaBlend(W.paperRule, W.paper)),
+      contrast(Paper.sheet, Color.alphaBlend(Paper.rule, Paper.sheet)),
       lessThan(2),
     );
     expect(
-      contrast(W.paper, Color.alphaBlend(W.paperMargin, W.paper)),
+      contrast(Paper.sheet, Color.alphaBlend(Paper.margin, Paper.sheet)),
       lessThan(3),
     );
   });
@@ -210,12 +211,12 @@ void main() {
   test('the delete backdrop reads as an alert, not as a command', () {
     // Near-white on it, like the rest of the app's furniture - the dark ink is
     // for coloured rows.
-    expect(contrast(W.text, W.danger), greaterThanOrEqualTo(7));
+    expect(contrast(W.text, Paper.danger), greaterThanOrEqualTo(7));
 
     // And it must not be mistaken for the storage family, which wears a red.
     for (final spec in commandCatalogue) {
       expect(
-        deltaE(W.danger, spec.colour),
+        deltaE(Paper.danger, spec.colour),
         greaterThan(12),
         reason: '${spec.id} is too close to the delete backdrop',
       );
@@ -228,7 +229,7 @@ void main() {
     for (final spec in commandCatalogue.where((c) => c.isBlock)) {
       for (final depth in [0, 1]) {
         expect(
-          contrast(W.ink, W.blockFill(spec.colour, depth)),
+          contrast(Paper.ink, Paper.fillFor(spec.colour, depth)),
           greaterThanOrEqualTo(7),
           reason: 'caret on ${spec.id} at depth $depth',
         );

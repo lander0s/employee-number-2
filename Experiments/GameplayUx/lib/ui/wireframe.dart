@@ -35,6 +35,16 @@ abstract final class W {
   /// full width; only what is written on it respects the margin.
   static const paperGutter = 34.0;
 
+  /// A paperclip on the top corner of the page. It says "this is a sheet of
+  /// paper someone is working on" faster than any amount of ruling does, and it
+  /// gives the sticky note something to be stuck *to*.
+  ///
+  /// Steel: a dark side and a light side, because a single flat grey wire reads
+  /// as a drawing of a clip rather than as a clip.
+  static const clipMetal = Color(0xFFB4B8BD);
+  static const clipShade = Color(0xFF6B7075);
+  static const clipSize = Size(22, 58);
+
   /// Commands are tilted a fraction of a degree, like stickers pressed onto the
   /// page by hand. Deterministic per command, never random: a fresh angle on
   /// every rebuild would make the whole program twitch every time anything

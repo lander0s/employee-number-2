@@ -10,12 +10,15 @@
 /// text scale rises, which 7.3 requires us to survive to 200%.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../model/program.dart';
 import 'floor_pane.dart';
-import 'program_pane.dart';
-import 'tray.dart';
+import 'notebook/lift.dart';
+import 'notebook/note.dart';
+import 'notebook/program.dart';
 import 'wireframe.dart';
 
 const _programFocused = 0.38;
@@ -37,22 +40,88 @@ class GameplayScreen extends StatefulWidget {
 class _GameplayScreenState extends State<GameplayScreen> {
   final _doc = ProgramDocument();
 
-  /// The pane answers drags that start in the tray as well as its own, so the
-  /// screen holds the handle that lets one talk to the other.
-  final _pane = GlobalKey<ProgramPaneState>();
+  /// Page and note are siblings, and a drag routinely starts on one and ends on
+  /// the other, so the two things they share live here: what is in the air, and
+  /// the scrolling it can cause.
+  final _lift = LiftState();
+  final _scroll = ScrollController();
+  late final AutoScroller _autoScroll = AutoScroller(
+    controller: _scroll,
+    visiblePage: _visiblePage,
+  );
 
-  /// The tray lies *over* the page, so the page has to know how much of its
-  /// bottom edge is covered. Measured rather than computed: the tray's height
+  /// The note lies *over* the page, so the page has to know how much of its
+  /// bottom edge is covered. Measured rather than computed: the note's height
   /// follows the OS text scale, so there is no constant to use.
-  final _trayKey = GlobalKey();
-  double _trayHeight = 0;
+  final _pageKey = GlobalKey();
+  final _noteKey = GlobalKey();
+  double _noteHeight = 0;
 
-  void _measureTray() {
-    final box = _trayKey.currentContext?.findRenderObject() as RenderBox?;
+  void _measureNote() {
+    final box = _noteKey.currentContext?.findRenderObject() as RenderBox?;
     final height = _running ? 0.0 : (box?.size.height ?? 0);
-    if (mounted && height != _trayHeight) {
-      setState(() => _trayHeight = height);
+    if (mounted && height != _noteHeight) {
+      setState(() => _noteHeight = height);
     }
+  }
+
+  /// The part of the page a finger can actually reach: the note covers the rest.
+  Rect _visiblePage() {
+    final box = _pageKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return Rect.zero;
+    final origin = box.localToGlobal(Offset.zero);
+    return origin & Size(box.size.width, box.size.height - _noteHeight);
+  }
+
+  /// One way to delete, whichever gesture asked for it: a swipe on the page, or
+  /// a drop on the note.
+  void _remove(Node node) {
+    final label = node.spec.label;
+    setState(() => _doc.delete(node.id));
+    _refresh();
+    _toast('Deleted $label');
+  }
+
+  void _toast(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          backgroundColor: W.chrome,
+          duration: _toastLife,
+          content: Text(message, style: W.labelDim),
+          action: SnackBarAction(
+            label: 'UNDO',
+            textColor: W.text,
+            onPressed: () {
+              setState(_doc.undo);
+              _refresh();
+            },
+          ),
+        ),
+      );
+
+    // Timed here as well as in the SnackBar, because SnackBar's own timer does
+    // not run at all while a screen reader is active - it waits to be dismissed
+    // by hand, which left the offer sitting there indefinitely.
+    _toastTimer?.cancel();
+    _toastTimer = Timer(_toastLife, () {
+      if (mounted) messenger.hideCurrentSnackBar();
+    });
+  }
+
+  static const _toastLife = Duration(seconds: 1);
+  Timer? _toastTimer;
+
+  @override
+  void dispose() {
+    _toastTimer?.cancel();
+    _autoScroll.dispose();
+    _lift.dispose();
+    _scroll.dispose();
+    super.dispose();
   }
 
   double _floorFraction = _programFocused;
@@ -95,10 +164,10 @@ class _GameplayScreenState extends State<GameplayScreen> {
   @override
   Widget build(BuildContext context) {
     // The tray's height is only knowable once it has laid out.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measureTray());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureNote());
 
     // The tray's height is only knowable after it lays out.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measureTray());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureNote());
 
     return Scaffold(
       backgroundColor: W.page,
@@ -173,12 +242,15 @@ class _GameplayScreenState extends State<GameplayScreen> {
                         child: Stack(
                           children: [
                             Positioned.fill(
-                              child: ProgramPane(
-                                key: _pane,
+                              child: ProgramEditor(
                                 doc: _doc,
+                                controller: _scroll,
+                                lift: _lift,
+                                autoScroll: _autoScroll,
                                 onChanged: _refresh,
+                                onRemove: _remove,
                                 running: _running,
-                                bottomInset: _trayHeight,
+                                bottomInset: _noteHeight,
                                 shadows: _shadows,
                               ),
                             ),
@@ -188,17 +260,15 @@ class _GameplayScreenState extends State<GameplayScreen> {
                                 right: 0,
                                 bottom: 0,
                                 child: Chrome(
-                                  child: CommandTray(
-                                    key: _trayKey,
+                                  child: CommandNote(
+                                    key: _noteKey,
+                                    lift: _lift,
+                                    autoScroll: _autoScroll,
+                                    onTrash: (id) {
+                                      final node = _doc.nodeById(id);
+                                      if (node != null) _remove(node);
+                                    },
                                     shadows: _shadows,
-                                    // A command carried up from the tray
-                                    // scrolls the program when it reaches an
-                                    // edge, exactly as a row being moved does.
-                                    onDragUpdate: (position) => _pane
-                                        .currentState
-                                        ?.autoScrollTo(position),
-                                    onDragEnd: () =>
-                                        _pane.currentState?.stopAutoScroll(),
                                   ),
                                 ),
                               ),
