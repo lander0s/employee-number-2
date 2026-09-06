@@ -1,135 +1,124 @@
-# Level 4 — "Blues Only"
+# Level 4 — "Positives Only"
 
-**Act:** 1 · ONBOARDING · **Position:** 4 of 8 · **ID:** `a1_l04_blues_only`
-**Status:** Spec ready · outside the Milestone 1 slice (slice is levels 1–3)
+**Act:** 1 · ONBOARDING · **Position:** 4 of 8 · **ID:** `a1_l04_positives_only`
+**Status:** Spec ready for Milestone 1 vertical slice
 **Companion docs:** [game-design-document.md](game-design-document.md) ·
-[level-01-briefing.md](level-01-briefing.md)
+[level-01-briefing.md](level-01-briefing.md) · [program-editor.md](program-editor.md)
+
+> **Re-cut** for the numeric vocabulary (§6.2–6.3). This level used to filter on
+> `IF TYPE IS BLUE`; it now filters on `IF POSITIVE`. Everything else about it — the discard
+> lesson, the six-shipment set, the reference solution's shape, the pars, the adversarial
+> suite, and every one of the three counting rules in §5.1 — survived the change with the
+> numbers swapped in. The predicate was never what this level was about.
+
+---
+
+## 4.0 Where this sits
+
+| Level | Teaches | New commands |
+|---|---|---|
+| 1 | a program is a list, run top to bottom | `TAKE`, `SHIP` |
+| 2 | you don't write the list, you write the rule | `REPEAT` |
+| 3 | packages have values, and values can be compared | `IF` (+ the six conditions) |
+| **4** | **not every package gets shipped** | *(none — this is a synthesis level)* |
+| 5 | packages can be held somewhere other than the claws | `COPY TO`, `COPY FROM` |
+
+Level 4 introduces **no new command.** It is a **Synthesizer** (§8.1): the first level where
+`REPEAT` and `IF` have to be used *together*, and the first where the correct answer involves
+UNIT-02 deliberately destroying something.
+
+Level 3 taught the player to *read* a condition — a program with an `IF` where every package
+happened to satisfy it. Level 4 is the first time the `IF` is load-bearing: the shipment
+contains packages that must not be shipped, and there is no command for "throw this away."
 
 ---
 
 ## 1. Purpose
 
-This is the **discard level**. It is the first puzzle where the correct program has to get rid
-of a package, and it teaches the discard rule (§6.3) in the best possible way: by making the
-*intuitive* program the correct one.
-
-The player's instinct is "if it's not blue, do nothing with it." That instinct is exactly
-right — the next `TAKE` throws the unwanted package away on its own. There is nothing to
-write. The lesson is a subtraction, and the recycling bin does the teaching.
-
-### Assumed prior levels
-| Level | Taught |
-|---|---|
-| 1 | `TAKE`, `SHIP`, programs run top to bottom |
-| 2 | `REPEAT` / `END`, variable-length shipments, `TAKE` on empty intake ends the shift |
-| 3 | `IF TYPE IS` / `ELSE` / `END` |
-
 ### What it teaches
-- Packages you don't want need no handling. Take the next one; the old one goes in the bin.
-- A conditional that has **no `ELSE`** — the first time "do nothing" is a valid branch.
-- Output length is no longer input length. Three levels have trained "one in, one out," and
-  this is where that assumption breaks.
+- **The filter shape.** `REPEAT { TAKE; IF cond { SHIP } }` — the single most reused program
+  shape in the game. Every later level either contains this or contains something built on it.
+- **Discarding by taking.** There is no `DISCARD` command (§6.3). The only way to get rid of a
+  package you're holding is to `TAKE` the next one, which destroys it. The player has to
+  *notice* that the program they already wrote does this, and that it's correct.
+- **Zero is not positive.** The condition family says exactly what it says. A shipment
+  containing `0` separates the player who read `IF POSITIVE` from the player who read "if it's
+  a number that isn't negative."
+- **The shift can end with something still in the claws** — and that can be right.
 
 ### What it must NOT do
-- No new command in the tray. `IF TYPE IS` arrived in level 3; this level adds a *pattern*, and
-  §8.1 forbids introducing a command and a pattern together.
-- No arithmetic, no pallets, no weights.
-- No level where the discard is *optional*. If a player can clear this by routing packages
-  cleverly instead of dropping them, the level has failed at its one job.
-
-### ⚠ A note on level ordering
-§8.3 lists Act 1's sample beats as *"ship everything; ship everything forever; ship only the
-blues; ship two greens per blue"*, which reads as this level being **3rd**. This briefing puts
-it **4th**, with level 3 introducing `IF TYPE IS` on a non-discarding task (*"ship everything,
-but ship blues twice"*).
-
-The reason is §8.1's Teacher rule: combining a brand-new conditional with a brand-new discard
-idiom in one level is exactly the "new command + new pattern" pairing the doc rules out. Split
-in two, each level has one idea. §14's slice (three levels ending at `IF TYPE IS`) is
-unaffected. Flagging it because it contradicts a written beat list — easy to reorder if you
-disagree, and level 1's briefing plus §6.3 both already reference "Act 1 level 4" as the
-discard level.
+- **No arithmetic.** `SUM` and `SUB` exist in the language but not on this note. The discard
+  rule is subtle enough to deserve a level with nothing else in it; arithmetic lands at
+  level 6, once the filter shape is muscle memory.
+- **No pallets.** `COPY TO` / `COPY FROM` arrive next level. The floor stays empty.
+- **No nesting past one level.** The `IF` sits inside the `REPEAT` and nothing sits inside the
+  `IF` but a single `SHIP`.
+- **No optimization pressure.** The reference solution is the shortest solution and there is no
+  second shape (see §6.2).
 
 ---
 
 ## 2. The call
 
-Brent, portrait framing, home office. Six lines — longer than level 1's four, because by now
-the player is fluent in the call UI and skipping is enabled.
+Brent, portrait framing, same home office, later in the day. Three lines.
 
-> **BRENT:** Morning! Okay, slight change of pace today.
+> **BRENT:** Okay so — inventory sent up a mixed batch. Some of those numbers are junk.
 >
-> **BRENT:** Batch coming in is mixed. Blues, greens, reds, whatever else procurement felt
-> like. We only want the blues going out.
+> **BRENT:** Anything positive, ship it. Anything else, I don't want to see it. Not on the
+> belt, not on the floor, gone.
 >
-> **BRENT:** Everything else? Not our problem. There's a bin down there — have the unit just
-> grab the next one and let the old one go. It'll figure it out.
->
-> **BRENT:** And don't worry about telling it when to stop. It stops when the chute runs dry.
-> Union thing. Long story.
->
-> **BRENT:** Oh, and heads up, the batches aren't the same size every day. Some days it's all
-> blue, some days there's not a single one. Write it so it just... handles that.
->
-> **BRENT:** Honestly the unit's picking this up fast. Faster than I did.
->
-> **BRENT:** Anyway. Blues only. Thanks champ.
+> **BRENT:** I'd tell you how to get rid of them but honestly? You'll figure it out. That's
+> why we hired you, champ.
 
 Notes for the writer:
-- Line 3 introduces the recycling bin **diegetically**, in the level where it first matters.
-  This is the game's only explanation of the discard rule, so it has to be in the call, not a
-  tooltip (§9.7).
-- Line 4 is load-bearing: it tells the player, out loud, that the shipment varies — including
-  the two degenerate cases in the set. A player who meets the QUALITY ASSURANCE card here
-  (§8.5) should be able to remember being warned.
-- Line 5 is the **first seed of the whole story.** It's a throwaway compliment and it means
-  nothing yet. It should be delivered as filler, not as a beat — no music change, no pause.
-  It is the earliest point in the game where the theme is on screen.
-- "champ" again. Same nickname, every act, unchanged (see level 1 §2).
+- Line 2 states the rule in the player's language — *"anything positive"* — which is the exact
+  wording of the condition on the note. It is not a puzzle to translate the brief into a
+  program; the puzzle is the *shape*.
+- Line 2 says "anything else," not "anything negative." Zero is anything else. Brent doesn't
+  point at it, and the player finding out the hard way on shipment `s1` is the lesson.
+- Line 3 is the level's only hint, and it is deliberately not a hint. Brent does not know how
+  discarding works. Nobody at this company knows how anything works.
+- "champ" again. Fourth time. Keep the count — it matters in Act 5.
 
 **Task Card:**
 
-> Ship only the BLUE packages.
+> Ship the positive packages. Nothing else.
 
 ---
 
 ## 3. Input — the shipment set
 
-Six authored shipments (§8.5). The player has `REPEAT` and `IF TYPE IS`, so per the axis table
-this level may vary **length, type composition, and order** — all three.
+Six shipments, one rolled at random when the level opens (§8.5). Every one of them is a real
+test: §7.2 shows that four different *wrong* programs each pass at least one member of this
+set, which is why the set has six members and not two.
 
-| ID | Role | Intake, in order | Len | Expected outbound |
+```
+SHIPMENT SET — 1 of 6, rolled on open
+```
+
+| Shipment | Intake, in order | Len | Positives | Role |
 |---|---|---|---|---|
-| `s1` | **typical / max length** · `parShipment` | `RED` `BLUE` `GREEN` `BLUE` `BLUE` `RED` | 6 | `BLUE` ×3 |
-| `s2` | **degenerate** — empty batch | *(nothing)* | 0 | *(nothing)* |
-| `s3` | **adversarial** — no blues at all | `RED` `GREEN` `RED` | 3 | *(nothing)* |
-| `s4` | **adversarial** — nothing but blues | `BLUE` ×5 | 5 | `BLUE` ×5 |
-| `s5` | **boundary** — blue first *and* last | `BLUE` `RED` `RED` `BLUE` | 4 | `BLUE` ×2 |
-| `s6` | **degenerate** — one package, rejected | `RED` | 1 | *(nothing)* |
+| `s1` | `-4` `7` `0` `3` `9` `-1` | 6 | 3 | **par shipment.** Typical, and the longest. Mixed signs, a zero in the middle, ends on a rejected package. |
+| `s2` | *(empty)* | 0 | 0 | Empty intake. The loop must survive zero iterations. |
+| `s3` | `-5` `0` `-2` | 3 | 0 | Nothing to ship. Outbound must end empty and that is a **pass**. |
+| `s4` | `2` `8` `5` | 3 | 3 | Nothing to reject. A ship-everything program passes this one — see §7.2. |
+| `s5` | `6` `-3` `0` `4` | 4 | 2 | Boundary: positive first *and* last. Catches off-by-one programs that skip the first or last package. |
+| `s6` | `-7` | 1 | 0 | Single rejected package. **The shift ends with it still in the claws** — see §5.3. |
 
-Each earns its place against a specific wrong solution:
+`parShipment: s1`
 
-- **`s2` / `s6`** break "there is always something to ship." `s6` additionally leaves UNIT-02
-  holding a package at shift end, which is the case that catches a mis-set `requireHandsEmpty`
-  (§5).
-- **`s3`** breaks any program that ships unconditionally, and is the only shipment where the
-  correct answer is *nothing at all* from a non-empty batch. Expect playtesters to be
-  genuinely unsettled by a correct empty outbound; that discomfort is the level working.
-- **`s4`** breaks inverted conditionals — a program that reads `IF TYPE IS RED → discard` looks
-  right on `s1` and collapses when the batch has no reds to key off.
-- **`s5`** breaks off-by-one loop structures in both directions: a blue at index 0 catches
-  "take one before the loop starts," and a blue at the last index catches "the loop exits one
-  iteration early."
-- **`s1`** is the one tuned for the teaching moment — enough non-blues to make the bin fire
-  three times, mixed enough that the pattern is visible, longest in the set so fixed-count
-  unrolling fails.
+### Why the zeros
 
-`singleShipment` is **absent** here (unlike level 1). The verifier's auto-generated
-transcription of `s1` must fail — it fails `s2` immediately on length — so the anti-hardcoding
-check is live and non-vacuous (§13.2).
+Three of the six shipments contain `0`, and that is the level's sharpest edge. A player who
+writes `IF NOT NEGATIVE` — a perfectly reasonable reading of "anything positive" if you're
+moving fast — has a program that is correct on `s4`, correct on `s6`, correct on `s2`, and
+**wrong on `s1`, `s3` and `s5`.** The failure is one box in outbound that shouldn't be there,
+and the fix is one tap on a cyclable word.
 
-**FLOOR:** no pallets. The **recycling bin** is visible for the first time, downstage, and it
-is the only new thing on the floor.
+That is the best possible shape for a mistake in Act 1: cheap to make, instantly legible in
+the failure message, and one gesture to repair.
+
+**FLOOR:** no pallets.
 **OUTBOUND:** empty.
 **UNIT-02:** idle, claws empty.
 
@@ -137,17 +126,24 @@ is the only new thing on the floor.
 
 ## 4. Expected output
 
-The goal is a **rule**, not a list (§13.2):
+**OUTBOUND** must contain the positive packages of the rolled shipment, in intake order.
 
-> outbound == the BLUE packages from this shipment, in their original relative order
+| Shipment | Expected outbound |
+|---|---|
+| `s1` | `7` `3` `9` |
+| `s2` | *(empty)* |
+| `s3` | *(empty)* |
+| `s4` | `2` `8` `5` |
+| `s5` | `6` `4` |
+| `s6` | *(empty)* |
 
-Written derived in the level file as `shipment.intake.where(type == BLUE)`. Every entry in the
-table above is that expression evaluated, not an independently authored answer — which is what
-makes adding a seventh shipment a one-line change.
+Nothing may remain on intake. **Something may remain in the claws** (§5.3).
 
-Order **is** checked here, unlike level 1: the blues are indistinguishable from each other, but
-a program that reversed or duplicated them would produce a wrong-length or wrong-position
-outbound against `s1` and `s5`. This is the first level whose validator has real coverage.
+Written as a derived expression rather than six literal lists, per §13.2:
+
+```
+goal.outbound = shipment.intake.where(value > 0)
+```
 
 ---
 
@@ -155,201 +151,231 @@ outbound against `s1` and `s5`. This is the first level whose validator has real
 
 | Rule | Behaviour here |
 |---|---|
-| `TAKE`, claws empty, intake non-empty | Robot catches the next package. |
-| **`TAKE`, claws full** | **The held package is discarded** into the bin — one step, no failure (§6.3). This is the level's whole subject. |
-| `TAKE`, intake empty | The shift ends successfully. **This is the only loop exit that exists** (§6.6) — there is no way to ask whether the intake is empty, so the reference solution's `REPEAT` is deliberately never closed by the player. |
-| `SHIP`, claws full | Package goes to outbound. |
-| `SHIP`, claws empty | Failure. |
-| `IF TYPE IS <t>`, claws full | Compares the held package's type. |
-| **`IF TYPE IS <t>`, claws empty** | **Failure** — see §5.2. |
-| `IF` with no `ELSE` | The skip branch does nothing and falls through to `END`. First appearance. |
-| Program runs past its last instruction | Shift ends, goal checked. Unreachable inside `REPEAT`. |
-| Instruction guard | 2,000 *instructions* (not steps — see §5.1). Unreachable with a correct solution. |
+| `TAKE` with claws full | **The held package is discarded.** One step. No failure. This is the level. |
+| `TAKE` with intake empty | **The shift ends**, successfully, and the goal is checked. |
+| `TAKE` with intake empty *and* claws full | **The shift ends. The held package is not discarded** — see below. |
+| `IF POSITIVE` with a package held | Compares the held value against zero. `> 0` enters the body. |
+| `IF` with empty claws | **Failure.** See §5.2. |
+| `REPEAT` | Loops its body forever. The only exits are an empty `TAKE` or the end of the program. |
+| Program runs past its last instruction | The shift ends and the goal is checked. |
 
-**Tray contents:** `TAKE`, `SHIP`, `REPEAT`, `IF TYPE IS [type]` — four buttons, plus `ELSE` as
-an option on any placed `IF`. **The tray does not scroll** (§6.6).
+### The ordering that matters
 
-### 5.1 Three counting rules this level forces us to pin down
+When `TAKE` finds an empty intake *while the claws are full*, the shift-end wins and the held
+package survives. The alternative ordering — discard, then end — would leave `s6` finishing
+with empty claws, which is a difference nobody would ever see in the outbound but which
+changes what UNIT-02 is holding in the end-of-shift animation. **The robot is standing there
+holding the rejected package when the screen dims**, and that image is worth more to the
+lesson than any wording in the failure text. Lock the ordering in the VM and test it; it is
+one line and it is easy to get backwards.
 
-The GDD defines `SIZE` and `SPEED` (§8.2) but not how to count them, and level 1 had no blocks
-so it never came up. Level 4 is the first level where the answer changes the numbers.
-**Proposed, needs back-porting to §8.2:**
+### 5.1 Counting: what SIZE and SPEED actually count
 
-1. **`SIZE` counts command rows. Block closers are free.** `REPEAT` and `IF` each cost 1;
-   their `END`s and any `ELSE` cost 0. Rationale: closers are auto-inserted as a matched pair
-   (§6.4) and were never separately authored, so charging for them would penalise the
-   structured-block model against the flat-jump model it replaced — and would make our `SIZE`
-   numbers incomparable to the genre's.
-2. **`SPEED` counts robot actions only.** `TAKE`, `SHIP`, `STACK ON`, `PICK FROM`, `MERGE`,
-   `STRIP`, `PAD`, `TRIM`, `THROW` cost 1 step each. `REPEAT`, `IF`, `END`, `ELSE` and
-   `CLOCK OUT` cost 0. Rationale: `SPEED` is UNIT-02's working day, which is what the fiction
-   measures and what the player is actually optimising. It also keeps `SPEED` stable if we
-   ever change how control flow compiles.
-3. **The infinite-loop guard counts instructions, not steps.** Consequence of rule 2: an
-   empty `REPEAT / END` performs no robot actions, so a step-based guard would never fire and
-   the app would hang. The guard needs its own counter. **This is a real bug avoided, not a
-   style preference** — write it into the VM spec.
+Three rules, all of which have bitten before, none of which are about this level specifically.
 
-A `TAKE` that ends the shift by finding the intake empty **does** cost a step: the robot walked
-to the chute. This matters — it's what creates the par tension in §6.
+1. **SIZE counts command rows. Closers are free.** A container is one row, not two: the `END`
+   that closes a `REPEAT` is not a command the player placed — the editor has no `END` to
+   place (see [program-editor.md](program-editor.md)). Counting it would make loops look more
+   expensive than they are and would punish the exact shape this level exists to teach.
 
-### 5.2 Package conditions with empty claws
+2. **SPEED counts robot actions.** Structure is free; work costs one step each.
 
-Also unspecified in the GDD, and reachable here for the first time (a player who puts
-`IF TYPE IS BLUE` before `TAKE`).
+   | Costs 1 | Costs 0 |
+   |---|---|
+   | `TAKE` | `REPEAT` |
+   | `SHIP` | `REPEAT WHILE` |
+   | `COPY TO` | `IF` |
+   | `COPY FROM` | *(loop back-edge)* |
+   | `SUM` | *(container close)* |
+   | `SUB` | |
 
-**Proposed: it is a failure**, not a silently-false comparison.
+   The rule is physical, not syntactic: a step is a thing the player watches the robot do.
+   Deciding is free because deciding has no animation.
 
-> *"UNIT-02 checked what it was holding. It wasn't holding anything."*
+3. **The infinite-loop guard counts instructions, not steps.** This is the one that is a bug
+   rather than a design choice, and it is stated here because this is the first level where a
+   `REPEAT` can spin without doing anything.
 
-Silent-false would let a broken program limp along and fail much later with an unrelated
-symptom, which violates P4. A hard stop at the offending instruction is honest and teaches the
-ordering in one attempt — and the fix is to move the `TAKE`, which is the thing the player needs
-to learn.
+   A program of `REPEAT { IF POSITIVE { } }` with a package held executes forever while its
+   *step* count stays frozen at whatever it was. A guard that watches SPEED never trips, the
+   frame never advances, and the app hangs — on a phone, with no console, in front of a
+   playtester. **Count executed instructions**, cap them at something generous (100k), and
+   fail with *"UNIT-02 got stuck in a loop."*
 
-(This was previously justified by pointing at `HANDS ARE EMPTY` as the safe alternative. That
-condition is now itself under review (§6.6) and cannot be leaned on. The failure message has to
-stand on its own, which it does: it names what UNIT-02 did and why it couldn't.)
+   Test it explicitly. Adversarial case 9 in §7.1 exists for exactly this.
+
+### 5.2 A condition with empty claws is a failure
+
+`IF POSITIVE` asks about the package UNIT-02 is holding. With nothing in the claws there is no
+question to answer, so the program fails rather than picking a branch.
+
+The alternative — treating empty claws as false — is worse in a way that is invisible: the
+program keeps running and produces a wrong shipment several seconds later, and the player has
+to work backwards from a missing box to a condition that quietly answered a question nobody
+asked. Failing at the instruction puts the error where the mistake is.
+
+Message: *"UNIT-02 checked what it was holding. It wasn't holding anything."*
+
+This is reachable here by putting the `IF` above the `TAKE` inside the loop — adversarial
+case 5, and a likely first attempt for a player who thinks in terms of "check, then fetch."
 
 ### 5.3 `requireHandsEmpty` must be **false**
 
-On `s6` (a single `RED`), the correct program takes it, doesn't ship it, loops, and the next
-`TAKE` ends the shift with the `RED` **still in UNIT-02's claws**. Perfectly correct. If this
-level inherited level 1's `requireHandsEmpty: true`, the reference solution would fail.
+Shipment `s6` is a single rejected package. The correct program takes it, declines to ship it,
+loops, calls `TAKE` on an empty intake, and the shift ends **with `-7` still in the claws.**
 
-Level 1 set it `true` harmlessly, since there everything must ship. **The field's default
-should be `false`**, and level 1's `true` should be understood as redundant belt-and-braces
-rather than the norm. Worth simplifying when the schema is locked.
+If the goal required empty hands, the reference solution would fail its own level on one
+shipment in six — a bug that appears once every six plays, in a random level roll, on a
+program the player has every reason to believe is right. That is close to the worst failure
+mode a puzzle game can ship.
+
+```json
+"requireHandsEmpty": false
+```
+
+Level 1 sets it `true`, because there it is a real check (§7 case 3). It is a per-level flag
+for exactly this reason, and level 4 is the level that proves the flag has to exist.
 
 ---
 
 ## 6. Reference solution
 
-Four command rows. No `ELSE`, and no loop guard — because none exists (§6.6). The `REPEAT` is
-never closed by the player; the shift ends when `TAKE` finds the chute empty.
-
 ```
-1  REPEAT
-2    TAKE
-3    IF TYPE IS BLUE
-4      SHIP
-5    END
-6  END
+REPEAT
+    TAKE
+    IF POSITIVE
+        SHIP
 ```
 
-`SIZE 4` (rows 5 and 6 are free closers, §5.1).
+Four rows.
 
-### Step trace — shipment `s5` (`BLUE` `RED` `RED` `BLUE`)
+### 6.1 Step trace, shipment `s1` (`-4 7 0 3 9 -1`)
 
-Traced on `s5` rather than `s1` because it's shorter and fires the bin twice.
-
-| Step | Instruction | UNIT-02 does | Claws | Intake left | Outbound |
+| Step | Instruction | Claws | Intake left | Outbound | Note |
 |---|---|---|---|---|---|
-| — | *(start)* | idle | empty | B R R B | — |
-| 1 | `TAKE` | catch | `BLUE` | R R B | — |
-| — | `IF TYPE IS BLUE` | *(true)* | `BLUE` | R R B | — |
-| 2 | `SHIP` | toss to belt | empty | R R B | B |
-| 3 | `TAKE` | catch | `RED` | R B | B |
-| — | `IF TYPE IS BLUE` | *(false, skip)* | `RED` | R B | B |
-| 4 | `TAKE` | **bin the RED**, catch | `RED` | B | B |
-| — | `IF TYPE IS BLUE` | *(false, skip)* | `RED` | B | B |
-| 5 | `TAKE` | **bin the RED**, catch | `BLUE` | — | B |
-| — | `IF TYPE IS BLUE` | *(true)* | `BLUE` | — | B |
-| 6 | `SHIP` | toss to belt | empty | — | B B |
-| 7 | `TAKE` | walk to chute — **empty** | empty | — | B B |
-| — | *(shift ends)* | wave | empty | — | **B B ✓** |
+| 1 | `TAKE` | `-4` | 7 0 3 9 -1 | — | |
+| — | `IF POSITIVE` | `-4` | | | false, skip |
+| 2 | `TAKE` | `7` | 0 3 9 -1 | — | **`-4` discarded** |
+| — | `IF POSITIVE` | `7` | | | true |
+| 3 | `SHIP` | empty | 0 3 9 -1 | 7 | |
+| 4 | `TAKE` | `0` | 3 9 -1 | 7 | |
+| — | `IF POSITIVE` | `0` | | | **false — zero is not positive** |
+| 5 | `TAKE` | `3` | 9 -1 | 7 | `0` discarded |
+| — | `IF POSITIVE` | `3` | | | true |
+| 6 | `SHIP` | empty | 9 -1 | 7 3 | |
+| 7 | `TAKE` | `9` | -1 | 7 3 | |
+| — | `IF POSITIVE` | `9` | | | true |
+| 8 | `SHIP` | empty | -1 | 7 3 9 | |
+| 9 | `TAKE` | `-1` | — | 7 3 9 | |
+| — | `IF POSITIVE` | `-1` | | | false |
+| 10 | `TAKE` | `-1` | — | 7 3 9 | intake empty → **shift ends, still holding `-1`** |
+| | | | | **7 3 9 ✓** | |
 
-Steps 4 and 5 are the level. The player wrote nothing to make them happen.
+Steps 2 and 5 are the whole lesson: the discard is not an instruction the player wrote, it is
+a *consequence* of the instruction they wrote. Both must clang.
 
-### The variant that is also correct
+### 6.2 There is exactly one correct shape
 
-`ELSE` may be placed and left empty. It changes nothing:
+An earlier draft of this level discussed an `ELSE`-based variant. `ELSE` was cut from the
+language (§6.3), and with it went the only alternative solution: with no `ELSE` and no
+`DISCARD`, the only way to get rid of a package is to take the next one, and the only way to
+take the next one is to reach the top of the loop. Every correct program is the reference
+solution modulo dead rows.
 
-```
-1  REPEAT
-2    TAKE
-3    IF TYPE IS BLUE
-4      SHIP
-5    ELSE
-6    END
-7  END
-```
+This is unusual and it is fine here. Level 4 is a Synthesizer, not a Toy (§8.1) — its job is
+to make one shape automatic, and a level with one answer makes that answer stick. The levels
+with a design space are 6, 7 and 8.
 
-Same `SIZE 4` (`ELSE` is a free closer, §5.1), same `SPEED`, same result. Worth having in the
-adversarial suite as a **PASS**: a player who reaches for `ELSE` and finds it does nothing has
-learned that "do nothing" is a real branch, which is one of this level's stated lessons.
+It does mean the pars are **not a challenge**, they are a confirmation. Both are awarded on
+any correct clear, exactly as in level 1.
 
-### Pars
+### 6.3 Pars
 
-Measured on `parShipment: s1` (`RED BLUE GREEN BLUE BLUE RED`, 3 blues).
-
-| | Value |
+| | `s1` (par shipment) |
 |---|---|
 | `SIZE` | **4** |
-| `SPEED` | **10** steps — 7 `TAKE` (the last finds the chute empty) + 3 `SHIP` |
+| `SPEED` | **10** steps |
 
-**Both pars are met by the reference solution.** There is exactly one shape of correct program
-here, and it is simultaneously the smallest and the fastest.
+SPEED on the reference solution generalises to:
 
-This is a change from an earlier draft, and the change is an improvement worth recording. With
-`IF INTAKE IS EMPTY` in the tray, this level had two solutions — the four-row one, and a
-six-row one that spent two rows to skip the final wasted walk to the chute — giving mutually
-exclusive pars of `SIZE 4` / `SPEED 9`. That looked like the §8.2 *"two ways to be a good
-employee"* tension arriving early. It wasn't. It was an artifact of a redundant command: the
-player wasn't choosing between two strategies, only between writing a guard and not writing
-one. Cutting the condition (§6.6) removed the fake tension. **The real `SIZE`/`SPEED` conflicts
-should come from genuinely different algorithms, and those live in Act 3 and later.**
+```
+speed = len + 1 + positives
+```
 
-`SPEED` for the reference solution across the whole set, for the record: `s1` 10 · `s2` 1 ·
-`s3` 4 · `s4` 11 · `s5` 7 · `s6` 2. It is `len + 1 + (number of blues)` in every case.
+One `TAKE` per package, one final `TAKE` that ends the shift, one `SHIP` per positive.
+
+| Shipment | Len | Positives | Steps |
+|---|---|---|---|
+| `s1` | 6 | 3 | **10** |
+| `s2` | 0 | 0 | 1 |
+| `s3` | 3 | 0 | 4 |
+| `s4` | 3 | 3 | 7 |
+| `s5` | 4 | 2 | 7 |
+| `s6` | 1 | 0 | 2 |
+
+Pars are stated against the par shipment only (§8.2). SPEED varies with the roll, so the
+shift-complete card compares against `s1`'s numbers and a player who rolled `s3` sees a
+smaller step count than par. That is not a bug and must not read as one: the card shows the
+par shipment's figure with the rolled shipment's beside it.
 
 ---
 
-## 7. Adversarial suite
+## 7. Failure cases and the CI suite
 
-Per §13.2 CI runs **every program × every shipment**. This table is the spec for that cross
-product; `✓` = clears, `✗` = fails.
+### 7.1 The adversarial programs
 
-| # | Program | s1 | s2 | s3 | s4 | s5 | s6 | Verdict |
-|---|---|---|---|---|---|---|---|---|
-| 1 | reference (§6) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | **PASS** |
-| 2 | empty-`ELSE` variant (§6) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | **PASS** |
-| 3 | `REPEAT / TAKE / SHIP / END` — ship everything | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | FAIL → **QA card** |
-| 4 | auto-generated transcription of `s1` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | FAIL — the anti-hardcode check |
-| 5 | `TAKE / IF TYPE IS BLUE / SHIP / END` — no loop | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | FAIL → **QA card** |
-| 6 | `REPEAT / TAKE / IF TYPE IS RED / ELSE / SHIP / END / END` — inverted | ✗ | ✓ | ✗ | ✓ | ✓ | ✓ | FAIL → **QA card** |
-| 7 | `REPEAT / SHIP / TAKE / END` — ship first | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | FAIL, instruction 2 |
-| 8 | `REPEAT / IF TYPE IS BLUE / TAKE / SHIP / END / END` — check before take | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | FAIL, instruction 2 (§5.2) |
-| 9 | reference + a second `SHIP` inside the `IF` | ✗ | ✓ | ✓ | ✗ | ✗ | ✓ | FAIL → **QA card** |
-| 10 | `REPEAT / END` — empty loop | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | FAIL, instruction guard (§5.1 rule 3) |
+Ten programs, each run against **all six shipments** — sixty executions in `dart test` (§13.2).
+A program passes the level only if it passes all six.
 
-### Player-facing messages
+| # | Program | Passes | Fails | Why it matters |
+|---|---|---|---|---|
+| 1 | `REPEAT { TAKE; IF POSITIVE { SHIP } }` | **all 6** | — | reference solution |
+| 2 | `REPEAT { TAKE; SHIP }` | `s4` | `s1 s2 s3 s5 s6` | ships everything. On `s2`, `SHIP` with empty claws → clean failure. |
+| 3 | `REPEAT { TAKE }` | `s2 s3 s6` | `s1 s4 s5` | ships nothing. Passes half the set. |
+| 4 | `TAKE; IF POSITIVE { SHIP }` | `s2 s6` | `s1 s3 s4 s5` | no loop — one package only. `s3` fails on intake-not-empty. |
+| 5 | `REPEAT { IF POSITIVE { SHIP }; TAKE }` | — | all 6 | condition before take → §5.2 failure on step 1, every shipment. |
+| 6 | `REPEAT { TAKE; IF NOT NEGATIVE { SHIP } }` | `s2 s4 s6` | `s1 s3 s5` | **ships the zeros.** The level's signature wrong answer. |
+| 7 | `REPEAT { TAKE; IF NOT ZERO { SHIP } }` | `s2 s4` | `s1 s3 s5 s6` | ships the negatives. |
+| 8 | `REPEAT { TAKE; IF POSITIVE { SHIP }; SHIP }` | — | all 6 | double ship → empty-claws failure. |
+| 9 | `REPEAT { IF POSITIVE { } }` | — | all 6 | **fails on §5.2 before it can spin.** Pair with case 10. |
+| 10 | `TAKE; REPEAT { IF POSITIVE { } }` | — | all 6 | claws full, condition legal, body empty, no `TAKE` — **the infinite loop.** Must trip the instruction guard (§5.1 rule 3), not hang. This test is the reason rule 3 is written down. |
 
-| Case | Message |
+Case 10 is the single most important test in this file. It is the only program in Act 1 that
+can hang the app, and a SPEED-based guard passes every other case here while failing this one
+silently — by locking up the device.
+
+### 7.2 Why the shipment set needs all six members
+
+The set is not decoration. Cross-referencing §7.1:
+
+| Wrong program | Passes | Only caught by |
+|---|---|---|
+| ships everything (#2) | `s4` | any shipment with a non-positive |
+| ships nothing (#3) | `s2 s3 s6` | any shipment with a positive |
+| no loop (#4) | `s2 s6` | any shipment of length ≥ 2 |
+| **ships the zeros (#6)** | `s2 s4 s6` | **only `s1`, `s3`, `s5` — the shipments containing `0`** |
+
+Drop the zeros and program #6 clears the level. Drop `s4` and "ship everything" survives longer
+than it should in playtest. Drop `s6` and `requireHandsEmpty` never gets exercised, and the bug
+in §5.3 ships.
+
+**QA card for this level:** run all four wrong programs above, on all six shipments, before
+sign-off. If any of them passes the level, either the goal expression or the shipment set has
+regressed.
+
+### 7.3 Player-facing messages
+
+| Situation | Message |
 |---|---|
-| 3, 6 on `s1` | *"Shipped a RED. Brent asked for BLUE only."* + expected/actual boxes |
-| 3 on `s3` | *"Shipped 3 packages. Brent asked for none today."* |
-| 5 on `s1` | *"The shift ended with 5 packages still on intake."* |
-| 7 | *"UNIT-02 tried to ship, but its claws were empty."* |
-| 8 | *"UNIT-02 checked what it was holding. It wasn't holding anything."* |
-| 9 on `s1` | *"UNIT-02 shipped 6 packages. Brent asked for 3."* |
-| 10 | *"This program has run 2,000 steps. UNIT-02 will keep doing this forever unless you stop it."* |
+| shipped a non-positive | *"UNIT-02 shipped a package Brent didn't want: `0`."* — name the value. |
+| missed a positive | *"UNIT-02 was supposed to ship `9`. It didn't."* |
+| shift ended with intake non-empty | *"The shift ended with 4 packages still on intake."* |
+| `SHIP` with empty claws | *"UNIT-02 tried to ship, but its claws were empty."* |
+| `IF` with empty claws | *"UNIT-02 checked what it was holding. It wasn't holding anything."* |
+| instruction guard tripped | *"UNIT-02 got stuck in a loop."* |
 
-### This level is where the QUALITY ASSURANCE card earns its keep
-
-**Four of the ten programs pass at least one shipment while being wrong** — cases 3, 5, 6 and
-9. Case 3 (ship everything) passes `s4` outright, and `s4` is one shipment in six, so roughly
-one player in six who writes the laziest possible program will see it clear on screen.
-
-Without §8.5 that player learns the wrong lesson and hits a wall two levels later with no idea
-why. With it, they get the QA card, watch their own program ship a red on `s1`, and learn the
-actual rule. **Level 4 is the earliest place in the game where randomised shipments change what
-the player believes**, which makes it the level to watch hardest in playtest.
-
-Case 6 (inverted conditional) is the subtle one — it clears four of six shipments. Whichever
-shipment the QA card promotes should be `s1` or `s3`, i.e. the first failure in set order, so
-the counterexample the player watches is the clearest one available. Worth confirming that "first
-in set order" is the promotion rule rather than "random failing shipment."
+Every message names a **value** where it can. The player's whole model of this level is "which
+numbers went where," and a message that says "the shipment was wrong" throws that away.
 
 ---
 
@@ -357,138 +383,150 @@ in set order" is the promotion rule rather than "random failing shipment."
 
 ```json
 {
-  "id": "a1_l04_blues_only",
+  "id": "a1_l04_positives_only",
   "act": 1,
   "index": 4,
-  "title": "Blues Only",
-  "taskCard": "Ship only the BLUE packages.",
+  "title": "Positives Only",
+  "taskCard": "Ship the positive packages. Nothing else.",
   "call": "a1_l04_call",
-  "callSkippableOnFirstView": true,
 
   "shipments": [
-    { "id": "s1", "intake": ["RED", "BLUE", "GREEN", "BLUE", "BLUE", "RED"] },
+    { "id": "s1", "intake": [-4, 7, 0, 3, 9, -1] },
     { "id": "s2", "intake": [] },
-    { "id": "s3", "intake": ["RED", "GREEN", "RED"] },
-    { "id": "s4", "intake": ["BLUE", "BLUE", "BLUE", "BLUE", "BLUE"] },
-    { "id": "s5", "intake": ["BLUE", "RED", "RED", "BLUE"] },
-    { "id": "s6", "intake": ["RED"] }
+    { "id": "s3", "intake": [-5, 0, -2] },
+    { "id": "s4", "intake": [2, 8, 5] },
+    { "id": "s5", "intake": [6, -3, 0, 4] },
+    { "id": "s6", "intake": [-7] }
   ],
   "parShipment": "s1",
 
   "pallets": [],
-  "showWeights": false,
-  "showRecyclingBin": true,
 
-  "allowedCommands": ["TAKE", "SHIP", "REPEAT", "IF_TYPE_IS"],
-  "availableTypes": ["BLUE", "RED", "GREEN"],
+  "allowedCommands": ["TAKE", "SHIP", "REPEAT", "IF"],
+  "allowedConditions": [
+    "ZERO", "NOT ZERO",
+    "POSITIVE", "NOT POSITIVE",
+    "NEGATIVE", "NOT NEGATIVE"
+  ],
 
   "goal": {
-    "outbound": "shipment.intake.where(type == BLUE)",
+    "outbound": "shipment.intake.where(value > 0)",
     "requireIntakeEmpty": true,
-    "requireHandsEmpty": false
+    "requireHandsEmpty": false,
+    "requireHandsEmptyReason": "s6 correctly ends holding a rejected package. See §5.3."
   },
 
   "pars": { "size": 4, "speed": 10 },
 
   "referenceSolution": [
-    "REPEAT", "TAKE", "IF_TYPE_IS:BLUE", "SHIP", "END", "END"
+    { "cmd": "REPEAT", "body": [
+      { "cmd": "TAKE" },
+      { "cmd": "IF", "arg": "POSITIVE", "body": [ { "cmd": "SHIP" } ] }
+    ]}
   ]
 }
 ```
 
-`intake` is written as a bare type list rather than objects, since `showWeights` is false and
-Act 1 packages have no other properties — worth deciding whether the schema allows this
-shorthand or requires the verbose form used in level 1.
+Three notes:
 
-There is no `parsMutuallyExclusive` flag on this level any more — see §6. Keep the field in the
-schema for the levels that genuinely have the tension (Act 3+), so the shift-complete card can
-show the §8.2 line from data rather than from hardcoded level ids.
+- **`allowedCommands` omits `REPEAT WHILE`, `COPY TO`, `COPY FROM`, `SUM`, `SUB`.** They exist
+  in the language; they are not on this level's note. `REPEAT WHILE` in particular is a
+  tempting inclusion — it isn't, because the exit condition here is "intake ran out," which is
+  not a condition about a held value and cannot be written as one.
+- **`allowedConditions` is the full family**, deliberately. Restricting it to `POSITIVE` would
+  delete the level's best mistake (§3, and case 6 in §7.1). The cyclable word is the puzzle.
+- **`requireHandsEmptyReason`** is a comment that survives into the file on purpose. The next
+  person to see a level end with a package in the claws will assume it's a bug.
 
 ---
 
 ## 9. Portrait layout
 
-Opens in **Program-focused** (§7.1). The program is now six rows with one level of nesting —
-the first time the colored block spine and indentation carry real meaning, and the first real
-test of whether the editor reads at a glance.
+Opens in **Balanced** snap state (§7.1) rather than Program-focused: the discard is a floor
+event and the player has to be able to see it happen. This is the first level where the top
+pane is worth more than the extra program rows.
 
 ```
 ┌───────────────────────────┐
-│  ▣ Ship only the BLUE     │
+│  TASK                     │
+│  Ship the positive         │
+│  packages. Nothing else.[i]│
 ├───────────────────────────┤
-│      ▼ ▼ ▼   intake       │
-│    ┌──┐                   │
-│    │▨▢│      🤖      ⌸    │   floor, 34% — bin at right
-│    └──┘                   │
+│   ▼ ▼ ▼  intake    ▶ RUN  │
+│  ┌──┐┌──┐┌──┐             │
+│  │-4││ 7││ 0│    🤖       │   floor, 50% — the bin is
+│  └──┘└──┘└──┘      ┌───┐  │   visible, and used
+│                    │🗑 │  │
+│                    └───┘  │
 │              outbound ▶   │
-├───────────────────────────┤
-│ 1  REPEAT              ┐  │
-│ 2    TAKE              │  │
-│ 3    IF TYPE IS BLUE  ┐│  │   program, 66%
-│ 4      SHIP           ││  │
-│ 5    END              ┘│  │
-│ 6  END                 ┘  │
-│ ▸ ·······  caret ········ │
-├───────────────────────────┤
-│ ⊞ [TAKE][SHIP][REPEAT][IF]│   4 commands — no scroll
-├───────────────────────────┤
-│      ▶  RUN SHIFT         │
-└───────────────────────────┘
+├──────────── ⌃⌄ ───────────┤
+│ ╎     ┌─────────────┐  🖇 │
+│ ╎     │ REPEAT      │     │   containers are notes,
+│ ╎     │  ┌────────┐ │     │   glued at the top
+│ ╎     │  │ TAKE   │ │     │
+│ ╎     │  ├─────────┴──┐   │
+│ ╎     │  │ IF POSITIVE│   │
+│ ╎     │  │  ┌───────┐ │   │
+│ ╎     │  │  │ SHIP  │ │   │
+│ ╎     │  │  └───────┘ │   │
+│ ╎     │  └────────────┘   │
+│ ╎     └─────────────────┘  │
+│ ╎  ┌──────┬──────┬──────┐ │   the note: four commands,
+│ ╎  │ TAKE │ SHIP │REPEAT│ │   one row
+└───┴──────┴──────┴───IF───┴┘
 ```
 
-Layout notes specific to this level:
+`POSITIVE` is a cyclable word inside the `IF` row: tapping it walks the six conditions in
+order. See [program-editor.md](program-editor.md) §3 for the chip's behaviour and target size.
 
-- **The bin needs to be visible without stealing focus.** It sits opposite the outbound belt so
-  that ship-right / discard-left reads as a spatial decision, and a discard is legible in
-  peripheral vision even when the player is watching the program pane.
-- **The tray still fits on one screen** — four buttons, no horizontal scroll, nothing hidden.
-  A direct dividend of cutting `IF INTAKE IS EMPTY` (§6.6), and it holds for all of Act 1 at
-  five commands maximum. **Treat "the Act 1 tray never scrolls" as a constraint on future
-  command additions**, not as a happy accident: any command that pushes Act 1 into a scrolling
-  tray has to justify hiding part of the vocabulary from a player who has been programming for
-  fifteen minutes.
-- **First real nesting.** Row 4's indentation is the only thing distinguishing "ship inside the
-  if" from "ship after the if." If the golden tests (§13.3) don't already assert indentation
-  legibility at 2.0× text scale in German, add the case with this level's program.
+### UX beats
+1. **The bin gets an entrance.** It is on the floor from level 1 but nothing has ever gone into
+   it. The first discard of this level should be the first time the camera has any reason to
+   care about it — a small shake, and the sound is not reused from anything else.
+2. **The rejected package is visible in the claws at shift end** on `s3`, `s5` and `s6`. UNIT-02
+   does its end-of-shift wave while still holding it. Do not add a tidy-up animation; the
+   image is the lesson (§5).
+3. **No hint system fires on the condition.** A player stuck on `NOT NEGATIVE` vs `POSITIVE`
+   gets the failure message naming the zero, and that is enough. If playtest says otherwise,
+   fix the message, not the level.
 
 ---
 
 ## 10. Playtest criteria
 
-1. **8 of 10** players clear it without a hint.
-2. **No player asks how to throw a package away.** If they ask, the call's line 3 or the bin's
-   animation failed — the answer is supposed to be "you don't."
-3. Every player who triggers a discard **notices it**, unprompted, on the first occurrence.
-   This is the single most important observation in this playtest: it validates the §6.3
-   mitigation for the whole rest of the game.
-4. Players who meet the QUALITY ASSURANCE card resume editing **without asking what happened.**
-   Watch for the failure mode where they think the game cheated.
-5. No player believes an empty outbound on `s3` is a bug.
-6. Median time to clear under **4 minutes**, including the call.
-
-If criterion 3 fails, stop and fix the discard's audio and animation before authoring any
-level past this one — every later act depends on discards being noticeable.
+1. **4 of 5** players reach a correct program within 4 minutes of the call ending.
+2. **At least 2 of 5 discover the discard by accident** — write the reference solution without
+   having thought about where the rejects go, then notice the bin firing during the run. If
+   nobody does, the discard is too quiet.
+3. **Every player who triggers a discard can explain afterwards what happened to the package.**
+   This is the criterion that fails if the audio or the animation is wrong, and it is the one
+   worth re-running after any change to the run view.
+4. **At least 1 of 5 writes `NOT NEGATIVE` first.** If nobody does, the zeros are doing nothing
+   and the shipment set can be simplified. If *everybody* does, the condition names are
+   ambiguous and §6.3 needs another look.
+5. **Nobody hangs the app.** If any playtester reproduces case 10 in §7.1 and the device locks,
+   the level does not ship.
+6. **No player asks for a "throw away" command after clearing the level.** Before clearing is
+   fine and expected; after clearing means the discard never landed as an idea.
 
 ---
 
 ## 11. Open items
 
-1. **Level ordering vs §8.3's beat list** (§1). Needs a ruling; everything else here is
-   independent of it.
-2. **The three counting rules** (§5.1) and the **empty-claws condition ruling** (§5.2) should be
-   back-ported to §8.2 and §6.3 respectively once confirmed. Rule 3 (guard counts instructions)
-   is a genuine hang bug if missed.
-3. **`requireHandsEmpty` default** (§5.3) — flip to `false` and drop level 1's redundant `true`.
-4. **QA card promotion rule** (§7) — first failing shipment in set order, or random? First-in-
-   order is the recommendation, so the promoted counterexample is predictable and designers can
-   author `s1` to be the clearest failure.
-5. **Third package type.** `GREEN` appears in `s1` only, purely so the batch isn't a binary
-   blue/red split. Confirm it's worth spending a third type's art on in Act 1, or collapse to
-   two types and rely on `s3`/`s4` for the composition variety.
+1. **Whether `s2` (empty intake) is fun or just correct.** It is a real edge case and the loop
+   must survive it, but a player who rolls it sees a shift that lasts one step and ends. Worth
+   deciding whether empty shipments should be excluded from the *first* roll of a level and
+   only appear on replays.
+2. **Whether the par card should show both figures** (par-shipment SPEED and rolled-shipment
+   SPEED) or normalise. See §6.3 — the current answer is "show both," untested.
+3. **Whether the discard needs a one-time diegetic line** the first time it fires in the game.
+   Currently no. Brent saying *"...huh. Okay, that works"* over the bin clang is tempting and
+   is probably one line too many.
 
 **Resolved since first draft:**
-- *`IF INTAKE IS EMPTY` cut from the game* (§6.6). This level was the main beneficiary: tray
-  down from six commands to four and no longer scrolling, one canonical solution instead of two,
-  and both pars met by the same program. The mutually-exclusive pars this briefing previously
-  celebrated were an artifact of the redundant command, not a real tradeoff.
-- *`HANDS ARE EMPTY` is now also under review* (§6.6) and §5.2 no longer relies on it.
+- *`ELSE` variant of the solution* → `ELSE` was cut from the language. There is exactly one
+  correct shape now (§6.2), which suits a Synthesizer.
+- *Type-based predicate* → replaced by `IF POSITIVE`. The level's structure was independent of
+  it, which is why this rewrite touched the numbers and almost nothing else.
+- *Where the zeros go* → three of six shipments carry one, and §7.2 shows they are the only
+  thing standing between the player and a wrong program that passes.

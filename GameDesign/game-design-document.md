@@ -288,7 +288,7 @@ express — and it would cost a second body on every IF, a toggle on every IF ro
 branch dimension running through the whole document model.
 
 **The discard rule.** UNIT-02 holds exactly one thing. Any command that puts something new
-in its claws while they are already full — `TAKE` and `PICK FROM` — **discards what it was
+in its claws while they are already full — `TAKE` and `COPY FROM` — **discards what it was
 holding.** No error, no failure, one step. UNIT-02 tosses the old package over its shoulder
 into a recycling bin without breaking stride, and the animation should be *slightly* too
 casual about it.
@@ -313,11 +313,14 @@ yet know where.
 Conditions are introduced one per level, and each one's first appearance gets a short
 diegetic explanation from Brent rather than a tutorial popup.
 
-> **Stale below this point.** §8.3's act plan and the two level briefings
-> (`level-01-briefing.md`, `level-04-briefing.md`) were written against types and weights and
-> still talk about BLUE packages and the merge economy. The shapes of those levels survive —
-> first shift, filter-and-discard, the par goals, the shipment-set format — but the contents
-> need re-cutting against numbers.
+> **Stale: §8.3's act plan.** It is still written against types and weights — five-command
+> trays, `IF TYPE IS` / `ELSE`, `CLOCK OUT`, the merge economy, "ship only the blues" — and
+> needs re-cutting against numbers. The act *shapes* survive; the contents do not.
+>
+> The two level briefings (`level-01-briefing.md`, `level-04-briefing.md`) **have been
+> re-cut** and are current with this section. Both kept their structure, their pars and their
+> adversarial suites through the change, which is the evidence that the act plan's shapes will
+> survive it too.
 
 ### 6.4 Structured blocks, not jump arrows — a deliberate divergence
 
@@ -638,7 +641,7 @@ structure in §8.3:
 |---|---|
 | `TAKE` / `SHIP` only | **nothing** — length must be fixed |
 | `REPEAT` | length — the loop exits on its own when `TAKE` finds the chute empty (§6.6) |
-| `IF TYPE IS` | type composition and order |
+| `IF` | package values, sign composition, and order |
 | weights (Act 2+) | weight values |
 | indirect addressing (Act 4+) | pallet contents and layout |
 
@@ -651,7 +654,8 @@ Direct consequence: **Level 1 has exactly one possible shipment.** With only `TA
 in the tray, and no loop, a variable-length intake is unsolvable. This is correct, not an
 exception grudgingly carved out — variation begins in level 2, which is precisely what
 `REPEAT` is for, and the set sizes grow from there. Early Act 1 levels have 1–2 shipments;
-by Act 3 a level typically has 4–6.
+a level whose lesson is a *filter* needs enough members to catch each wrong predicate
+separately, which is why Act 1 level 4 already carries six.
 
 #### Randomness rules
 - The shipment is chosen when the level **opens**, before the editor is interactive, and is
