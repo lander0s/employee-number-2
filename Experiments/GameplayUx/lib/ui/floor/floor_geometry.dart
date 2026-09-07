@@ -146,14 +146,23 @@ class FloorGeometry {
   Rect body(Offset centre) =>
       Rect.fromCenter(center: centre, width: robotSide, height: robotSide);
 
+  /// How far above the unit's centre a carried package sits.
+  ///
+  /// The sprite holds things in front of its chest, not across its middle, so a
+  /// box centred on the body sat low and covered the face.
+  static const carryLift = 0.13;
+
   /// The package in the unit's claws.
   ///
   /// The same size it is on a belt, deliberately: a package does not grow when
   /// it is picked up. It was being drawn as a fraction of the *unit* instead,
   /// which made it half again as big as a belt package and large enough to
   /// cover the whole sprite - the box was the only thing you could see.
-  Rect carried(Offset centre) =>
-      Rect.fromCenter(center: centre, width: boxSize, height: boxSize);
+  Rect carried(Offset centre) => Rect.fromCenter(
+    center: centre.translate(0, -robotSide * carryLift),
+    width: boxSize,
+    height: boxSize,
+  );
 
   /// The unit's whole footprint, art included. This is what must not meet a
   /// belt.

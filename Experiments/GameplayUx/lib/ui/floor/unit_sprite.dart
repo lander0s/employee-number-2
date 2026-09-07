@@ -31,6 +31,11 @@ enum UnitPose {
   /// from the far end - which is what putting a thing down *is*, and cheaper
   /// than an animation that would only ever be the reverse of one we have.
   putdown,
+
+  /// Working on what it is holding: SUM and SUB. Named for the merge it was
+  /// drawn for, which was the same gesture in an earlier design - two things
+  /// becoming one.
+  merge,
 }
 
 extension on UnitPose {
@@ -42,12 +47,19 @@ extension on UnitPose {
       'assets/animations/delivery-robot-walking-holding.json',
     UnitPose.pickup ||
     UnitPose.putdown => 'assets/animations/delivery-robot-pickup.json',
+    UnitPose.merge => 'assets/animations/delivery-robot-merge.json',
   };
 
   /// The loops run themselves; the grab and its reverse are driven, so that
   /// the moment the box leaves the belt is the moment the claws close on it
   /// rather than whenever the loop happened to be.
-  bool get loops => this != UnitPose.pickup && this != UnitPose.putdown;
+  bool get loops => switch (this) {
+    UnitPose.pickup || UnitPose.putdown || UnitPose.merge => false,
+    UnitPose.idle ||
+    UnitPose.holding ||
+    UnitPose.walking ||
+    UnitPose.walkingHolding => true,
+  };
 }
 
 /// The unit, drawn at whatever it is doing.

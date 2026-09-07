@@ -54,6 +54,7 @@ class FloorState {
     required this.outbound,
     required this.pallets,
     required this.station,
+    required this.op,
   });
 
   FloorState.of(Tick tick)
@@ -61,7 +62,8 @@ class FloorState {
       claws = tick.claws,
       outbound = tick.outbound,
       pallets = tick.pallets,
-      station = tick.station;
+      station = tick.station,
+      op = tick.op;
 
   /// The batch as it arrived, before a program has touched it. Also what the
   /// floor shows while the player is still writing: the shipment is the
@@ -71,7 +73,11 @@ class FloorState {
       claws = null,
       outbound = const [],
       pallets = const [],
-      station = Station.start;
+      station = Station.start,
+      // Nothing has run, so nothing is being done. A jump is the machine's own
+      // bookkeeping and the unit does not act on one, which makes it the right
+      // stand-in for "no instruction at all".
+      op = Op.jump;
 
   final List<int> intake;
   final int? claws;
@@ -80,6 +86,10 @@ class FloorState {
 
   /// Where the unit is standing. The floor walks it between the two states.
   final Station station;
+
+  /// What it is doing. The pose comes from this rather than from comparing the
+  /// two states, because `COPY FROM` and `SUB` look identical from outside.
+  final Op op;
 }
 
 /// Drives the floor's animation off a [RunController].
@@ -170,7 +180,6 @@ class _FloorStageState extends State<FloorStage>
 
     final moving = from.station != to.station;
     final took = from.intake.length - to.intake.length == 1;
-    final shipped = to.outbound.length - from.outbound.length == 1;
 
     // What it is carrying depends on which phase this is, not just on where the
     // instruction ended: during the walk it still has whatever it set off with.
@@ -181,17 +190,26 @@ class _FloorStageState extends State<FloorStage>
     // down. It carries the box over, and puts it down.
     final carrying = (t < _walkPhase ? from.claws : to.claws) != null;
 
-    // The grab and its reverse are transients: they play while the instruction
-    // is in flight and give way to the resting pose the moment it lands. A
-    // one-shot's last frame is the end of a movement, not a pose to stand in.
+    // Every acting pose is a transient: it plays while the instruction is in
+    // flight and gives way to the resting pose the moment it lands. A one-shot's
+    // last frame is the end of a movement, not a pose to stand in.
     final settled = t >= 1;
+    final resting = carrying ? UnitPose.holding : UnitPose.idle;
+
     final pose = moving && t < _walkPhase
         ? (carrying ? UnitPose.walkingHolding : UnitPose.walking)
-        : (took && !settled)
-        ? UnitPose.pickup
-        : (shipped && !settled)
-        ? UnitPose.putdown
-        : (carrying ? UnitPose.holding : UnitPose.idle);
+        : settled
+        ? resting
+        : switch (to.op) {
+            // Guarded on the delta: a TAKE that finds the chute empty walks
+            // over and finds nothing, so there is no grab to play.
+            Op.take when took => UnitPose.pickup,
+            Op.copyFrom => UnitPose.pickup,
+            Op.ship || Op.copyTo => UnitPose.putdown,
+            Op.sum || Op.sub => UnitPose.merge,
+            // A condition is the one instruction the unit does not act on.
+            Op.take || Op.branchUnless || Op.jump => resting,
+          };
 
     return Stack(
       children: [
@@ -205,6 +223,10 @@ class _FloorStageState extends State<FloorStage>
           at: at,
           pose: pose,
           driver: pose == UnitPose.putdown ? _actBack : _act,
+
+          // COPY TO leaves the package in the claws as well as on the pallet,
+          // so unlike SHIP the reverse-grab must not end empty-handed - which
+          // it does not, because `carrying` still reads true afterwards.
         ),
         Positioned.fill(
           child: CustomPaint(

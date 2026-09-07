@@ -212,6 +212,7 @@ class Tick {
     required this.pallets,
     required this.steps,
     required this.station,
+    required this.op,
   });
 
   /// The row that ran, for the caret.
@@ -230,6 +231,16 @@ class Tick {
 
   /// Where the unit was standing when this instruction finished.
   final Station station;
+
+  /// Which instruction it was.
+  ///
+  /// Recorded for the same reason as [station]: the floor cannot work it out.
+  /// Some of it is inferable from the state either side - a package leaving the
+  /// intake means a TAKE - but `COPY FROM` and `SUB` both just change what is
+  /// in the claws, and telling them apart by comparing the new value against
+  /// the pallet fails on the shipment where a subtraction happens to land on
+  /// it. The machine knows; this is it saying so.
+  final Op op;
 }
 
 class RunResult {
@@ -448,6 +459,7 @@ class Machine {
         pallets: List.unmodifiable(_pallets),
         steps: _steps,
         station: _station,
+        op: instr.op,
       ),
     );
   }

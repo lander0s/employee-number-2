@@ -255,6 +255,28 @@ void main() {
       expect(r.ticks[0].intake, isEmpty);
     });
 
+    test('and it says which instruction it was', () {
+      // The floor picks the unit's pose from this. It cannot be inferred:
+      // COPY FROM and SUB both just change what is in the claws, and telling
+      // them apart by whether the new value matches the pallet breaks on the
+      // shipment where a subtraction happens to land on it.
+      final r = exec([
+        cmd('take'),
+        cmd('copyTo', pallet: 1),
+        cmd('sub', pallet: 1),
+        cmd('copyFrom', pallet: 1),
+        cmd('ship'),
+      ], levelOf([5]));
+
+      expect(r.ticks.map((t) => t.op), [
+        Op.take,
+        Op.copyTo,
+        Op.sub,
+        Op.copyFrom,
+        Op.ship,
+      ]);
+    });
+
     test('COPY TO leaves it in both, which is what copying means', () {
       final r = exec([cmd('take'), cmd('copyTo', pallet: 2)], levelOf([5]));
       expect(r.ticks[1].claws, 5);
@@ -355,6 +377,117 @@ void main() {
       expect(
         r.ticks.map((t) => t.station.kind),
         isNot(contains(StationKind.home)),
+      );
+    });
+  });
+
+  group('flipping a sign', () {
+    // The level the app actually opens on. There is no NEGATE, so the only way
+    // to turn -4 into 4 is to put it on the floor and subtract it from itself
+    // twice - which is the whole reason SUM and SUB exist.
+    Level absLevel(List<int> intake) => Level(
+      brief: const LevelBrief(task: 'Ship every number, as a positive.'),
+      intake: intake,
+      goal: (i) => i.map((n) => n.abs()).toList(),
+      requireHandsEmpty: true,
+    );
+
+    List<Node> flipper() => [
+      block('repeat', [
+        cmd('take'),
+        block('ifCond', [
+          cmd('copyTo', pallet: 0),
+          cmd('sub', pallet: 0),
+          cmd('sub', pallet: 0),
+        ], cond: 'NEGATIVE'),
+        cmd('ship'),
+      ]),
+    ];
+
+    test('subtracting a number from itself twice negates it', () {
+      final r = exec([
+        cmd('take'),
+        cmd('copyTo', pallet: 0),
+        cmd('sub', pallet: 0),
+        cmd('sub', pallet: 0),
+        cmd('ship'),
+      ], absLevel([-4]));
+
+      // The middle of it is worth pinning: the first SUB has to reach zero, and
+      // the second reaches -x from there. Getting the operand order backwards
+      // gives 0 and then x again, which looks right on positives only.
+      expect(r.ticks[2].claws, 0);
+      expect(r.ticks[3].claws, 4);
+      expect(r.outbound, [4]);
+      expect(r.passed, isTrue);
+    });
+
+    test('the reference solution clears the level', () {
+      final r = exec(flipper(), absLevel([-4, 7, 0, -9]));
+      expect(r.outbound, [4, 7, 0, 9]);
+      expect(r.passed, isTrue);
+    });
+
+    test('SPEED is two per package, one to finish, three per flip', () {
+      // TAKE and SHIP for everything; COPY TO and two SUBs only for the
+      // negatives; one last TAKE that finds the chute empty.
+      for (final intake in [
+        <int>[],
+        [5],
+        [-5],
+        [-4, 7, 0, -9],
+      ]) {
+        final flips = intake.where((n) => n < 0).length;
+        expect(
+          exec(flipper(), absLevel(intake)).steps,
+          2 * intake.length + 1 + 3 * flips,
+          reason: '$intake',
+        );
+      }
+    });
+
+    test('flipping unconditionally fails on the positives', () {
+      // Which is what makes the IF load-bearing rather than decoration, and why
+      // the shipment has a 7 in it.
+      final always = [
+        block('repeat', [
+          cmd('take'),
+          cmd('copyTo', pallet: 0),
+          cmd('sub', pallet: 0),
+          cmd('sub', pallet: 0),
+          cmd('ship'),
+        ]),
+      ];
+      expect(exec(always, absLevel([-4, 7, 0, -9])).passed, isFalse);
+      expect(exec(always, absLevel([-4, -9])).passed, isTrue);
+    });
+
+    test('zero does not distinguish NEGATIVE from NOT POSITIVE here', () {
+      // Worth recording rather than assuming: the filter level leaned on zero
+      // to separate those two readings, and this one cannot - flipping zero
+      // gives zero, so both conditions ship the same thing. If this level ever
+      // needs to teach that distinction it needs a different mechanism.
+      final notPositive = [
+        block('repeat', [
+          cmd('take'),
+          block('ifCond', [
+            cmd('copyTo', pallet: 0),
+            cmd('sub', pallet: 0),
+            cmd('sub', pallet: 0),
+          ], cond: 'NOT POSITIVE'),
+          cmd('ship'),
+        ]),
+      ];
+      expect(exec(notPositive, absLevel([-4, 7, 0, -9])).passed, isTrue);
+    });
+
+    test('and the unit visits the pallet, which is why this level exists', () {
+      // The filter level never sent it off the belt line, so the cross-floor
+      // routing had no way to be seen. This one does.
+      final r = exec(flipper(), absLevel([-4]));
+      expect(
+        r.ticks.map((t) => t.station.kind),
+        contains(StationKind.pallet),
       );
     });
   });

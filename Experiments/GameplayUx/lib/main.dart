@@ -58,8 +58,12 @@ class GameplayUxApp extends StatelessWidget {
       ),
       // Straight into gameplay. There is no menu, no call and no progression
       // in this experiment: it opens on the one level and that is the whole
-      // app (see model/levels.dart).
-      home: GameplayScreen(level: levels.first),
+      // app (see model/levels.dart), with its solution already on the page so
+      // that RUN does something on the first tap.
+      home: GameplayScreen(
+        level: levels.first,
+        program: referenceSolution(),
+      ),
     );
   }
 }
