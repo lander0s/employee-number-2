@@ -106,6 +106,26 @@ abstract final class W {
     color: text,
   );
 
+  // ------------------------------------------------------------------ floor
+  //
+  // The simulation is a wireframe on kraft: lines and boxes, no art. These are
+  // its whole palette, and it having one at all is what keeps the floor from
+  // borrowing the program's colours - the commands are the language, and the
+  // world they act on should not compete with it.
+
+  /// Cell lines and belt rollers: present, never read.
+  static const floorGrid = Color(0x33241B12);
+
+  /// Belts, pallets and the unit itself.
+  static const floorLine = Color(0xFF5C4A35);
+
+  /// INTAKE, OUTBOUND, the pallet numbers.
+  static const floorLabel = Color(0xFF6A553C);
+
+  /// A package. Lighter than the board it sits on, because a package is the one
+  /// thing on the floor that moves and the eye should find it first.
+  static const floorPackage = Color(0xFFE8D9BC);
+
   /// A failed shift, and text on it. Shared with the page's own delete
   /// backdrop, which is the same idea: this went wrong.
   static const danger = Color(0xFF991B1B);

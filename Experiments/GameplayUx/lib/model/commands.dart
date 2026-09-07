@@ -70,7 +70,14 @@ class CommandSpec {
 
 /// The numbered floor spots. HRM calls them tiles; the warehouse calls them
 /// pallets.
-const palletCount = 6;
+///
+/// Five, because five is what fits across the bottom of a square floor at a
+/// size a thumb can hit, and the floor is the thing the player looks at. Six
+/// was a number with nothing behind it. `COPY TO` therefore cycles 0-4, and
+/// the floor draws exactly what the language can address - a readout showing
+/// five spots while a command can name a sixth is a bug waiting for a level to
+/// need it.
+const palletCount = 5;
 
 // ---------------------------------------------------------- condition grammar
 

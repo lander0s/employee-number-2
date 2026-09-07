@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 
 import '../model/level.dart';
 import '../model/program.dart';
+import 'floor/floor_view.dart';
 import 'floor_pane.dart';
 import 'run_controller.dart';
 import 'notebook/lift.dart';
@@ -23,10 +24,17 @@ import 'notebook/note.dart';
 import 'notebook/program.dart';
 import 'wireframe.dart';
 
-const _programFocused = 0.38;
-const _floorFocused = 0.60;
-const _minFloor = 0.0;
-const _maxFloor = 1.0;
+/// How far the floor is pulled out, as a fraction of a square.
+///
+/// The floor is a square the width of the pane and can never be taller than
+/// that (see [FloorSquare]), so the splitter's whole range is 0 - shut - to 1,
+/// fully out. It used to be a fraction of the screen, which let the floor grow
+/// into a letterbox and made the two snap states depend on the phone.
+///
+/// Two snaps. Fully out is where the floor is read; [_snapProgram] is where it
+/// is glanced at, and leaves the page most of the panel.
+const _snapProgram = 0.55;
+const _snapFloor = 1.0;
 
 /// Floor heights below this collapse the pane entirely: the run button lives in
 /// the floor, and a floor too short to reach it would be a dead strip.
@@ -137,7 +145,9 @@ class _GameplayScreenState extends State<GameplayScreen> {
     super.dispose();
   }
 
-  double _floorFraction = _programFocused;
+  /// Opens on the square. The floor is the thing that just became worth
+  /// looking at, and the page still gets most of a tall phone at this setting.
+  double _floorOpen = _snapFloor;
   bool _draggingDivider = false;
 
   /// The machine, and the playback of what it did.
@@ -167,21 +177,23 @@ class _GameplayScreenState extends State<GameplayScreen> {
     _run.addListener(_refresh);
   }
 
-  void _snapTo(double target) => setState(() => _floorFraction = target);
+  void _snapTo(double target) => setState(() => _floorOpen = target);
 
   void _toggleSnap() {
     final toFloor =
-        (_floorFraction - _floorFocused).abs() >
-        (_floorFraction - _programFocused).abs();
-    _snapTo(toFloor ? _floorFocused : _programFocused);
+        (_floorOpen - _snapFloor).abs() > (_floorOpen - _snapProgram).abs();
+    _snapTo(toFloor ? _snapFloor : _snapProgram);
   }
 
   /// On release, settle onto a snap state if we are close to one, otherwise
   /// leave the divider where it was put.
+  ///
+  /// Shut is a snap too: a splitter pushed almost all the way up should close
+  /// rather than leave a two-millimetre sliver of floor nobody asked for.
   void _settle() {
-    const threshold = 0.05;
-    for (final snap in const [_programFocused, _floorFocused]) {
-      if ((_floorFraction - snap).abs() < threshold) {
+    const threshold = 0.06;
+    for (final snap in const [0.0, _snapProgram, _snapFloor]) {
+      if ((_floorOpen - snap).abs() < threshold) {
         _snapTo(snap);
         return;
       }
@@ -212,9 +224,20 @@ class _GameplayScreenState extends State<GameplayScreen> {
                   // floor, not an error.
                   final available = (constraints.maxHeight - W.dividerHitHeight)
                       .clamp(0.0, double.infinity);
-                  final floorHeight = (available * _floorFraction).clamp(
+
+                  // The hard limit: a square. The floor is as wide as the panel
+                  // and the simulation is seen from above, so a floor taller
+                  // than it is wide would be a world stretched in one axis -
+                  // and pulling the splitter past that point would give the
+                  // player empty board rather than more warehouse.
+                  //
+                  // On a phone short enough that a square will not fit, the
+                  // screen wins and the square is clipped from the top.
+                  final square = constraints.maxWidth;
+                  final maxFloor = square < available ? square : available;
+                  final floorHeight = (maxFloor * _floorOpen).clamp(
                     0.0,
-                    available,
+                    maxFloor,
                   );
 
                   // The floor is either tall enough to hold the run button or
@@ -240,10 +263,15 @@ class _GameplayScreenState extends State<GameplayScreen> {
                         onDragStart: () =>
                             setState(() => _draggingDivider = true),
                         onDragUpdate: (dy) {
-                          if (available <= 0) return;
+                          if (maxFloor <= 0) return;
                           setState(() {
-                            _floorFraction = (_floorFraction + dy / available)
-                                .clamp(_minFloor, _maxFloor);
+                            // Against the square, not the screen: a drag moves
+                            // the drawer, and the drawer is only ever one
+                            // square deep. Past the end it simply stops.
+                            _floorOpen = (_floorOpen + dy / maxFloor).clamp(
+                              0.0,
+                              1.0,
+                            );
                           });
                         },
                         onDragEnd: () {

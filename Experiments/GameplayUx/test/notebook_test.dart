@@ -675,7 +675,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1));
       await tester.pump();
       for (var i = 0; i < ticks; i++) {
-        await tester.pump(const Duration(milliseconds: 420));
+        // Comfortably past the longest hold rather than equal to it: the
+        // playback's pacing is a feel decision that will keep moving, and a
+        // test that copies the current number quietly stops advancing a full
+        // tick the day it changes.
+        await tester.pump(const Duration(seconds: 1));
       }
       // One more frame: the scroll is scheduled post-frame, so the tick that
       // just landed has not been followed yet.

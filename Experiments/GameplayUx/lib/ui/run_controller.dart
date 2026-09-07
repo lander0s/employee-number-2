@@ -17,11 +17,14 @@ import '../model/vm.dart';
 
 /// How long one instruction is held on screen.
 ///
-/// Slow enough to read the line that just ran, fast enough that a six-package
-/// shipment does not outstay its welcome. Free instructions - the branches -
-/// go by quicker, because nothing moved on the floor for them.
-const _stepFor = Duration(milliseconds: 420);
-const _freeStepFor = Duration(milliseconds: 220);
+/// Paced to be *watched* rather than read. There is no narration on the floor
+/// any more, so the only way to follow a run is to see the packages move - and
+/// a package moving needs long enough to be noticed, not just long enough to
+/// be rendered. Free instructions - the branches - go by quicker, because
+/// nothing moves on the floor for them, but not so quickly that a loop's
+/// rhythm disappears.
+const _stepFor = Duration(milliseconds: 620);
+const _freeStepFor = Duration(milliseconds: 340);
 
 /// How long the verdict sits before the run lets go.
 const _verdictFor = Duration(milliseconds: 1400);

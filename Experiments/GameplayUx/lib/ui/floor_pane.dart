@@ -1,11 +1,13 @@
-/// The floor: a console, for now.
+/// The floor pane: the simulation, and the control that starts it.
 ///
-/// The real thing is a warehouse with a robot walking around it, and the state
-/// below - intake, claws, outbound, pallets - is what that animation will be
-/// animating. Printing it as text first is not a placeholder in the usual
-/// sense: it is the machine's whole observable surface, written out, so the
-/// semantics can be watched and argued with before a single sprite exists. If
-/// a rule reads wrong here it will read wrong with a robot on top of it.
+/// The simulation itself is [FloorSquare] - a wireframe seen from above. This
+/// wraps it in the pane, adds the line of narration along the top, and puts the
+/// verdict over it when a shift ends.
+///
+/// The narration is what is left of the console this pane used to be. The floor
+/// now shows the *state*, which is most of what the text was for, but not the
+/// *reason*: "POSITIVE? 0 -> no" is the one thing a picture of a warehouse
+/// cannot say, and it is exactly the thing a player gets wrong.
 ///
 /// It carries the run control, top-right, because that is where the thing being
 /// run lives. A consequence worth knowing: the divider can hide the floor
@@ -16,8 +18,10 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../model/commands.dart';
 import '../model/level.dart';
 import '../model/vm.dart';
+import 'floor/floor_view.dart';
 import 'run_controller.dart';
 import 'wireframe.dart';
 
@@ -47,14 +51,9 @@ class FloorPane extends StatelessWidget {
         child: Stack(
           children: [
             Positioned.fill(
-              // Clamped like the rest of the furniture: 7.3 asks the *program*
-              // to stay readable at 200%, and a readout that grew that far
-              // would overflow the well long before it helped anyone.
-              child: Chrome(
-                child: AnimatedBuilder(
-                  animation: run,
-                  builder: (context, _) => _Console(level: level, run: run),
-                ),
+              child: AnimatedBuilder(
+                animation: run,
+                builder: (context, _) => _Floor(level: level, run: run),
               ),
             ),
             Positioned(
@@ -75,8 +74,8 @@ class FloorPane extends StatelessWidget {
   }
 }
 
-class _Console extends StatelessWidget {
-  const _Console({required this.level, required this.run});
+class _Floor extends StatelessWidget {
+  const _Floor({required this.level, required this.run});
 
   final Level level;
   final RunController run;
@@ -89,130 +88,24 @@ class _Console extends StatelessWidget {
     // Before the first instruction the floor shows the batch as it arrived,
     // which is also what it shows while the player is still writing: the
     // shipment is the question, and it should be readable the whole time.
-    final intake = now?.intake ?? level.intake;
-    final claws = now?.claws;
-    final outbound = now?.outbound ?? const <int>[];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Right inset so the readout never runs under the RUN button.
-          Padding(
-            padding: const EdgeInsets.only(right: 96),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _Field(label: 'INTAKE', values: intake),
-                _Field(
-                  label: 'CLAWS',
-                  values: claws == null ? const [] : [claws],
-                ),
-                _Field(label: 'OUTBOUND', values: outbound),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(height: 1, color: W.line),
-          const SizedBox(height: 6),
-          Expanded(child: _Log(run: run)),
-          if (result != null && run.finished) ...[
-            const SizedBox(height: 6),
-            _Verdict(result: result, size: run.size),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// One row of the readout: a label, then the numbers on it.
-class _Field extends StatelessWidget {
-  const _Field({required this.label, required this.values});
-
-  final String label;
-  final List<int> values;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 2),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Stack(
       children: [
-        SizedBox(
-          width: 92,
-          child: Text(label, style: W.console.copyWith(color: W.textFaint)),
-        ),
-        Expanded(
-          child: Text(
-            values.isEmpty ? '--' : values.map((v) => '$v').join('   '),
-            style: W.console,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+        Positioned.fill(
+          child: FloorSquare(
+            intake: now?.intake ?? level.intake,
+            claws: now?.claws,
+            outbound: now?.outbound ?? const [],
+            pallets: now?.pallets ?? List<int?>.filled(palletCount, null),
           ),
         ),
+        if (result != null && run.finished)
+          Positioned(
+            left: 8,
+            right: 8,
+            bottom: 8,
+            child: Chrome(child: _Verdict(result: result, size: run.size)),
+          ),
       ],
-    ),
-  );
-}
-
-/// What has happened, newest at the bottom.
-///
-/// `reverse: true` rather than a scroll controller chasing the end: the list
-/// grows by one line every few hundred milliseconds, and anchoring it to the
-/// bottom is a property of the viewport rather than something to animate
-/// towards on every tick.
-class _Log extends StatelessWidget {
-  const _Log({required this.run});
-
-  final RunController run;
-
-  @override
-  Widget build(BuildContext context) {
-    final lines = run.log;
-    if (lines.isEmpty) {
-      return Text(
-        run.running ? '...' : 'Write a program and press RUN.',
-        style: W.console.copyWith(color: W.textFaint),
-      );
-    }
-
-    final newestFirst = lines.reversed.toList();
-
-    return ListView.builder(
-      reverse: true,
-      padding: EdgeInsets.zero,
-      itemCount: newestFirst.length,
-      itemBuilder: (context, i) {
-        final tick = newestFirst[i];
-        // Only the line that just ran is at full strength. The rest are there
-        // to be glanced back at, not read.
-        final current = i == 0;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 34,
-                child: Text(
-                  '${tick.steps}',
-                  style: W.console.copyWith(color: W.textFaint),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  tick.line,
-                  style: W.console.copyWith(
-                    color: current ? W.text : W.textDim,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
