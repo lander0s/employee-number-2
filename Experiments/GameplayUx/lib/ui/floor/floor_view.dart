@@ -26,26 +26,11 @@ import '../../model/vm.dart';
 import '../run_controller.dart';
 import '../wireframe.dart';
 import 'floor_geometry.dart';
+import 'pace.dart';
 import 'payload.dart';
 import 'unit_sprite.dart';
 
-/// How long one instruction's movement takes.
-///
-/// Shorter than [RunController.stepHold], so every movement lands and then
-/// rests. Continuous motion would read as a conveyor that never stops, which is
-/// a different machine from this one: UNIT-02 does one thing at a time, and the
-/// stillness between things is how you see what it did.
-///
-/// It is *longer* than [RunController.freeHold], and that is fine: a branch
-/// moves nothing, so there is no movement of its own to cut short.
-///
-/// Sized so the act phase lands near the pickup animation's own length - 70
-/// frames at 60fps, so about 1.2 seconds. Drive a one-shot much faster than it
-/// was drawn and the gesture is a blur; the reason to slow the whole run down
-/// was to stop that happening.
-const _travel = Duration(milliseconds: 2400);
-
-/// The instruction is in two phases: the unit walks, then it acts.
+/// Every instruction happens in two phases: the unit walks, then it acts.
 ///
 /// One phase would have the package leave the belt while the unit was still
 /// crossing the floor towards it - a box teleporting into claws that had not
@@ -53,7 +38,11 @@ const _travel = Duration(milliseconds: 2400);
 /// happens where the unit is standing, which is the order these things happen
 /// in. It is also why nothing about a package's position is written down: it is
 /// wherever the claws are, and the claws are wherever the walk got to.
-const _walkPhase = 0.6;
+///
+/// How long each phase lasts belongs to [Pace], not to this file, and it
+/// differs per instruction: the unit walks at a fixed speed, so going further
+/// takes longer. The split between them moves with it, which is why the phase
+/// is a field here rather than a constant.
 
 /// Everything on the floor at one instant.
 class FloorState {
@@ -119,40 +108,53 @@ class FloorStage extends StatefulWidget {
 
 class _FloorStageState extends State<FloorStage>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _anim = AnimationController(
-    vsync: this,
-    duration: _travel,
-  );
+  late final AnimationController _anim = AnimationController(vsync: this);
 
   /// The instruction the current animation belongs to.
   int _showing = -1;
 
-  /// The act phase on its own, for driving the grab.
+  /// Where this instruction's walk ends and its act begins.
+  double _walkPhase = 0.6;
+
+  /// The act phase on its own, for driving the grab, and the same read from the
+  /// far end - putting a package down is the grab in reverse, so it is the same
+  /// composition backwards.
   ///
-  /// It stops a thousandth short of the end on purpose: a Lottie layer's out
+  /// Both stop a thousandth short of the end on purpose: a Lottie layer's out
   /// point is *exclusive*, so driving a 70-frame composition to exactly 1.0
   /// asks for frame 70 - one past the last frame the layer exists on.
-  late final Animation<double> _act = Tween<double>(
-    begin: 0,
-    end: 0.999,
-  ).animate(_actPhase);
-
-  /// The same, from the far end: putting a package down is the grab in
-  /// reverse, so it is the same composition read backwards.
-  late final Animation<double> _actBack = Tween<double>(
-    begin: 0.999,
-    end: 0,
-  ).animate(_actPhase);
-
-  late final Animation<double> _actPhase = CurvedAnimation(
-    parent: _anim,
-    curve: const Interval(_walkPhase, 1),
-  );
+  late Animation<double> _act;
+  late Animation<double> _actBack;
 
   @override
   void initState() {
     super.initState();
+    _retime();
     widget.run.addListener(_onRun);
+  }
+
+  /// Fits the clock to the instruction, instead of the instruction to the
+  /// clock.
+  ///
+  /// The unit walks at one speed and every gesture runs at the length it was
+  /// drawn at, so an instruction with further to go simply takes longer. The
+  /// controller asks [Pace] the same question to decide when to advance, so the
+  /// program moves on exactly as the movement finishes.
+  void _retime() {
+    final now = widget.run.now;
+    final pace = now == null
+        ? const Pace.thinking()
+        : Pace.of(before: widget.run.previous, now: now, level: widget.level);
+
+    _anim.duration = pace.total;
+    _walkPhase = pace.walkFraction;
+
+    final phase = CurvedAnimation(
+      parent: _anim,
+      curve: Interval(_walkPhase, 1),
+    );
+    _act = Tween<double>(begin: 0, end: 0.999).animate(phase);
+    _actBack = Tween<double>(begin: 0.999, end: 0).animate(phase);
   }
 
   @override
@@ -167,6 +169,7 @@ class _FloorStageState extends State<FloorStage>
     final cursor = widget.run.cursor;
     if (cursor != _showing) {
       _showing = cursor;
+      _retime();
       // From zero every time rather than continuing: each instruction is its
       // own movement, and one that started late should not finish early.
       _anim.forward(from: 0);
@@ -226,7 +229,13 @@ class _FloorStageState extends State<FloorStage>
       children: [
         Positioned.fill(
           child: CustomPaint(
-            painter: _Floor(from: from, to: to, t: t, layer: _Layer.ground),
+            painter: _Floor(
+              from: from,
+              to: to,
+              t: t,
+              walkPhase: _walkPhase,
+              layer: _Layer.ground,
+            ),
           ),
         ),
         UnitOnFloor(
@@ -241,7 +250,13 @@ class _FloorStageState extends State<FloorStage>
         ),
         Positioned.fill(
           child: CustomPaint(
-            painter: _Floor(from: from, to: to, t: t, layer: _Layer.cargo),
+            painter: _Floor(
+              from: from,
+              to: to,
+              t: t,
+              walkPhase: _walkPhase,
+              layer: _Layer.cargo,
+            ),
           ),
         ),
       ],
@@ -296,6 +311,7 @@ class _Floor extends CustomPainter {
     required this.from,
     required this.to,
     required this.t,
+    required this.walkPhase,
     required this.layer,
   });
 
@@ -305,6 +321,11 @@ class _Floor extends CustomPainter {
 
   /// 0 at the previous instruction, 1 at this one.
   final double t;
+
+  /// Where this instruction's walk ends. Not a constant: the unit walks at a
+  /// fixed speed, so an instruction with further to go spends more of itself
+  /// walking. See [Pace].
+  final double walkPhase;
 
   /// How far a binned package falls before it is gone.
   static const _binDrop = 0.13;
@@ -316,8 +337,8 @@ class _Floor extends CustomPainter {
 
     // The walk finishes before the hand-over starts. Everything a package does
     // is measured against [act]; everything the unit does, against [walk].
-    final walk = (t / _walkPhase).clamp(0.0, 1.0);
-    final act = ((t - _walkPhase) / (1 - _walkPhase)).clamp(0.0, 1.0);
+    final walk = (t / walkPhase).clamp(0.0, 1.0);
+    final act = ((t - walkPhase) / (1 - walkPhase)).clamp(0.0, 1.0);
 
     final feet = g.walkBetween(from.station, to.station, walk);
 
@@ -612,5 +633,9 @@ class _Floor extends CustomPainter {
 
   @override
   bool shouldRepaint(_Floor old) =>
-      old.t != t || old.from != from || old.to != to || old.layer != layer;
+      old.t != t ||
+      old.walkPhase != walkPhase ||
+      old.from != from ||
+      old.to != to ||
+      old.layer != layer;
 }

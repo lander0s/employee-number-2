@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart';
 import '../model/level.dart';
 import '../model/program.dart';
 import '../model/vm.dart';
+import 'floor/pace.dart';
 
 /// How long the verdict sits before the run lets go.
 const _verdictFor = Duration(milliseconds: 2500);
@@ -21,23 +22,7 @@ const _verdictFor = Duration(milliseconds: 2500);
 class RunController extends ChangeNotifier {
   RunController({required this.level});
 
-  /// How long one instruction is held on screen.
-  ///
-  /// Deliberately slow: the point of a run right now is to *watch* the unit,
-  /// and a gesture you cannot follow is a gesture you cannot judge. A polished
-  /// build wants a fast-forward and probably a faster default, at which point
-  /// these come down - they are pacing, not physics.
-  ///
-  /// Long enough for the floor's travel animation to land and then rest, which
-  /// is the constraint [FloorStage] is written against. Free instructions - the
-  /// branches - go by quicker because nothing moves on the floor for them, only
-  /// the caret, but not so quickly that a loop's rhythm disappears.
-  ///
-  /// Public because the widget tests step the clock by hand, and a test that
-  /// copies these numbers quietly stops advancing a full tick the day they
-  /// change - which is exactly what happened the last time they moved.
-  static const stepHold = Duration(milliseconds: 2800);
-  static const freeHold = Duration(milliseconds: 1000);
+
 
   final Level level;
 
@@ -129,9 +114,7 @@ class RunController extends ChangeNotifier {
       return;
     }
 
-    // How long the tick already on screen stays there, not how long the next
-    // one will. A branch moved nothing on the floor, so it does not earn the
-    // same beat as a package changing hands.
+    // How long the instruction already on screen takes, not the next one.
     final delay = _cursor < 0 ? Duration.zero : _hold(_cursor);
 
     _timer = Timer(delay, () {
@@ -141,13 +124,14 @@ class RunController extends ChangeNotifier {
     });
   }
 
-  /// A tick is free when it did not advance SPEED, which is the same question
-  /// as "did the robot do anything".
-  Duration _hold(int index) {
-    final ticks = _result!.ticks;
-    final before = index == 0 ? 0 : ticks[index - 1].steps;
-    return ticks[index].steps == before ? freeHold : stepHold;
-  }
+  /// How long the instruction on screen gets.
+  ///
+  /// Asked of [Pace], which is also what the floor times its animation by - so
+  /// the program advances exactly when the movement finishes. It used to be a
+  /// fixed hold with the movement squeezed to fit, which made the unit's speed
+  /// depend on how far it happened to be going.
+  Duration _hold(int index) =>
+      Pace.of(before: _at(index - 1), now: _at(index)!, level: level).total;
 
   @override
   void dispose() {

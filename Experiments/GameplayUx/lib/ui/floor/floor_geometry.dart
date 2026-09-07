@@ -288,6 +288,20 @@ class FloorGeometry {
     return path.last;
   }
 
+  /// How far the unit walks between two stations, along the route it takes.
+  ///
+  /// In side-units, so it is the same number on every screen - which is what
+  /// lets a walking speed be stated once and mean the same thing on a phone and
+  /// on a tablet.
+  double routeLength(Station from, Station to) {
+    final path = route(stand(from), stand(to));
+    var total = 0.0;
+    for (var i = 1; i < path.length; i++) {
+      total += (path[i] - path[i - 1]).distance;
+    }
+    return total;
+  }
+
   /// Where the unit is, [u] of the way from one station to another.
   Offset walkBetween(Station from, Station to, double u) =>
       walked(route(stand(from), stand(to)), u);

@@ -9,8 +9,10 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gameplay_ux/model/commands.dart';
+import 'package:gameplay_ux/model/level.dart';
 import 'package:gameplay_ux/model/vm.dart';
 import 'package:gameplay_ux/ui/floor/floor_geometry.dart';
+import 'package:gameplay_ux/ui/floor/pace.dart';
 import 'package:gameplay_ux/ui/floor/payload.dart';
 
 /// A realistic square: the panel is 448dp wide on the device this is built on.
@@ -109,7 +111,11 @@ void main() {
       // coordinate was that far out.
       final feet = g.stand(const Station(StationKind.chute));
       final box = g.body(feet);
-      expect(box.bottom, greaterThan(feet.dy), reason: 'canvas below the wheels');
+      expect(
+        box.bottom,
+        greaterThan(feet.dy),
+        reason: 'canvas below the wheels',
+      );
       expect(
         (feet.dy - box.top) / box.height,
         closeTo(FloorGeometry.groundLine, 0.001),
@@ -121,7 +127,10 @@ void main() {
       // the art inside its box and puts the payload slots somewhere the floor
       // cannot predict.
       final box = g.body(g.stand(Station.start));
-      expect(box.width / box.height, closeTo(FloorGeometry.spriteAspect, 0.001));
+      expect(
+        box.width / box.height,
+        closeTo(FloorGeometry.spriteAspect, 0.001),
+      );
     });
 
     test('the grip is at chest height, above the belt it works', () {
@@ -270,12 +279,7 @@ void main() {
       // and an outward one has not yet let go, so both have the package in
       // hand. It is the one moment the two directions agree.
       for (final act in [0.1, 0.3, 0.7, 0.9]) {
-        final out = g.transfer(
-          claw: claw,
-          slot: slot,
-          outward: true,
-          act: act,
-        );
+        final out = g.transfer(claw: claw, slot: slot, outward: true, act: act);
         final into = g.transfer(
           claw: claw,
           slot: slot,
@@ -326,7 +330,10 @@ void main() {
     test('and a pallet gives it the surround a belt does', () {
       // Which is why the pallet is derived from the package rather than the
       // other way round.
-      expect(g.palletSide, closeTo(g.side * FloorGeometry.beltThickness, 0.001));
+      expect(
+        g.palletSide,
+        closeTo(g.side * FloorGeometry.beltThickness, 0.001),
+      );
       expect(g.palletSide, greaterThan(g.boxSize));
     });
 
@@ -375,6 +382,143 @@ void main() {
       // no way round either end.
       expect(g.intakeBelt.left, lessThan(0));
       expect(g.outBelt.right, greaterThan(g.side));
+    });
+  });
+
+  group('the animation drives the clock, not the other way round', () {
+    // The unit used to be held for a fixed time per instruction with the
+    // movement squeezed to fit, so its speed depended on how far it happened to
+    // be going: a sprint across the floor to a pallet and a shuffle between two
+    // belt slots took the same number of milliseconds.
+    Level level(List<int> intake) => Level(
+      brief: const LevelBrief(task: 'x'),
+      intake: intake,
+      goal: (i) => i,
+    );
+
+    Tick tick({
+      required Station station,
+      required Op op,
+      List<int> intake = const [],
+    }) => Tick(
+      nodeId: 'n',
+      line: '',
+      intake: intake,
+      claws: null,
+      outbound: const [],
+      pallets: const [],
+      steps: 0,
+      station: station,
+      op: op,
+    );
+
+    test('walking further takes longer, in proportion', () {
+      final near = Pace.of(
+        before: tick(station: const Station(StationKind.chute), op: Op.ship),
+        now: tick(station: const Station(StationKind.outbound), op: Op.ship),
+        level: level(const []),
+      );
+      final far = Pace.of(
+        before: tick(station: const Station(StationKind.outbound), op: Op.ship),
+        now: tick(station: const Station(StationKind.pallet, 0), op: Op.ship),
+        level: level(const []),
+      );
+
+      const g = FloorGeometry(1);
+      final nearDistance = g.routeLength(
+        const Station(StationKind.chute),
+        const Station(StationKind.outbound),
+      );
+      final farDistance = g.routeLength(
+        const Station(StationKind.outbound),
+        const Station(StationKind.pallet, 0),
+      );
+
+      expect(farDistance, greaterThan(nearDistance));
+      // The same speed, so the times are in the same ratio as the distances.
+      expect(
+        far.walk.inMicroseconds / near.walk.inMicroseconds,
+        closeTo(farDistance / nearDistance, 0.01),
+      );
+    });
+
+    test('standing still costs no walk at all', () {
+      // Two SUBs on the same pallet, back to back. This is where a fixed hold
+      // was most obviously wrong: it charged a full crossing for going nowhere.
+      final pace = Pace.of(
+        before: tick(station: const Station(StationKind.pallet, 2), op: Op.sub),
+        now: tick(station: const Station(StationKind.pallet, 2), op: Op.sub),
+        level: level(const []),
+      );
+      expect(pace.walk, Duration.zero);
+      expect(pace.total, const Duration(milliseconds: 2200));
+      expect(pace.walkFraction, 0);
+    });
+
+    test('a gesture runs at the length it was drawn at', () {
+      // From Animations/README.md: pickup 1.15s, merge 2.2s. Played at anything
+      // else the gesture reads as a blur or a mime.
+      Duration act(Op op) => Pace.of(
+        before: tick(station: const Station(StationKind.pallet, 1), op: op),
+        now: tick(station: const Station(StationKind.pallet, 1), op: op),
+        level: level(const []),
+      ).act;
+
+      expect(act(Op.copyFrom), const Duration(milliseconds: 1150));
+      expect(act(Op.ship), const Duration(milliseconds: 1150));
+      expect(act(Op.sum), const Duration(milliseconds: 2200));
+      expect(act(Op.copyTo), const Duration(milliseconds: 2200));
+    });
+
+    test('a condition gets a beat of its own', () {
+      // It moves nothing and plays nothing, so there is no movement to time it
+      // by - but the caret still has to be readable on the line.
+      final pace = Pace.of(
+        before: tick(
+          station: const Station(StationKind.chute),
+          op: Op.branchUnless,
+        ),
+        now: tick(
+          station: const Station(StationKind.chute),
+          op: Op.branchUnless,
+        ),
+        level: level(const []),
+      );
+      expect(pace.total, greaterThan(Duration.zero));
+      expect(pace.walk, Duration.zero);
+    });
+
+    test('a TAKE that finds nothing has a walk and no grab', () {
+      // It goes to the chute and comes away empty-handed. Nothing to play, so
+      // nothing to wait for - but the walk is real.
+      final pace = Pace.of(
+        before: tick(station: const Station(StationKind.outbound), op: Op.ship),
+        now: tick(station: const Station(StationKind.chute), op: Op.take),
+        level: level(const []),
+      );
+      expect(pace.act, Duration.zero);
+      expect(pace.walk, greaterThan(Duration.zero));
+      // Clamped short of 1, or the floor would ask for an empty act interval.
+      expect(pace.walkFraction, closeTo(0.999, 0.001));
+    });
+
+    test('the first instruction walks from where a shift starts', () {
+      // No previous instruction, so the unit is at home and the shipment is
+      // untouched - which is what the floor shows before a run begins.
+      final pace = Pace.of(
+        now: tick(
+          station: const Station(StationKind.chute),
+          op: Op.take,
+          intake: const [1, 2],
+        ),
+        level: level(const [1, 2, 3]),
+      );
+      expect(pace.walk, greaterThan(Duration.zero));
+      expect(
+        pace.act,
+        const Duration(milliseconds: 1150),
+        reason: 'a package did leave the intake',
+      );
     });
   });
 }

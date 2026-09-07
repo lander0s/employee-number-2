@@ -21,7 +21,6 @@ import 'package:gameplay_ux/ui/notebook/note.dart';
 import 'package:gameplay_ux/ui/notebook/program.dart';
 import 'package:gameplay_ux/ui/notebook/slot.dart';
 import 'package:gameplay_ux/ui/notebook/tokens.dart';
-import 'package:gameplay_ux/ui/run_controller.dart';
 
 /// MaterialApp installs its own MediaQuery from the view, so the scale has to be
 /// injected via `builder` to reach the widgets under test. Animations are off by
@@ -663,37 +662,42 @@ void main() {
     Rect pageOf(WidgetTester tester) =>
         tester.getRect(find.byType(ProgramEditor));
 
-    /// Starts a run and steps the clock by hand.
+    /// Starts a run and lets it play for [elapsed], stepping the clock by hand.
     ///
-    /// Never `pumpAndSettle` here: playback reschedules a frame on every tick,
-    /// so settling runs the entire program to completion and tears the caret
-    /// down again before anything can be measured.
-    Future<void> runTo(WidgetTester tester, int ticks) async {
+    /// Measured in run *time*, not in instructions. Instructions no longer take
+    /// a fixed hold - the animation drives the clock, so one that walks further
+    /// takes longer - and counting them from outside would mean knowing the
+    /// pacing, which is the thing most likely to change.
+    ///
+    /// Sliced rather than jumped, so every scheduled instruction actually
+    /// fires. And never `pumpAndSettle`: playback reschedules a frame on every
+    /// instruction, so settling runs the whole program and tears the caret down
+    /// before anything can be measured.
+    Future<void> runFor(WidgetTester tester, Duration elapsed) async {
       await tester.tap(find.text('RUN'));
       await tester.pump();
       // The first instruction is scheduled with no delay, and a bare pump does
       // not advance the clock far enough to fire a zero-duration timer.
       await tester.pump(const Duration(milliseconds: 1));
       await tester.pump();
-      for (var i = 0; i < ticks; i++) {
-        // The real hold plus a beat, not a copy of it. The pacing is a feel
-        // decision that keeps moving, and a hardcoded second silently stopped
-        // advancing a full tick the moment it grew past one.
-        await tester.pump(
-          RunController.stepHold + const Duration(milliseconds: 50),
-        );
+
+      const slice = Duration(milliseconds: 100);
+      for (var left = elapsed; left > Duration.zero; left -= slice) {
+        await tester.pump(slice);
       }
-      // One more frame: the scroll is scheduled post-frame, so the tick that
-      // just landed has not been followed yet.
+      // One more frame: the scroll is scheduled post-frame, so the instruction
+      // that just landed has not been followed yet.
       await tester.pump();
     }
 
     testWidgets('it scrolls the running line to the middle', (tester) async {
       await boot(tester, level: longLevel(), program: longProgram());
 
-      // Far enough in that the row would be well off the bottom of the page if
-      // nothing had scrolled.
-      await runTo(tester, 14);
+      // Long enough to be a dozen or so rows in, where the row would be well
+      // off the bottom of the page if nothing had scrolled. Every TAKE here
+      // costs one pickup and no walk - the unit never leaves the chute after
+      // the first instruction - so this is comfortably mid-program.
+      await runFor(tester, const Duration(seconds: 12));
 
       final page = pageOf(tester);
       final caret = tester.getRect(find.byType(CaretGutter));
@@ -710,7 +714,7 @@ void main() {
       await boot(tester, level: longLevel(), program: longProgram());
       final before = tester.getRect(boxOf(onPage('TAKE').first));
 
-      await runTo(tester, 0);
+      await runFor(tester, Duration.zero);
 
       expect(tester.getRect(boxOf(onPage('TAKE').first)), before);
       expect(
