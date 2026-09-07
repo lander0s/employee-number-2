@@ -236,6 +236,53 @@ void main() {
     });
   });
 
+  group('a package is one size, everywhere', () {
+    test('on a belt, in the claws, and on a pallet', () {
+      // It was not: the pallet was a constant a fifth larger than a belt is
+      // thick, and a box drawn to fit it came out a fifth bigger - so a package
+      // grew when it was set down and shrank when it was picked up.
+      final onBelt = g.intakeSlot(0);
+      final onOutbound = g.outSlot(2);
+      final inClaws = g.packageAt(
+        g.handAt(g.stand(Station.start), Payload.grip),
+      );
+      final onPallet = g.packageAt(g.palletSlot(3).center);
+
+      for (final it in [onBelt, onOutbound, inClaws, onPallet]) {
+        expect(it.width, closeTo(g.boxSize, 0.001));
+        expect(it.height, closeTo(g.boxSize, 0.001));
+      }
+    });
+
+    test('a pallet is furniture and is bigger than what sits on it', () {
+      // Which is exactly why a transfer has to interpolate the package's
+      // *centre* and build the rect once: lerping the rects instead
+      // interpolates their size, and starting from the pallet square swelled
+      // the box to the pallet's size on its way out of it.
+      expect(g.palletSlot(0).width, greaterThan(g.boxSize));
+      expect(
+        g.packageAt(g.palletSlot(0).center).width,
+        closeTo(g.boxSize, 0.001),
+      );
+    });
+
+    test('and a pallet gives it the surround a belt does', () {
+      // Which is why the pallet is derived from the package rather than the
+      // other way round.
+      expect(g.palletSide, closeTo(g.side * FloorGeometry.beltThickness, 0.001));
+      expect(g.palletSide, greaterThan(g.boxSize));
+    });
+
+    test('a package on a pallet sits inside it', () {
+      for (var i = 0; i < palletCount; i++) {
+        final slot = g.palletSlot(i);
+        final box = g.packageAt(slot.center);
+        expect(slot.contains(box.topLeft), isTrue, reason: 'pallet $i');
+        expect(slot.contains(box.bottomRight), isTrue, reason: 'pallet $i');
+      }
+    });
+  });
+
   group('the floor is laid out where the unit expects', () {
     test('a station is directly over the thing it works on', () {
       expect(

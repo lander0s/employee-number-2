@@ -326,6 +326,14 @@ class _Floor extends CustomPainter {
     final grip = hand(const Payload.fixed(Payload.grip), 0);
     final held = g.packageAt(grip);
 
+    // Every package position below is interpolated as a *centre* and turned
+    // into a rect once, at the end. Lerping the rects instead interpolates
+    // their size too, and the moment one of the endpoints was a piece of
+    // furniture - a pallet square rather than a package on it - a box swelled
+    // to the size of the pallet on its way out of it.
+    Rect between(Offset a, Offset b, double u) =>
+        g.packageAt(Offset.lerp(a, b, u)!);
+
     if (layer == _Layer.ground) {
       _grid(canvas, s);
       _rail(canvas, g.intakeBelt, 'INTAKE', g.intakeSlot(0), s);
@@ -351,18 +359,19 @@ class _Floor extends CustomPainter {
       Op.sum || Op.sub => (Payload.mergeA, act),
       _ => (const Payload.fixed(Payload.grip), 0),
     };
-    final onHand = g.packageAt(hand(slot, u));
+    final onHandAt = hand(slot, u);
+    final onHand = g.packageAt(onHandAt);
 
     // -------------------------------------------------------------- intake
     //
     // Everything still on the belt slides one slot closer when a package comes
     // off the front, which is what a conveyor does.
     for (var i = 0; i < to.intake.length; i++) {
-      final rect = Rect.lerp(
-        g.intakeSlot(i + (took ? 1 : 0)),
-        g.intakeSlot(i),
+      final rect = between(
+        g.intakeSlot(i + (took ? 1 : 0)).center,
+        g.intakeSlot(i).center,
         act,
-      )!;
+      );
       if (rect.right < 0) break;
       _package(canvas, rect, to.intake[i]);
     }
@@ -378,8 +387,8 @@ class _Floor extends CustomPainter {
           // and released onto the belt. The hand only takes it most of the way
           // - the last of it is the box settling into its slot, which the
           // animation has no keyframe for because the belt is not its business.
-          ? Rect.lerp(onHand, g.outSlot(0), _release(act))!
-          : Rect.lerp(g.outSlot(i - added), g.outSlot(i), act)!;
+          ? between(onHandAt, g.outSlot(0).center, _release(act))
+          : between(g.outSlot(i - added).center, g.outSlot(i).center, act);
       if (rect.left > s) break;
       _package(canvas, rect, value);
     }
@@ -387,7 +396,11 @@ class _Floor extends CustomPainter {
     // --------------------------------------------------------------- claws
     if (to.claws != null) {
       final arriving = took || to.op == Op.copyFrom;
-      final source = took ? g.intakeSlot(0) : g.palletSlot(to.station.pallet);
+      // The package's own place, not the slot's: a pallet square is bigger
+      // than a package, and starting a transfer from it made the box grow.
+      final source = took
+          ? g.intakeSlot(0).center
+          : g.palletSlot(to.station.pallet).center;
 
       // Arriving cargo starts where it was and meets the claw as it closes;
       // after that it is the hand's. Anything already held just rides.
@@ -397,7 +410,7 @@ class _Floor extends CustomPainter {
       // animation says it does.
       final rect = switch (to.op) {
         Op.sum || Op.sub => held,
-        _ when arriving => Rect.lerp(source, onHand, _grasp(act))!,
+        _ when arriving => between(source, onHandAt, _grasp(act)),
         _ => onHand,
       };
       final fade = switch (to.op) {
@@ -434,11 +447,11 @@ class _Floor extends CustomPainter {
       if (operand != null) {
         _package(
           canvas,
-          Rect.lerp(
-            g.palletSlot(to.station.pallet),
-            g.packageAt(hand(Payload.mergeB, act)),
+          between(
+            g.palletSlot(to.station.pallet).center,
+            hand(Payload.mergeB, act),
             _grasp(act),
-          )!,
+          ),
           operand,
           fade: 1 - Payload.mergeB.alphaAt(act),
         );
@@ -454,7 +467,7 @@ class _Floor extends CustomPainter {
     if (binned) {
       _package(
         canvas,
-        Rect.lerp(held, held.translate(0, s * _binDrop), act)!,
+        between(grip, grip.translate(0, s * _binDrop), act),
         from.claws!,
         fade: act,
       );
@@ -512,7 +525,10 @@ class _Floor extends CustomPainter {
 
       final value = i < to.pallets.length ? to.pallets[i] : null;
       if (value != null) {
-        _package(canvas, rect.deflate(rect.width * 0.16), value);
+        // [FloorGeometry.packageAt], like every other package on the floor.
+        // Fitting one to the pallet instead is what made it a different size
+        // here than on a belt.
+        _package(canvas, g.packageAt(rect.center), value);
       }
     }
   }

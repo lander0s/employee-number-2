@@ -46,7 +46,6 @@ class FloorGeometry {
   static const beltOff = 0.6;
 
   static const palletTop = 0.805;
-  static const palletSize = 0.135;
 
   /// The unit's footprint, and the box its sprite is drawn in.
   ///
@@ -117,8 +116,16 @@ class FloorGeometry {
     boxSize,
   );
 
+  /// A pallet is a package-sized spot with the same surround a belt gives one.
+  ///
+  /// Derived, not chosen. It was a constant a fifth larger than this, and a
+  /// package drawn to fit it came out a fifth bigger than the same package on a
+  /// belt - so a box grew when it was set down and shrank when it was picked
+  /// up. A package is one size everywhere; the furniture is what adapts.
+  double get palletSide => boxSize + _lip * 2;
+
   Rect palletSlot(int i) {
-    final size = side * palletSize;
+    final size = palletSide;
     final margin = side * pad;
     final span = side - margin * 2;
     // Evenly spaced, ends flush with the margin: the floor should read as one
