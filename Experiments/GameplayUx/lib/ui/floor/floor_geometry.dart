@@ -49,15 +49,22 @@ class FloorGeometry {
 
   /// The unit's footprint, and the box its sprite is drawn in.
   ///
-  /// It has grown twice. The wireframe version was a box with two drawn claws
-  /// hanging below it, so the footprint had to allow for the reach; the sprite
-  /// is contained in this square instead, which gave that room back. Then the
-  /// belts got thinner, which gave more.
+  /// It has grown three times. The wireframe version was a box with two drawn
+  /// claws hanging below it, so the footprint had to allow for the reach; the
+  /// sprite is contained in this square instead, which gave that room back.
+  /// Then the belts got thinner, which gave more.
   ///
   /// It is the one thing on the floor with a face, so it earns the space: the
   /// belts and the pallets are furniture and read fine small, and the unit is
   /// what the player is actually watching.
-  static const robot = 0.31;
+  ///
+  /// Two things bound it, and neither is close yet. Standing at a pallet the
+  /// sprite reaches up toward the outbound belt and must not touch it, which
+  /// leaves 0.09 of the floor spare here; and the corridor between the belt
+  /// ends has to stay wide enough to walk through, which shuts at about 0.5.
+  /// The collision test in test/floor_test.dart is what actually says so - it
+  /// samples every journey, so it fails before a screenshot would show it.
+  static const robot = 0.34;
 
   /// The sprite's own canvas, and where its wheels sit inside it.
   ///
