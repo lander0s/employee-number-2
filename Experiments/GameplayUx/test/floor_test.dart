@@ -236,6 +236,63 @@ void main() {
     });
   });
 
+  group('a package changes hands in the right direction', () {
+    // Getting this backwards is silent and specific, and it produced two
+    // complaints that turned out to be one bug: the package parked on the slot
+    // for the near half of the instruction, which reads at once as the value
+    // arriving early and as the claw being empty.
+    const claw = Offset(200, 100);
+    const slot = Offset(200, 300);
+
+    test('picking up: it waits on the slot, then rides the claw', () {
+      Offset at(double act) =>
+          g.transfer(claw: claw, slot: slot, outward: false, act: act);
+
+      expect(at(0), slot, reason: 'still where it was');
+      expect(at(0.25).dy, greaterThan(claw.dy), reason: 'on its way');
+      expect(at(0.5), claw, reason: 'in hand by the halfway mark');
+      expect(at(1), claw, reason: 'and stays there');
+    });
+
+    test('setting down: it rides the claw, then lands on the slot', () {
+      Offset at(double act) =>
+          g.transfer(claw: claw, slot: slot, outward: true, act: act);
+
+      expect(at(0), claw, reason: 'carried');
+      expect(at(0.5), claw, reason: 'still carried at the halfway mark');
+      expect(at(0.75).dy, greaterThan(claw.dy), reason: 'being let go');
+      expect(at(1), slot, reason: 'down');
+    });
+
+    test('the two directions are mirrors', () {
+      // Which is the whole point of the parameter. Not at 0.5 though: that is
+      // the crossover, where an inward transfer has just arrived in the claw
+      // and an outward one has not yet let go, so both have the package in
+      // hand. It is the one moment the two directions agree.
+      for (final act in [0.1, 0.3, 0.7, 0.9]) {
+        final out = g.transfer(
+          claw: claw,
+          slot: slot,
+          outward: true,
+          act: act,
+        );
+        final into = g.transfer(
+          claw: claw,
+          slot: slot,
+          outward: false,
+          act: act,
+        );
+        expect(out, isNot(into), reason: 'act $act');
+      }
+
+      expect(
+        g.transfer(claw: claw, slot: slot, outward: true, act: 0.5),
+        g.transfer(claw: claw, slot: slot, outward: false, act: 0.5),
+        reason: 'both hold it at the crossover',
+      );
+    });
+  });
+
   group('a package is one size, everywhere', () {
     test('on a belt, in the claws, and on a pallet', () {
       // It was not: the pallet was a constant a fifth larger than a belt is

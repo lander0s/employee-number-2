@@ -214,7 +214,9 @@ class _FloorStageState extends State<FloorStage>
             // over and finds nothing, so there is no grab to play.
             Op.take when took => UnitPose.pickup,
             Op.copyFrom => UnitPose.pickup,
-            Op.ship || Op.copyTo => UnitPose.putdown,
+            Op.ship => UnitPose.putdown,
+            // One box becoming two, which is what a copy is.
+            Op.copyTo => UnitPose.split,
             Op.sum || Op.sub => UnitPose.merge,
             // A condition is the one instruction the unit does not act on.
             Op.take || Op.branchUnless || Op.jump => resting,
@@ -231,7 +233,7 @@ class _FloorStageState extends State<FloorStage>
           geometry: g,
           at: at,
           pose: pose,
-          driver: pose == UnitPose.putdown ? _actBack : _act,
+          driver: pose.reversed ? _actBack : _act,
 
           // COPY TO leaves the package in the claws as well as on the pallet,
           // so unlike SHIP the reverse-grab must not end empty-handed - which
@@ -334,11 +336,27 @@ class _Floor extends CustomPainter {
     Rect between(Offset a, Offset b, double u) =>
         g.packageAt(Offset.lerp(a, b, u)!);
 
+    // The merge rig runs forwards for arithmetic - two values becoming one -
+    // and backwards for COPY TO, which is one becoming two: the unit splits
+    // what it is holding, sets one half on the pallet and keeps the other.
+    //
+    // That is what a copy *is*, and it is why the reverse of this animation
+    // fits where the reverse of a pickup did not: a putdown set the whole
+    // package on the pallet and left the unit inexplicably still holding it.
+    final splitting = to.op == Op.copyTo;
+    final merging = splitting || to.op == Op.sum || to.op == Op.sub;
+
+    // Progress through the merge rig, whichever way it is being read.
+    final rig = splitting ? 1 - act : act;
+
     if (layer == _Layer.ground) {
       _grid(canvas, s);
       _rail(canvas, g.intakeBelt, 'INTAKE', g.intakeSlot(0), s);
       _rail(canvas, g.outBelt, 'OUTBOUND', g.outSlot(0), s);
-      _pallets(canvas, g);
+      // A COPY TO's pallet box is arriving, so the rig below draws it rather
+      // than it sitting there from the first frame. SUM and SUB only read a
+      // pallet, so theirs stays put.
+      _pallets(canvas, g, hide: splitting && t < 1 ? to.station.pallet : null);
       return;
     }
 
@@ -355,8 +373,8 @@ class _Floor extends CustomPainter {
     final (Payload slot, double u) = switch (to.op) {
       Op.take when took => (Payload.pickup, act),
       Op.copyFrom => (Payload.pickup, act),
-      Op.ship || Op.copyTo => (Payload.pickup, 1 - act),
-      Op.sum || Op.sub => (Payload.mergeA, act),
+      Op.ship => (Payload.pickup, 1 - act),
+      Op.sum || Op.sub || Op.copyTo => (Payload.mergeA, rig),
       _ => (const Payload.fixed(Payload.grip), 0),
     };
     final onHandAt = hand(slot, u);
@@ -387,7 +405,14 @@ class _Floor extends CustomPainter {
           // and released onto the belt. The hand only takes it most of the way
           // - the last of it is the box settling into its slot, which the
           // animation has no keyframe for because the belt is not its business.
-          ? between(onHandAt, g.outSlot(0).center, _release(act))
+          ? g.packageAt(
+              g.transfer(
+                claw: onHandAt,
+                slot: g.outSlot(0).center,
+                outward: true,
+                act: act,
+              ),
+            )
           : between(g.outSlot(i - added).center, g.outSlot(i).center, act);
       if (rect.left > s) break;
       _package(canvas, rect, value);
@@ -408,52 +433,61 @@ class _Floor extends CustomPainter {
       // The result of an arithmetic instruction is the exception: it does not
       // exist until the impact, so it appears at the grip on the beat the
       // animation says it does.
-      final rect = switch (to.op) {
-        Op.sum || Op.sub => held,
-        _ when arriving => between(source, onHandAt, _grasp(act)),
-        _ => onHand,
-      };
-      final fade = switch (to.op) {
-        Op.sum || Op.sub => 1 - Payload.mergeResult.alphaAt(act),
-        _ => 0.0,
-      };
+      // Under the merge rig this is the *un-split* box: the single package
+      // that exists before a split and after a merge. Its halves are below.
+      final rect = merging
+          ? held
+          : arriving
+          ? g.packageAt(
+              g.transfer(
+                claw: onHandAt,
+                slot: source,
+                outward: false,
+                act: act,
+              ),
+            )
+          : onHand;
+      final fade = merging ? 1 - Payload.mergeResult.alphaAt(rig) : 0.0;
       _package(canvas, rect, to.claws!, fade: fade);
     }
 
-    // Arithmetic is the one instruction with two operands, and the merge is the
-    // one animation where the hands do different things - so both are on
-    // screen, one per claw, and they disappear together on the frame the result
-    // appears. Their opacities are authored, not invented.
-    if (to.op == Op.sum || to.op == Op.sub) {
-      // A: what it was already holding, in the right claw.
-      if (from.claws != null) {
-        _package(
-          canvas,
-          onHand,
-          from.claws!,
-          fade: 1 - Payload.mergeA.alphaAt(act),
-        );
+    // The two halves, one per claw, appearing and disappearing on the authored
+    // beats. Forwards they are the operands that become a result; backwards
+    // they are the copy kept and the copy set down. The merge is the only
+    // animation where the hands do different things, which is what makes it fit
+    // both readings.
+    if (merging && to.station.kind == StationKind.pallet) {
+      final pallet = to.station.pallet;
+
+      // A, right claw: the value already held, or the half kept.
+      final a = splitting ? to.claws : from.claws;
+      if (a != null) {
+        _package(canvas, onHand, a, fade: 1 - Payload.mergeA.alphaAt(rig));
       }
 
-      // B: the operand, read off its pallet and lifted by the left claw.
+      // B, left claw: the value read off the pallet, or the half put on it.
+      // Its far end is the pallet either way, so the same convergence serves
+      // whichever direction the rig is running.
       //
-      // The pallet keeps its own copy - SUM and SUB read a pallet, they do not
-      // empty it - so [_pallets] still draws it and for a moment the two sit on
-      // top of each other. That is the point: the box lifting away from the one
-      // left behind is what "read" looks like.
-      final operand = to.station.kind == StationKind.pallet
-          ? to.pallets.elementAtOrNull(to.station.pallet)
-          : null;
-      if (operand != null) {
+      // Reading does not empty a pallet, so for SUM and SUB [_pallets] still
+      // draws the original and for a moment the two sit on top of each other.
+      // That is the point: the box lifting away from the one left behind is
+      // what "read" looks like.
+      final b = splitting ? to.claws : to.pallets.elementAtOrNull(pallet);
+      if (b != null) {
         _package(
           canvas,
-          between(
-            g.palletSlot(to.station.pallet).center,
-            hand(Payload.mergeB, act),
-            _grasp(act),
+          g.packageAt(
+            g.transfer(
+              claw: hand(Payload.mergeB, rig),
+              slot: g.palletSlot(pallet).center,
+              // A read lifts a package off the pallet; a copy sets one on it.
+              outward: splitting,
+              act: act,
+            ),
           ),
-          operand,
-          fade: 1 - Payload.mergeB.alphaAt(act),
+          b,
+          fade: 1 - Payload.mergeB.alphaAt(rig),
         );
       }
     }
@@ -473,14 +507,6 @@ class _Floor extends CustomPainter {
       );
     }
   }
-
-  /// How much of the way the cargo has transferred from its source into the
-  /// claw. The claw spends the first part of a pickup reaching, so the box
-  /// stays put and then goes with it.
-  static double _grasp(double act) => (act / 0.5).clamp(0.0, 1.0);
-
-  /// The mirror: the hand carries it down and lets go at the end.
-  static double _release(double act) => ((act - 0.5) / 0.5).clamp(0.0, 1.0);
 
   void _grid(Canvas canvas, double s) {
     final paint = Paint()
@@ -512,7 +538,7 @@ class _Floor extends CustomPainter {
   }
 
   /// The numbered spots, and whatever is on them.
-  void _pallets(Canvas canvas, FloorGeometry g) {
+  void _pallets(Canvas canvas, FloorGeometry g, {int? hide}) {
     for (var i = 0; i < palletCount; i++) {
       final rect = g.palletSlot(i);
       canvas.drawRect(rect, _stroke());
@@ -523,7 +549,7 @@ class _Floor extends CustomPainter {
         g.side,
       );
 
-      final value = i < to.pallets.length ? to.pallets[i] : null;
+      final value = i == hide || i >= to.pallets.length ? null : to.pallets[i];
       if (value != null) {
         // [FloorGeometry.packageAt], like every other package on the floor.
         // Fitting one to the pallet instead is what made it a different size

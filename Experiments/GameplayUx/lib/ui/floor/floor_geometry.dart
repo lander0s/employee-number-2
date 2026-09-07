@@ -182,6 +182,31 @@ class FloorGeometry {
     return Offset(box.left + comp.dx * k, box.top + comp.dy * k);
   }
 
+  /// A package changing hands between a claw and a place on the floor.
+  ///
+  /// [outward] is the direction: true when the unit is setting the package
+  /// down, false when it is picking one up. It is a named parameter rather than
+  /// an argument order because getting it backwards is silent and specific -
+  /// the package parks on the slot for the near half of the instruction, which
+  /// reads at once as the value arriving early *and* as an empty claw. Both
+  /// halves of the same swap.
+  ///
+  /// The claw spends the near half of an instruction reaching, so the package
+  /// holds still and then travels with it. Setting down is the mirror: carried
+  /// the whole way, released at the end. Neither animation has a keyframe for
+  /// the last of it, because a belt slot is not the sprite's business.
+  Offset transfer({
+    required Offset claw,
+    required Offset slot,
+    required bool outward,
+    required double act,
+  }) {
+    final u = outward
+        ? ((act - 0.5) / 0.5).clamp(0.0, 1.0)
+        : (act / 0.5).clamp(0.0, 1.0);
+    return outward ? Offset.lerp(claw, slot, u)! : Offset.lerp(slot, claw, u)!;
+  }
+
   /// A package, wherever it happens to be.
   ///
   /// Always [boxSize], deliberately: a package does not grow when it is picked

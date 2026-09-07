@@ -36,9 +36,17 @@ enum UnitPose {
   /// drawn for, which was the same gesture in an earlier design - two things
   /// becoming one.
   merge,
+
+  /// The merge, backwards: one thing becoming two.
+  ///
+  /// COPY TO. The unit splits what it is holding and sets one half down while
+  /// keeping the other, which is what a copy *is*. It was a reverse pickup,
+  /// which put the whole package down and then had the unit inexplicably still
+  /// holding it.
+  split,
 }
 
-extension on UnitPose {
+extension UnitPoseAnimation on UnitPose {
   String get asset => switch (this) {
     UnitPose.idle => 'assets/animations/delivery-robot-idle.json',
     UnitPose.holding => 'assets/animations/delivery-robot-holding.json',
@@ -47,19 +55,28 @@ extension on UnitPose {
       'assets/animations/delivery-robot-walking-holding.json',
     UnitPose.pickup ||
     UnitPose.putdown => 'assets/animations/delivery-robot-pickup.json',
-    UnitPose.merge => 'assets/animations/delivery-robot-merge.json',
+    UnitPose.merge ||
+    UnitPose.split => 'assets/animations/delivery-robot-merge.json',
   };
 
   /// The loops run themselves; the grab and its reverse are driven, so that
   /// the moment the box leaves the belt is the moment the claws close on it
   /// rather than whenever the loop happened to be.
   bool get loops => switch (this) {
-    UnitPose.pickup || UnitPose.putdown || UnitPose.merge => false,
+    UnitPose.pickup ||
+    UnitPose.putdown ||
+    UnitPose.merge ||
+    UnitPose.split => false,
     UnitPose.idle ||
     UnitPose.holding ||
     UnitPose.walking ||
     UnitPose.walkingHolding => true,
   };
+
+  /// The poses that are another pose read backwards, and so need the reversed
+  /// driver: putting down is a grab in reverse, splitting is a merge in
+  /// reverse.
+  bool get reversed => this == UnitPose.putdown || this == UnitPose.split;
 }
 
 /// The unit, drawn at whatever it is doing.
