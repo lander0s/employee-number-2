@@ -407,16 +407,42 @@ class _Floor extends CustomPainter {
       _package(canvas, rect, to.claws!, fade: fade);
     }
 
-    // The value the arithmetic consumed, riding the right claw until the smash
-    // takes it. Its opacity is authored: the README has it disappearing at the
-    // impact, which is the frame the result appears.
-    if ((to.op == Op.sum || to.op == Op.sub) && from.claws != null) {
-      _package(
-        canvas,
-        onHand,
-        from.claws!,
-        fade: 1 - Payload.mergeA.alphaAt(act),
-      );
+    // Arithmetic is the one instruction with two operands, and the merge is the
+    // one animation where the hands do different things - so both are on
+    // screen, one per claw, and they disappear together on the frame the result
+    // appears. Their opacities are authored, not invented.
+    if (to.op == Op.sum || to.op == Op.sub) {
+      // A: what it was already holding, in the right claw.
+      if (from.claws != null) {
+        _package(
+          canvas,
+          onHand,
+          from.claws!,
+          fade: 1 - Payload.mergeA.alphaAt(act),
+        );
+      }
+
+      // B: the operand, read off its pallet and lifted by the left claw.
+      //
+      // The pallet keeps its own copy - SUM and SUB read a pallet, they do not
+      // empty it - so [_pallets] still draws it and for a moment the two sit on
+      // top of each other. That is the point: the box lifting away from the one
+      // left behind is what "read" looks like.
+      final operand = to.station.kind == StationKind.pallet
+          ? to.pallets.elementAtOrNull(to.station.pallet)
+          : null;
+      if (operand != null) {
+        _package(
+          canvas,
+          Rect.lerp(
+            g.palletSlot(to.station.pallet),
+            g.packageAt(hand(Payload.mergeB, act)),
+            _grasp(act),
+          )!,
+          operand,
+          fade: 1 - Payload.mergeB.alphaAt(act),
+        );
+      }
     }
 
     // ----------------------------------------------------------------- bin

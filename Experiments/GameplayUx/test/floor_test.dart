@@ -161,6 +161,35 @@ void main() {
       expect((mid - linear).distance, greaterThan(4));
     });
 
+    test('the two operands take different paths, one per hand', () {
+      // The only state where the hands do different things, which is what
+      // makes it the arithmetic gesture: A is already held, B is picked up off
+      // the floor, and they meet.
+      expect(Payload.mergeA.at(0), Payload.grip, reason: 'A starts held');
+      expect(
+        Payload.mergeB.at(0).dy,
+        greaterThan(180),
+        reason: 'B starts on the floor',
+      );
+
+      // They are on opposite sides of the unit through the wind-up, and both
+      // arrive at the middle for the impact.
+      final windA = Payload.mergeA.at(0.68);
+      final windB = Payload.mergeB.at(0.68);
+      expect(windA.dx, greaterThan(Payload.grip.dx));
+      expect(windB.dx, lessThan(Payload.grip.dx));
+
+      final hitA = Payload.mergeA.at(0.79);
+      final hitB = Payload.mergeB.at(0.79);
+      expect((hitA - hitB).distance, lessThan(30), reason: 'they collide');
+    });
+
+    test('and both go on the frame the result arrives', () {
+      expect(Payload.mergeA.alphaAt(0.95), 0);
+      expect(Payload.mergeB.alphaAt(0.95), 0);
+      expect(Payload.mergeResult.alphaAt(0.95), 1);
+    });
+
     test('opacity steps rather than fading', () {
       // A is visible until the impact and gone after it; the result is the
       // other way round. Nobody drew a cross-fade, so nobody should invent one.

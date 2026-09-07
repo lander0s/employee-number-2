@@ -118,6 +118,34 @@ class Payload {
     alphas: <double>[1, 1, 1, 1, 1, 1, 1, 0, 0],
   );
 
+  /// `merge`, 2.2s, slot B: the other operand.
+  ///
+  /// It waits on the floor while the left claw reaches down for it, rides up
+  /// into the wind-up, and is gone at the impact. Two hands doing different
+  /// things is the only thing this animation does that no other state does, and
+  /// it is the whole reason it suits arithmetic - two values becoming one.
+  ///
+  /// The README's prose says B is hidden until the claw closes; the authored
+  /// file has it visible from frame 0. The file wins, and it is also the better
+  /// reading here: the operand is sitting on its pallet the whole time, which
+  /// is exactly where this path starts.
+  static const mergeB = Payload(
+    times: _mergeTimes,
+    points: [
+      Offset(145, 188.6),
+      Offset(145, 188.6),
+      Offset(145, 188.6),
+      Offset(145, 188.6),
+      Offset(109.9, 90),
+      Offset(97.3, 81.5),
+      Offset(139, 99.3),
+      Offset(118, 94.3),
+      Offset(121.3, 97.5),
+    ],
+    splines: _mergeSplines,
+    alphas: <double>[1, 1, 1, 1, 1, 1, 1, 0, 0],
+  );
+
   /// `merge`, slot `payload` - the result, which appears at the impact and
   /// stays at the grip.
   static const mergeResult = Payload(
