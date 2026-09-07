@@ -147,6 +147,13 @@ abstract final class Paper {
   /// to itself, and stops clear of the rule rather than touching it.
   static const caretInset = 6.0;
 
+  /// How long the page takes to bring the running line back to the middle.
+  ///
+  /// Shorter than the fastest instruction holds for, so the page has settled
+  /// before the next line is marked. Any longer and a fast stretch of program
+  /// leaves the scroll permanently chasing a caret it never catches.
+  static const caretFollow = Duration(milliseconds: 180);
+
   /// The marked command is also outlined, in the caret's own colour, so the
   /// mark and the thing it marks are obviously one statement rather than an
   /// arrow near a row.

@@ -46,6 +46,8 @@ Widget harness({
   double textScale = 1.0,
   bool animate = false,
   LevelBrief brief = testBrief,
+  Level? level,
+  ProgramDocument? program,
 }) => MaterialApp(
   debugShowCheckedModeBanner: false,
   builder: (context, child) => MediaQuery(
@@ -55,18 +57,27 @@ Widget harness({
     ),
     child: child!,
   ),
-  home: GameplayScreen(level: levelWith(brief)),
+  home: GameplayScreen(level: level ?? levelWith(brief), program: program),
 );
 
 Future<void> boot(
   WidgetTester tester, {
   double textScale = 1.0,
   LevelBrief brief = testBrief,
+  Level? level,
+  ProgramDocument? program,
 }) async {
   tester.view.physicalSize = const Size(393, 852);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(harness(textScale: textScale, brief: brief));
+  await tester.pumpWidget(
+    harness(
+      textScale: textScale,
+      brief: brief,
+      level: level,
+      program: program,
+    ),
+  );
   await tester.pumpAndSettle();
 }
 
@@ -625,6 +636,82 @@ void main() {
         await tester.pumpAndSettle();
         await run(tester);
       }
+    });
+  });
+
+  group('a run keeps the line it is on in view', () {
+    // A program long enough that the caret has to leave the first screen, run
+    // against an intake long enough to reach the bottom of it. Every row is a
+    // TAKE, so the machine walks straight down the page one row per tick.
+    const rows = 24;
+
+    ProgramDocument longProgram() {
+      final doc = ProgramDocument();
+      for (var i = 0; i < rows; i++) {
+        doc.insertAt('take', Slot(null, i, 0));
+      }
+      return doc;
+    }
+
+    Level longLevel() => Level(
+      brief: testBrief,
+      intake: List<int>.generate(rows, (i) => i + 1),
+      goal: (intake) => const [],
+    );
+
+    Rect pageOf(WidgetTester tester) =>
+        tester.getRect(find.byType(ProgramEditor));
+
+    /// Starts a run and steps the clock by hand.
+    ///
+    /// Never `pumpAndSettle` here: playback reschedules a frame on every tick,
+    /// so settling runs the entire program to completion and tears the caret
+    /// down again before anything can be measured.
+    Future<void> runTo(WidgetTester tester, int ticks) async {
+      await tester.tap(find.text('RUN'));
+      await tester.pump();
+      // The first instruction is scheduled with no delay, and a bare pump does
+      // not advance the clock far enough to fire a zero-duration timer.
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.pump();
+      for (var i = 0; i < ticks; i++) {
+        await tester.pump(const Duration(milliseconds: 420));
+      }
+      // One more frame: the scroll is scheduled post-frame, so the tick that
+      // just landed has not been followed yet.
+      await tester.pump();
+    }
+
+    testWidgets('it scrolls the running line to the middle', (tester) async {
+      await boot(tester, level: longLevel(), program: longProgram());
+
+      // Far enough in that the row would be well off the bottom of the page if
+      // nothing had scrolled.
+      await runTo(tester, 14);
+
+      final page = pageOf(tester);
+      final caret = tester.getRect(find.byType(CaretGutter));
+      expect(
+        caret.center.dy,
+        closeTo(page.center.dy, Paper.rowHeight),
+        reason: 'the running line drifted off centre',
+      );
+    });
+
+    testWidgets('and does not fight the top of the page', (tester) async {
+      // The first line cannot be centred - there is nothing above it to scroll
+      // in - so the page must stay put rather than pulling the program down.
+      await boot(tester, level: longLevel(), program: longProgram());
+      final before = tester.getRect(boxOf(onPage('TAKE').first));
+
+      await runTo(tester, 0);
+
+      expect(tester.getRect(boxOf(onPage('TAKE').first)), before);
+      expect(
+        tester.getRect(find.byType(CaretGutter)).center.dy,
+        lessThan(pageOf(tester).center.dy),
+        reason: 'clamped above centre, which is the honest answer here',
+      );
     });
   });
 

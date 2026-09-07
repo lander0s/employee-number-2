@@ -33,18 +33,23 @@ const _maxFloor = 1.0;
 const _minRunnableFloor = RunButton.height + 36;
 
 class GameplayScreen extends StatefulWidget {
-  const GameplayScreen({super.key, required this.level});
+  const GameplayScreen({super.key, required this.level, this.program});
 
   /// The level being played. Passed in rather than held here: it is content,
   /// and the screen is the frame around it.
   final Level level;
+
+  /// The program to open with. Null means the sample, which is what a fresh
+  /// level does here for now; 13.3 wants a half-written program to survive
+  /// backgrounding, and this is the seam it comes back through.
+  final ProgramDocument? program;
 
   @override
   State<GameplayScreen> createState() => _GameplayScreenState();
 }
 
 class _GameplayScreenState extends State<GameplayScreen> {
-  final _doc = ProgramDocument();
+  late final ProgramDocument _doc;
 
   /// Page and note are siblings, and a drag routinely starts on one and ends on
   /// the other, so the two things they share live here: what is in the air, and
@@ -155,7 +160,7 @@ class _GameplayScreenState extends State<GameplayScreen> {
   @override
   void initState() {
     super.initState();
-    _doc.loadSample();
+    _doc = widget.program ?? (ProgramDocument()..loadSample());
     // The whole screen rebuilds on every tick. It is a page of text and a
     // dozen boxes at two or three frames a second, and threading a notifier
     // through to the two places that care would buy nothing measurable.

@@ -79,6 +79,40 @@ class ProgramEditorState extends State<ProgramEditor> {
   /// program does not close up behind a command being moved.
   String? _lifted;
 
+  /// Attached to whichever row the caret is on, so the page can be scrolled to
+  /// it without measuring anything. Only one row is ever marked, so one key is
+  /// enough - it moves down the program as the run does.
+  final _marked = GlobalKey();
+
+  @override
+  void didUpdateWidget(ProgramEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.executing != oldWidget.executing && widget.executing != null) {
+      // After the frame: the key is attached to the row this build is about to
+      // create, and asking where it is before that gets the previous one.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _follow());
+    }
+  }
+
+  /// Puts the running line in the middle of the page.
+  ///
+  /// `alignment: 0.5` is the centring, and `ensureVisible` clamps it to what
+  /// the scroll extent allows - so the first lines of a program sit above
+  /// centre and the last ones below it, which is the only thing the page can
+  /// honestly do at the ends.
+  void _follow() {
+    final context = _marked.currentContext;
+    if (!mounted || context == null) return;
+    Scrollable.ensureVisible(
+      context,
+      alignment: 0.5,
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : Paper.caretFollow,
+      curve: Curves.easeOut,
+    );
+  }
+
   void _mutate(void Function() change) {
     setState(change);
     widget.onChanged();
@@ -208,7 +242,14 @@ class ProgramEditorState extends State<ProgramEditor> {
     // pass the row straight through, but a caret that swallowed them would be a
     // silent trap the day anything marks a line outside a run.
     final pointed = marked
-        ? CaretGutter(header: node.isBlock, depth: depth, child: body)
+        ? KeyedSubtree(
+            key: _marked,
+            child: CaretGutter(
+              header: node.isBlock,
+              depth: depth,
+              child: body,
+            ),
+          )
         : body;
 
     return _swipeable(node, _liftable(node, pointed));
