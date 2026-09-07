@@ -89,11 +89,12 @@ class UnitSprite extends StatelessWidget {
       controller: pose.loops ? null : driver,
       animate: loop,
       repeat: loop,
-      // Contained in the unit's own square, so the art can never reach further
-      // than the footprint the collision rule is written against. The sprites
-      // are 300x240, so this letterboxes rather than crops - a wider box would
-      // let an arm overhang a belt the body is clear of.
-      fit: BoxFit.contain,
+      // The box is already the composition's aspect (see FloorGeometry.body),
+      // so this maps 300x240 onto it one-to-one with no letterbox. That is the
+      // condition every published hand coordinate depends on: letterboxing
+      // would shift the sprite inside its box and put the payload slots
+      // somewhere the floor cannot predict.
+      fit: BoxFit.fill,
       // The frame it holds on before the first real frame arrives. Without it
       // the unit blinks out of existence every time the pose changes.
       addRepaintBoundary: true,

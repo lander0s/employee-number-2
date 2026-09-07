@@ -58,20 +58,25 @@ class FloorGeometry {
   /// It is the one thing on the floor with a face, so it earns the space: the
   /// belts and the pallets are furniture and read fine small, and the unit is
   /// what the player is actually watching.
-  static const robot = 0.26;
+  static const robot = 0.31;
 
-  /// The two rows the unit works from: clear above the belts, and clear above
-  /// the pallets. It stops at the edge of whatever it is reaching for rather
-  /// than standing on it, and both are derived from that - grow [robot] and
-  /// these have to come up to meet it, which the collision test enforces.
-  static const beltRow = 0.222;
-  static const palletRow = 0.67;
+  /// The sprite's own canvas, and where its wheels sit inside it.
+  ///
+  /// From Animations/README.md: the comp is 300x240 and the casters plant on
+  /// `y = 195`, which is 81.25% down. That matters more than it sounds. The
+  /// sprite was being fitted into a *square*, which letterboxed it and left
+  /// 18.75% of empty canvas below the wheels - so the unit floated most of a
+  /// body above whatever it was supposedly standing next to, and every
+  /// published hand coordinate was that far out.
+  static const spriteAspect = 300 / 240;
+  static const groundLine = 195 / 240;
 
   // ------------------------------------------------------------------ absolute
 
   double get _beltW => side * beltThickness;
   double get _mid => side * beltAt;
-  double get robotSide => side * robot;
+  double get spriteWidth => side * robot;
+  double get spriteHeight => spriteWidth / spriteAspect;
 
   /// A package on a belt, and the gap between two of them.
   double get boxSize => _beltW * 0.59;
@@ -131,47 +136,64 @@ class FloorGeometry {
 
   // -------------------------------------------------------------------- the unit
 
-  /// Where the unit stands to work on something: over it, one body clear.
+  /// Where the unit's wheels plant when it works a belt, and a pallet.
+  ///
+  /// Derived rather than tuned: just clear of the thing it reaches for. They
+  /// were two hand-picked constants, which meant growing the unit silently
+  /// stood it on the rollers until the collision test said so.
+  double get beltFeet => intakeBelt.top - side * clearance;
+  double get palletFeet => palletSlot(0).top - side * clearance;
+
+  /// Where the unit stands to work on something. This is its *ground line* -
+  /// where the casters touch - not the middle of its sprite.
   Offset stand(Station at) => switch (at.kind) {
     // Mid-floor, between the two belts. Only ever the starting position.
-    StationKind.home => Offset(side / 2, side * beltRow),
-    StationKind.chute => Offset(intakeSlot(0).center.dx, side * beltRow),
-    StationKind.outbound => Offset(outSlot(0).center.dx, side * beltRow),
-    StationKind.pallet => Offset(
-      palletSlot(at.pallet).center.dx,
-      side * palletRow,
-    ),
+    StationKind.home => Offset(side / 2, beltFeet),
+    StationKind.chute => Offset(intakeSlot(0).center.dx, beltFeet),
+    StationKind.outbound => Offset(outSlot(0).center.dx, beltFeet),
+    StationKind.pallet => Offset(palletSlot(at.pallet).center.dx, palletFeet),
   };
 
-  Rect body(Offset centre) =>
-      Rect.fromCenter(center: centre, width: robotSide, height: robotSide);
-
-  /// How far above the unit's centre a carried package sits.
+  /// The sprite's draw rect, given where its wheels are.
   ///
-  /// The sprite holds things in front of its chest, not across its middle, so a
-  /// box centred on the body sat low and covered the face.
-  static const carryLift = 0.13;
-
-  /// The package in the unit's claws.
-  ///
-  /// The same size it is on a belt, deliberately: a package does not grow when
-  /// it is picked up. It was being drawn as a fraction of the *unit* instead,
-  /// which made it half again as big as a belt package and large enough to
-  /// cover the whole sprite - the box was the only thing you could see.
-  Rect carried(Offset centre) => Rect.fromCenter(
-    center: centre.translate(0, -robotSide * carryLift),
-    width: boxSize,
-    height: boxSize,
+  /// The aspect is the comp's, so `BoxFit.contain` maps the composition onto it
+  /// one-to-one with no letterbox - which is what makes [handAt] usable.
+  Rect body(Offset feet) => Rect.fromLTWH(
+    feet.dx - spriteWidth / 2,
+    feet.dy - spriteHeight * groundLine,
+    spriteWidth,
+    spriteHeight,
   );
 
-  /// The unit's whole footprint, art included. This is what must not meet a
-  /// belt.
+  /// A point in the sprite's own coordinates, on the floor.
   ///
-  /// Identical to [body] while the sprite is contained in its square, which it
-  /// is. Kept as its own name because that is a property of the art, not of the
-  /// rule: the day a sprite hangs an arm past the box, this is where the
-  /// overhang goes, and the collision test keeps working without being rewritten.
-  Rect sweep(Offset centre) => body(centre);
+  /// The comp is 300 wide however big the sprite is drawn, so this is one scale
+  /// factor and an origin. Every hand position in [Payload] comes through here.
+  Offset handAt(Offset feet, Offset comp) {
+    final box = body(feet);
+    final k = spriteWidth / 300;
+    return Offset(box.left + comp.dx * k, box.top + comp.dy * k);
+  }
+
+  /// A package, wherever it happens to be.
+  ///
+  /// Always [boxSize], deliberately: a package does not grow when it is picked
+  /// up. It was being sized as a fraction of the *unit* instead, which made it
+  /// half again as big as a belt package and large enough to cover the sprite.
+  Rect packageAt(Offset centre) =>
+      Rect.fromCenter(center: centre, width: boxSize, height: boxSize);
+
+  /// The unit's footprint: the art down to its wheels.
+  ///
+  /// Not the whole sprite box. Below the ground line is empty canvas and a cast
+  /// shadow, and treating that as solid would push the unit most of a body off
+  /// everything it works on. An arm reaching past the line during a pickup is
+  /// fine - the README says it does that on purpose, and in a three-quarter
+  /// view a reach passes over a belt rather than through it.
+  Rect sweep(Offset feet) {
+    final box = body(feet);
+    return Rect.fromLTRB(box.left, box.top, box.right, feet.dy);
+  }
 
   /// A hair of daylight between the unit and a belt it is passing.
   ///
@@ -182,8 +204,8 @@ class FloorGeometry {
 
   /// The gap between the two belt ends, less half a body and a margin at each
   /// side: the only strip of floor the unit can cross from one row to the other.
-  double get corridorLo => side * (chuteEnd + clearance) + robotSide / 2;
-  double get corridorHi => side * (1 - chuteEnd - clearance) - robotSide / 2;
+  double get corridorLo => side * (chuteEnd + clearance) + spriteWidth / 2;
+  double get corridorHi => side * (1 - chuteEnd - clearance) - spriteWidth / 2;
 
   /// The unit's path between two points, as a polyline.
   ///

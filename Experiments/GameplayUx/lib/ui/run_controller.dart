@@ -15,22 +15,29 @@ import '../model/level.dart';
 import '../model/program.dart';
 import '../model/vm.dart';
 
-/// How long one instruction is held on screen.
-///
-/// Paced to be *watched* rather than read. There is no narration on the floor
-/// any more, so the only way to follow a run is to see the packages move - and
-/// a package moving needs long enough to be noticed, not just long enough to
-/// be rendered. Free instructions - the branches - go by quicker, because
-/// nothing moves on the floor for them, but not so quickly that a loop's
-/// rhythm disappears.
-const _stepFor = Duration(milliseconds: 620);
-const _freeStepFor = Duration(milliseconds: 340);
-
 /// How long the verdict sits before the run lets go.
-const _verdictFor = Duration(milliseconds: 1400);
+const _verdictFor = Duration(milliseconds: 2500);
 
 class RunController extends ChangeNotifier {
   RunController({required this.level});
+
+  /// How long one instruction is held on screen.
+  ///
+  /// Deliberately slow: the point of a run right now is to *watch* the unit,
+  /// and a gesture you cannot follow is a gesture you cannot judge. A polished
+  /// build wants a fast-forward and probably a faster default, at which point
+  /// these come down - they are pacing, not physics.
+  ///
+  /// Long enough for the floor's travel animation to land and then rest, which
+  /// is the constraint [FloorStage] is written against. Free instructions - the
+  /// branches - go by quicker because nothing moves on the floor for them, only
+  /// the caret, but not so quickly that a loop's rhythm disappears.
+  ///
+  /// Public because the widget tests step the clock by hand, and a test that
+  /// copies these numbers quietly stops advancing a full tick the day they
+  /// change - which is exactly what happened the last time they moved.
+  static const stepHold = Duration(milliseconds: 2800);
+  static const freeHold = Duration(milliseconds: 1000);
 
   final Level level;
 
@@ -139,7 +146,7 @@ class RunController extends ChangeNotifier {
   Duration _hold(int index) {
     final ticks = _result!.ticks;
     final before = index == 0 ? 0 : ticks[index - 1].steps;
-    return ticks[index].steps == before ? _freeStepFor : _stepFor;
+    return ticks[index].steps == before ? freeHold : stepHold;
   }
 
   @override

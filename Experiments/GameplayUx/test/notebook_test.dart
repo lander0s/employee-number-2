@@ -21,6 +21,7 @@ import 'package:gameplay_ux/ui/notebook/note.dart';
 import 'package:gameplay_ux/ui/notebook/program.dart';
 import 'package:gameplay_ux/ui/notebook/slot.dart';
 import 'package:gameplay_ux/ui/notebook/tokens.dart';
+import 'package:gameplay_ux/ui/run_controller.dart';
 
 /// MaterialApp installs its own MediaQuery from the view, so the scale has to be
 /// injected via `builder` to reach the widgets under test. Animations are off by
@@ -675,11 +676,12 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1));
       await tester.pump();
       for (var i = 0; i < ticks; i++) {
-        // Comfortably past the longest hold rather than equal to it: the
-        // playback's pacing is a feel decision that will keep moving, and a
-        // test that copies the current number quietly stops advancing a full
-        // tick the day it changes.
-        await tester.pump(const Duration(seconds: 1));
+        // The real hold plus a beat, not a copy of it. The pacing is a feel
+        // decision that keeps moving, and a hardcoded second silently stopped
+        // advancing a full tick the moment it grew past one.
+        await tester.pump(
+          RunController.stepHold + const Duration(milliseconds: 50),
+        );
       }
       // One more frame: the scroll is scheduled post-frame, so the tick that
       // just landed has not been followed yet.

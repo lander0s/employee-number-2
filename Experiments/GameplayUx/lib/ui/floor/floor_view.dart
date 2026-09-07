@@ -26,15 +26,24 @@ import '../../model/vm.dart';
 import '../run_controller.dart';
 import '../wireframe.dart';
 import 'floor_geometry.dart';
+import 'payload.dart';
 import 'unit_sprite.dart';
 
 /// How long one instruction's movement takes.
 ///
-/// Shorter than the shortest hold in [RunController], so every movement lands
-/// and then rests. Continuous motion would read as a conveyor that never stops,
-/// which is a different machine from this one: UNIT-02 does one thing at a
-/// time, and the stillness between things is how you see what it did.
-const _travel = Duration(milliseconds: 280);
+/// Shorter than [RunController.stepHold], so every movement lands and then
+/// rests. Continuous motion would read as a conveyor that never stops, which is
+/// a different machine from this one: UNIT-02 does one thing at a time, and the
+/// stillness between things is how you see what it did.
+///
+/// It is *longer* than [RunController.freeHold], and that is fine: a branch
+/// moves nothing, so there is no movement of its own to cut short.
+///
+/// Sized so the act phase lands near the pickup animation's own length - 70
+/// frames at 60fps, so about 1.2 seconds. Drive a one-shot much faster than it
+/// was drawn and the gesture is a blur; the reason to slow the whole run down
+/// was to stop that happening.
+const _travel = Duration(milliseconds: 2400);
 
 /// The instruction is in two phases: the unit walks, then it acts.
 ///
@@ -308,7 +317,14 @@ class _Floor extends CustomPainter {
     final walk = (t / _walkPhase).clamp(0.0, 1.0);
     final act = ((t - _walkPhase) / (1 - _walkPhase)).clamp(0.0, 1.0);
 
-    final held = g.carried(g.walkBetween(from.station, to.station, walk));
+    final feet = g.walkBetween(from.station, to.station, walk);
+
+    // Where the unit's hands are, per the authored payload slots. Everything it
+    // is carrying hangs off this rather than off the middle of the sprite.
+    Offset hand(Payload slot, double u) => g.handAt(feet, slot.at(u));
+
+    final grip = hand(const Payload.fixed(Payload.grip), 0);
+    final held = g.packageAt(grip);
 
     if (layer == _Layer.ground) {
       _grid(canvas, s);
@@ -324,6 +340,18 @@ class _Floor extends CustomPainter {
     final took = from.intake.length - to.intake.length == 1;
     final shipped = to.outbound.length - from.outbound.length == 1;
     final binned = took && from.claws != null;
+
+    // The hand path this instruction's cargo rides, and how far along it is.
+    // `putdown` is the grab read backwards, which is what setting a thing down
+    // is - the same slot, the same easing, the other way.
+    final (Payload slot, double u) = switch (to.op) {
+      Op.take when took => (Payload.pickup, act),
+      Op.copyFrom => (Payload.pickup, act),
+      Op.ship || Op.copyTo => (Payload.pickup, 1 - act),
+      Op.sum || Op.sub => (Payload.mergeA, act),
+      _ => (const Payload.fixed(Payload.grip), 0),
+    };
+    final onHand = g.packageAt(hand(slot, u));
 
     // -------------------------------------------------------------- intake
     //
@@ -346,10 +374,11 @@ class _Floor extends CustomPainter {
       // the first thing shipped is furthest away, already off the edge.
       final value = to.outbound[to.outbound.length - 1 - i];
       final rect = i == 0 && shipped
-          // Carried in the claws for the whole walk, then set down. `held` is
-          // the walked-to position, so it leaves the unit wherever the unit
-          // actually got to.
-          ? Rect.lerp(held, g.outSlot(0), act)!
+          // Carried in the claws for the whole walk, then lowered by the hand
+          // and released onto the belt. The hand only takes it most of the way
+          // - the last of it is the box settling into its slot, which the
+          // animation has no keyframe for because the belt is not its business.
+          ? Rect.lerp(onHand, g.outSlot(0), _release(act))!
           : Rect.lerp(g.outSlot(i - added), g.outSlot(i), act)!;
       if (rect.left > s) break;
       _package(canvas, rect, value);
@@ -357,13 +386,36 @@ class _Floor extends CustomPainter {
 
     // --------------------------------------------------------------- claws
     if (to.claws != null) {
-      // A package arriving from the chute is lifted once the unit is there;
-      // one already in the claws, or one changed in place by arithmetic, just
-      // rides along with it.
+      final arriving = took || to.op == Op.copyFrom;
+      final source = took ? g.intakeSlot(0) : g.palletSlot(to.station.pallet);
+
+      // Arriving cargo starts where it was and meets the claw as it closes;
+      // after that it is the hand's. Anything already held just rides.
+      //
+      // The result of an arithmetic instruction is the exception: it does not
+      // exist until the impact, so it appears at the grip on the beat the
+      // animation says it does.
+      final rect = switch (to.op) {
+        Op.sum || Op.sub => held,
+        _ when arriving => Rect.lerp(source, onHand, _grasp(act))!,
+        _ => onHand,
+      };
+      final fade = switch (to.op) {
+        Op.sum || Op.sub => 1 - Payload.mergeResult.alphaAt(act),
+        _ => 0.0,
+      };
+      _package(canvas, rect, to.claws!, fade: fade);
+    }
+
+    // The value the arithmetic consumed, riding the right claw until the smash
+    // takes it. Its opacity is authored: the README has it disappearing at the
+    // impact, which is the frame the result appears.
+    if ((to.op == Op.sum || to.op == Op.sub) && from.claws != null) {
       _package(
         canvas,
-        took ? Rect.lerp(g.intakeSlot(0), held, act)! : held,
-        to.claws!,
+        onHand,
+        from.claws!,
+        fade: 1 - Payload.mergeA.alphaAt(act),
       );
     }
 
@@ -382,6 +434,14 @@ class _Floor extends CustomPainter {
       );
     }
   }
+
+  /// How much of the way the cargo has transferred from its source into the
+  /// claw. The claw spends the first part of a pickup reaching, so the box
+  /// stays put and then goes with it.
+  static double _grasp(double act) => (act / 0.5).clamp(0.0, 1.0);
+
+  /// The mirror: the hand carries it down and lets go at the end.
+  static double _release(double act) => ((act - 0.5) / 0.5).clamp(0.0, 1.0);
 
   void _grid(Canvas canvas, double s) {
     final paint = Paint()

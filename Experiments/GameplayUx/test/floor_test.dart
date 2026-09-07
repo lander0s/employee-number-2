@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gameplay_ux/model/commands.dart';
 import 'package:gameplay_ux/model/vm.dart';
 import 'package:gameplay_ux/ui/floor/floor_geometry.dart';
+import 'package:gameplay_ux/ui/floor/payload.dart';
 
 /// A realistic square: the panel is 448dp wide on the device this is built on.
 const g = FloorGeometry(448);
@@ -96,6 +97,84 @@ void main() {
       final home = g.stand(Station.start);
       final path = g.route(home, g.stand(const Station(StationKind.pallet, 2)));
       expect(path[1].dx, home.dx, reason: 'no detour was needed');
+    });
+  });
+
+  group('the sprite sits where the art says it does', () {
+    test('its wheels are on the station, not its middle', () {
+      // Animations/README.md puts the casters at 81.25% down the comp. The
+      // sprite was fitted into a square instead, which letterboxed it and left
+      // 18.75% of empty canvas below the wheels - so the unit floated most of a
+      // body above whatever it was standing next to, and every published hand
+      // coordinate was that far out.
+      final feet = g.stand(const Station(StationKind.chute));
+      final box = g.body(feet);
+      expect(box.bottom, greaterThan(feet.dy), reason: 'canvas below the wheels');
+      expect(
+        (feet.dy - box.top) / box.height,
+        closeTo(FloorGeometry.groundLine, 0.001),
+      );
+    });
+
+    test('and the box keeps the composition aspect, so nothing letterboxes', () {
+      // BoxFit.fill maps 300x240 onto this one-to-one. Any other aspect shifts
+      // the art inside its box and puts the payload slots somewhere the floor
+      // cannot predict.
+      final box = g.body(g.stand(Station.start));
+      expect(box.width / box.height, closeTo(FloorGeometry.spriteAspect, 0.001));
+    });
+
+    test('the grip is at chest height, above the belt it works', () {
+      final feet = g.stand(const Station(StationKind.chute));
+      final grip = g.handAt(feet, Payload.grip);
+      expect(grip.dx, closeTo(feet.dx, 0.01), reason: 'centred');
+      expect(grip.dy, lessThan(g.intakeBelt.top), reason: 'held clear of it');
+      expect(grip.dy, lessThan(feet.dy), reason: 'above its own wheels');
+    });
+
+    test("the pickup's grab point reaches the ground line", () {
+      // Which is what lets a package be met at the belt rather than snatched
+      // out of the air: the claw comes down to where the unit is standing.
+      final feet = g.stand(const Station(StationKind.chute));
+      final grab = g.handAt(feet, Payload.pickup.at(0));
+      expect(grab.dy, closeTo(feet.dy, g.side * 0.005));
+    });
+  });
+
+  group('the payload tracks follow what was authored', () {
+    test('pickup waits at the grab point, then rises to the grip', () {
+      expect(Payload.pickup.at(0), Payload.pickup.at(0.4));
+      expect(Payload.pickup.at(1), Payload.grip);
+      // Still down at the end of the dwell, well up by the end.
+      expect(Payload.pickup.at(0.58).dy, greaterThan(150));
+      expect(Payload.pickup.at(0.9).dy, lessThan(130));
+    });
+
+    test('the easing is not linear, which the README insists on', () {
+      // Segment 5 to 6 accelerates hard into the merge impact. Sampled at its
+      // midpoint, an eased path is nowhere near the linear halfway point - and
+      // the README says lerping desyncs worst exactly here.
+      final a = Payload.mergeA.at(0.68);
+      final b = Payload.mergeA.at(0.79);
+      final mid = Payload.mergeA.at((0.68 + 0.79) / 2);
+      final linear = Offset.lerp(a, b, 0.5)!;
+      expect((mid - linear).distance, greaterThan(4));
+    });
+
+    test('opacity steps rather than fading', () {
+      // A is visible until the impact and gone after it; the result is the
+      // other way round. Nobody drew a cross-fade, so nobody should invent one.
+      expect(Payload.mergeA.alphaAt(0.5), 1);
+      expect(Payload.mergeA.alphaAt(0.95), 0);
+      expect(Payload.mergeResult.alphaAt(0.5), 0);
+      expect(Payload.mergeResult.alphaAt(0.95), 1);
+    });
+
+    test('a fixed slot never moves', () {
+      const still = Payload.fixed(Payload.grip);
+      expect(still.at(0), Payload.grip);
+      expect(still.at(0.5), Payload.grip);
+      expect(still.at(1), Payload.grip);
     });
   });
 
