@@ -239,13 +239,16 @@ abstract final class Paper {
   /// between the lines is the tell that a page is a picture of paper.
   /// Sized to the face, not carried over from the last one: Schoolbell sets a
   /// good deal wider than the hand it replaced, so the 31 that fit there wraps
-  /// here - spending a whole ruled row on the word "numbers." 26 is the size
-  /// that puts the sample brief's first line back on one row.
+  /// here - spending a whole ruled row on the word "numbers." 26 was the size
+  /// that put the sample brief's first line back on one row, and 23 has more
+  /// room again, so the wrap that drove it is not the constraint any more.
   ///
   /// Where any given brief breaks is a property of its own text, so this is a
   /// nudge away from a cliff rather than a law. Re-check it when the face
   /// changes; it is the first thing a new one invalidates.
-  static const handSize = 26.0;
+  ///
+  /// Changing it moves [handDrop] too - see there.
+  static const handSize = 23.0;
 
   /// Schoolbell ships one face, so [FontWeight.w700] has nothing to select.
   /// It asks the engine to embolden the outlines it has, which it does - by a
@@ -292,18 +295,27 @@ abstract final class Paper {
 
   /// The air between the last written line and the first command.
   ///
-  /// Half a ruled row rather than a whole one. The program's own first gap adds
-  /// [gap] under it, so the separation on screen is 30 - enough to say the note
-  /// and the work are two things, without leaving a hole in the page.
+  /// Small on purpose, and smaller than it was: the program's own first gap
+  /// adds [gap] under this one, so what a player sees is the sum of the two -
+  /// which at half a ruled row came to 30 and read as a blank line left in the
+  /// page. 6 puts the total at [gap] and a half, still enough to say the note
+  /// and the work are two things.
   ///
   /// It sits below all the writing, so unlike [handDrop] it does not move any
   /// line off a rule; it only moves the program, which never sat on the rules
   /// anyway (rows are [rowHeight] with [gap] between, so they run at a pitch of
   /// 48 against the ruling's 36).
-  static const briefGap = 18.0;
+  static const briefGap = 6.0;
 
   /// How far the whole written block is pushed down so its first baseline sits
-  /// on the first rule rather than above it. One number, tuned once: every line
-  /// below it is a whole [rowHeight] further down and keeps the same relation.
-  static const handDrop = 6.0;
+  /// on the first rule rather than above it. One number: every line below it is
+  /// a whole [rowHeight] further down and keeps the same relation.
+  ///
+  /// It is not independent of [handSize]. The line box is [rowHeight] tall
+  /// whatever the size, with the slack split evenly, so a smaller face sits its
+  /// baseline higher in the box and needs pushing further down to land on the
+  /// same rule. Measured on the real face rather than reasoned about: Schoolbell
+  /// moves 0.31px of baseline per 1px of size, so the 26 this was first tuned
+  /// at needed 6.0, and 23 needs `6.0 + 3 * 0.31`.
+  static const handDrop = 6.9;
 }

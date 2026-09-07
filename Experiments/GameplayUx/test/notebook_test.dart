@@ -767,10 +767,17 @@ void main() {
       // below it are both outside the block that has to stay on the grid.
       final height = tester.getRect(find.byType(Brief)).height;
       final written = height - Paper.handDrop - Paper.briefGap;
+
+      // Distance to the nearest whole number of rows, not the remainder: a
+      // block a hair *under* two rows has a remainder of almost a whole row,
+      // which reads as maximally wrong when it is as close as floating point
+      // gets to right.
+      final rows = written / Paper.rowHeight;
+      final off = (rows - rows.roundToDouble()).abs() * Paper.rowHeight;
       expect(
-        written % Paper.rowHeight,
-        closeTo(0, 0.5),
-        reason: 'written block is $written tall',
+        off,
+        lessThan(0.5),
+        reason: 'written block is $written tall, ${off}px off the grid',
       );
     });
 

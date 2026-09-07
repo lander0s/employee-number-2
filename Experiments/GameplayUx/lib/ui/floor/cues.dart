@@ -77,5 +77,5 @@ abstract final class Cues {
     Op.branchUnless || Op.jump => const [],
   };
 
-  static const _grab = [Cue(Sound.pickup, delay: Duration(milliseconds: 300))];
+  static const _grab = [Cue(Sound.pickup, delay: Duration(milliseconds: 400))];
 }
