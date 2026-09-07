@@ -90,6 +90,26 @@ abstract final class W {
   );
 
   static const TextStyle labelDim = TextStyle(fontSize: 17, color: textDim);
+
+  /// The floor's readout, while the floor is a console.
+  ///
+  /// Monospaced, because it is columns of numbers and they have to line up
+  /// down the screen, and below the 17pt floor 7.3 sets for game text - which
+  /// is allowed precisely because this is not game text. It is the machine's
+  /// state printed out while the animation that will show it does not exist
+  /// yet, and it goes when that arrives.
+  static const TextStyle console = TextStyle(
+    fontFamily: 'monospace',
+    fontFamilyFallback: <String>['Consolas', 'Courier New'],
+    fontSize: 15,
+    height: 1.25,
+    color: text,
+  );
+
+  /// A failed shift, and text on it. Shared with the page's own delete
+  /// backdrop, which is the same idea: this went wrong.
+  static const danger = Color(0xFF991B1B);
+  static const onDanger = Color(0xFFF2F2F2);
 }
 
 /// Caps text scaling for furniture. See [W.chromeMaxTextScale].

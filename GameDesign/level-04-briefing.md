@@ -330,13 +330,13 @@ A program passes the level only if it passes all six.
 | # | Program | Passes | Fails | Why it matters |
 |---|---|---|---|---|
 | 1 | `REPEAT { TAKE; IF POSITIVE { SHIP } }` | **all 6** | — | reference solution |
-| 2 | `REPEAT { TAKE; SHIP }` | `s4` | `s1 s2 s3 s5 s6` | ships everything. On `s2`, `SHIP` with empty claws → clean failure. |
+| 2 | `REPEAT { TAKE; SHIP }` | `s2 s4` | `s1 s3 s5 s6` | ships everything. It clears `s2` by accident — see the note below. |
 | 3 | `REPEAT { TAKE }` | `s2 s3 s6` | `s1 s4 s5` | ships nothing. Passes half the set. |
 | 4 | `TAKE; IF POSITIVE { SHIP }` | `s2 s6` | `s1 s3 s4 s5` | no loop — one package only. `s3` fails on intake-not-empty. |
 | 5 | `REPEAT { IF POSITIVE { SHIP }; TAKE }` | — | all 6 | condition before take → §5.2 failure on step 1, every shipment. |
 | 6 | `REPEAT { TAKE; IF NOT NEGATIVE { SHIP } }` | `s2 s4 s6` | `s1 s3 s5` | **ships the zeros.** The level's signature wrong answer. |
 | 7 | `REPEAT { TAKE; IF NOT ZERO { SHIP } }` | `s2 s4` | `s1 s3 s5 s6` | ships the negatives. |
-| 8 | `REPEAT { TAKE; IF POSITIVE { SHIP }; SHIP }` | — | all 6 | double ship → empty-claws failure. |
+| 8 | `REPEAT { TAKE; IF POSITIVE { SHIP }; SHIP }` | `s2` | `s1 s3 s4 s5 s6` | double ship → empty-claws failure, except on `s2`. |
 | 9 | `REPEAT { IF POSITIVE { } }` | — | all 6 | **fails on §5.2 before it can spin.** Pair with case 10. |
 | 10 | `TAKE; REPEAT { IF POSITIVE { } }` | — | all 6 | claws full, condition legal, body empty, no `TAKE` — **the infinite loop.** Must trip the instruction guard (§5.1 rule 3), not hang. This test is the reason rule 3 is written down. |
 
@@ -350,7 +350,7 @@ The set is not decoration. Cross-referencing §7.1:
 
 | Wrong program | Passes | Only caught by |
 |---|---|---|
-| ships everything (#2) | `s4` | any shipment with a non-positive |
+| ships everything (#2) | `s2 s4` | any non-empty shipment with a non-positive |
 | ships nothing (#3) | `s2 s3 s6` | any shipment with a positive |
 | no loop (#4) | `s2 s6` | any shipment of length ≥ 2 |
 | **ships the zeros (#6)** | `s2 s4 s6` | **only `s1`, `s3`, `s5` — the shipments containing `0`** |

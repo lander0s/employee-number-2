@@ -13,6 +13,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../model/level.dart';
 import '../../model/program.dart';
 import 'brief.dart';
 import 'caret.dart';

@@ -11,13 +11,13 @@
 library;
 
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../model/level.dart';
 import '../model/program.dart';
 import 'floor_pane.dart';
-import 'notebook/brief.dart';
+import 'run_controller.dart';
 import 'notebook/lift.dart';
 import 'notebook/note.dart';
 import 'notebook/program.dart';
@@ -33,11 +33,11 @@ const _maxFloor = 1.0;
 const _minRunnableFloor = RunButton.height + 36;
 
 class GameplayScreen extends StatefulWidget {
-  const GameplayScreen({super.key, required this.brief});
+  const GameplayScreen({super.key, required this.level});
 
-  /// The level's brief, written at the top of the page. Passed in rather than
-  /// held here: it is level content, and the screen is the level's frame.
-  final LevelBrief brief;
+  /// The level being played. Passed in rather than held here: it is content,
+  /// and the screen is the frame around it.
+  final Level level;
 
   @override
   State<GameplayScreen> createState() => _GameplayScreenState();
@@ -124,6 +124,8 @@ class _GameplayScreenState extends State<GameplayScreen> {
   @override
   void dispose() {
     _toastTimer?.cancel();
+    _run.removeListener(_refresh);
+    _run.dispose();
     _autoScroll.dispose();
     _lift.dispose();
     _scroll.dispose();
@@ -133,32 +135,31 @@ class _GameplayScreenState extends State<GameplayScreen> {
   double _floorFraction = _programFocused;
   bool _draggingDivider = false;
 
-  /// Fake, for the moment: the button flips state so the two labels can be felt.
-  /// Nothing executes.
-  bool _running = false;
+  /// The machine, and the playback of what it did.
+  ///
+  /// The program is compiled and executed the instant RUN is pressed - the
+  /// verdict exists before the first frame of playback - and this walks the
+  /// trace so the page and the floor can show the same instruction.
+  late final RunController _run = RunController(level: widget.level);
 
-  /// Which line the caret is beside. There is no VM yet, so a run picks one row
-  /// at random and stays there - enough to judge whether a mark in the margin
-  /// reads as "here", which is the question this is for. When the VM lands this
-  /// becomes its program counter and nothing else on this screen changes.
-  String? _executing;
-  final _rng = Random();
+  bool get _running => _run.running;
 
-  void _toggleRun() => setState(() {
-    _running = !_running;
-    if (!_running) {
-      _executing = null;
-      return;
+  void _toggleRun() {
+    if (_run.running) {
+      _run.stop();
+    } else {
+      _run.start(_doc);
     }
-    // Closers are rendered but are not commands, so the robot is never on one.
-    final rows = _doc.flatten().where((r) => !r.isCloser).toList();
-    _executing = rows.isEmpty ? null : rows[_rng.nextInt(rows.length)].node.id;
-  });
+  }
 
   @override
   void initState() {
     super.initState();
     _doc.loadSample();
+    // The whole screen rebuilds on every tick. It is a page of text and a
+    // dozen boxes at two or three frames a second, and threading a notifier
+    // through to the two places that care would buy nothing measurable.
+    _run.addListener(_refresh);
   }
 
   void _snapTo(double target) => setState(() => _floorFraction = target);
@@ -223,7 +224,8 @@ class _GameplayScreenState extends State<GameplayScreen> {
                         height: floorHeight,
                         child: floorVisible
                             ? FloorPane(
-                                running: _running,
+                                level: widget.level,
+                                run: _run,
                                 onToggleRun: _toggleRun,
                               )
                             : const SizedBox.shrink(),
@@ -259,14 +261,14 @@ class _GameplayScreenState extends State<GameplayScreen> {
                             Positioned.fill(
                               child: ProgramEditor(
                                 doc: _doc,
-                                brief: widget.brief,
+                                brief: widget.level.brief,
                                 controller: _scroll,
                                 lift: _lift,
                                 autoScroll: _autoScroll,
                                 onChanged: _refresh,
                                 onRemove: _remove,
                                 running: _running,
-                                executing: _executing,
+                                executing: _run.executing,
                                 bottomInset: _noteHeight,
                               ),
                             ),

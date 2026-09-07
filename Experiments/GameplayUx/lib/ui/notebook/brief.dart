@@ -14,20 +14,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../model/level.dart';
 import 'tokens.dart';
-
-/// What the player was asked for. Actionable only - the story lives in the
-/// call, and a note written to yourself does not repeat the boss's small talk.
-class LevelBrief {
-  const LevelBrief({required this.task, this.detail});
-
-  /// One line, the thing to do.
-  final String task;
-
-  /// The rest of it, for levels whose rule does not fit in one line. Still no
-  /// fiction: the conditions, the edge case, what counts as done.
-  final String? detail;
-}
 
 class Brief extends StatelessWidget {
   const Brief({super.key, required this.brief});

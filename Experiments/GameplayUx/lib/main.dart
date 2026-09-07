@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'model/levels.dart';
 import 'ui/gameplay_screen.dart';
-import 'ui/notebook/brief.dart';
 import 'ui/wireframe.dart';
 
 void main() {
@@ -41,14 +41,6 @@ void main() {
   runApp(const GameplayUxApp());
 }
 
-/// Hardcoded for the experiment; a level file owns this in the real thing.
-/// Actionable only - what the boss said, and why, is the call's job. A note you
-/// wrote to yourself does not quote him back.
-const _sampleBrief = LevelBrief(
-  task: 'Ship only the positive numbers.',
-  detail: 'Zero is not positive. Everything else goes in the bin.',
-);
-
 class GameplayUxApp extends StatelessWidget {
   const GameplayUxApp({super.key});
 
@@ -64,7 +56,10 @@ class GameplayUxApp extends StatelessWidget {
         splashFactory: NoSplash.splashFactory,
         highlightColor: Colors.transparent,
       ),
-      home: const GameplayScreen(brief: _sampleBrief),
+      // Straight into gameplay. There is no menu, no call and no progression
+      // in this experiment: it opens on the one level and that is the whole
+      // app (see model/levels.dart).
+      home: GameplayScreen(level: levels.first),
     );
   }
 }

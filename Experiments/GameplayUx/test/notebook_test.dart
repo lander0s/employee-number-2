@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gameplay_ux/model/commands.dart';
 import 'package:gameplay_ux/model/program.dart';
+import 'package:gameplay_ux/model/level.dart';
 import 'package:gameplay_ux/ui/gameplay_screen.dart';
 import 'package:gameplay_ux/ui/notebook/brief.dart';
 import 'package:gameplay_ux/ui/notebook/caret.dart';
@@ -32,6 +33,15 @@ import 'package:gameplay_ux/ui/notebook/tokens.dart';
 /// pass their own.
 const testBrief = LevelBrief(task: 'Ship.');
 
+/// The level the harness plays, unless a test hands over its own. Its shipment
+/// is the briefing's `s1`, so a run exercises the discard, the zero and the
+/// correctly-rejected last package.
+Level levelWith(LevelBrief brief) => Level(
+  brief: brief,
+  intake: const [-4, 7, 0, 3, 9, -1],
+  goal: (intake) => intake.where((n) => n > 0).toList(),
+);
+
 Widget harness({
   double textScale = 1.0,
   bool animate = false,
@@ -45,7 +55,7 @@ Widget harness({
     ),
     child: child!,
   ),
-  home: GameplayScreen(brief: brief),
+  home: GameplayScreen(level: levelWith(brief)),
 );
 
 Future<void> boot(
