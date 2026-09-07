@@ -63,7 +63,12 @@ class Sfx {
   /// layout test down with it, and it should not stop a run either.
   bool _mute = false;
 
-  Future<void> play(Sound sound) async {
+  /// Plays [sound] at [volume], a fraction of the sample from 0 to 1.
+  ///
+  /// Passed per call rather than set on the player, because the player is
+  /// reused across cues and the same sound is deliberately not always at the
+  /// same level - see Cue.volume in floor/cues.dart.
+  Future<void> play(Sound sound, {double volume = 1.0}) async {
     if (_mute) return;
     try {
       final player = _players[sound] ??= AudioPlayer();
@@ -72,7 +77,7 @@ class Sfx {
       // one that the previous play is still going, and restarting reads as one
       // sound per action rather than as a slur.
       await player.stop();
-      await player.play(AssetSource(sound.asset));
+      await player.play(AssetSource(sound.asset), volume: volume);
     } catch (error) {
       _mute = true;
       debugPrint('sfx off: $error');

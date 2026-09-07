@@ -621,6 +621,20 @@ void main() {
       }
     });
 
+    test('a level is a fraction of its sample, never a boost', () {
+      // Cue's own const assert makes an out-of-range literal a compile error
+      // rather than a runtime one, so this is here for the table as a whole -
+      // including the verdict, which is reached by a different path and would
+      // otherwise be the one cue nothing checks.
+      final all = [
+        Cues.failed,
+        for (final op in ops) ...Cues.of(op, acts: true),
+      ];
+      for (final cue in all) {
+        expect(cue.volume, inInclusiveRange(0, 1));
+      }
+    });
+
     test('every sound in the catalogue has a file behind it', () {
       // A name with no file fails on the device rather than here, and silently
       // - Sfx swallows the failure so a missing plugin cannot stop a run.

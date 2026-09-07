@@ -174,10 +174,11 @@ class _FloorStageState extends State<FloorStage>
       if (_fired[i]) continue;
       // A cue authored past the end of its own gesture plays at the end of it
       // rather than being dropped, because dropping it is silent twice over.
-      final delay = _cues[i].delay;
+      final cue = _cues[i];
+      final delay = cue.delay;
       if (since < (delay < gesture ? delay : gesture)) continue;
       _fired[i] = true;
-      widget.sfx.play(_cues[i].sound);
+      widget.sfx.play(cue.sound, volume: cue.volume);
     }
   }
 
@@ -225,7 +226,9 @@ class _FloorStageState extends State<FloorStage>
     final result = widget.run.result;
     if (widget.run.finished && result != null && result != _judged) {
       _judged = result;
-      if (!result.passed) widget.sfx.play(Sound.error);
+      if (!result.passed) {
+        widget.sfx.play(Cues.failed.sound, volume: Cues.failed.volume);
+      }
     }
 
     final cursor = widget.run.cursor;

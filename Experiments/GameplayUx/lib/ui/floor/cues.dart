@@ -16,9 +16,13 @@ library;
 import '../../model/vm.dart';
 import '../sfx.dart';
 
-/// A sound, and how long after the gesture begins it plays.
+/// A sound, when it plays, and how loud.
 class Cue {
-  const Cue(this.sound, {this.delay = Duration.zero});
+  const Cue(this.sound, {this.delay = Duration.zero, this.volume = 1.0})
+    : assert(
+        volume >= 0 && volume <= 1,
+        'volume is a fraction of the sample, 0 to 1',
+      );
 
   final Sound sound;
 
@@ -34,6 +38,20 @@ class Cue {
   /// It is spent against the animation clock, not a timer, so a cue cannot
   /// arrive at a moment the picture is not at.
   final Duration delay;
+
+  /// A fraction of the sample, 0 to 1. Set per cue rather than per sound,
+  /// because the same noise does not want the same level in every place it is
+  /// used - the grab under a SUB is one beat of a two-part gesture and can sit
+  /// under it, where the same grab is the whole of a TAKE.
+  ///
+  /// Only ever down. There is no headroom above 1 to ask for: the platforms
+  /// disagree about what they do with a larger number, and a sample that is too
+  /// quiet at full volume wants normalising in an editor, where it can be done
+  /// once and heard while it happens.
+  ///
+  /// The bound is checked in a const constructor, so a value outside it fails
+  /// to compile rather than at the moment it would have played.
+  final double volume;
 }
 
 /// The table.
@@ -77,5 +95,13 @@ abstract final class Cues {
     Op.branchUnless || Op.jump => const [],
   };
 
-  static const _grab = [Cue(Sound.pickup, delay: Duration(milliseconds: 400))];
+  /// The shift's verdict, when it goes badly.
+  ///
+  /// Not an action: it is cued from the run's result rather than from an
+  /// instruction, so there is no gesture for a [Cue.delay] to be measured from
+  /// and that field is ignored here. It lives in this file anyway, so that
+  /// every level in the game is set in one place.
+  static const failed = Cue(Sound.error);
+
+  static const _grab = [Cue(Sound.pickup, delay: Duration(milliseconds: 600))];
 }
