@@ -554,14 +554,16 @@ void main() {
     testWidgets('it takes a whole number of ruled rows', (tester) async {
       await boot(tester, brief: brief);
 
-      // Otherwise every row of the program below it lands between the lines
-      // instead of on them, which is the tell that a page is a picture of
-      // paper rather than paper.
+      // Otherwise the written lines land between the rules instead of on
+      // them, which is the tell that a page is a picture of paper rather than
+      // paper. Measured on the writing alone: the drop above it and the gap
+      // below it are both outside the block that has to stay on the grid.
       final height = tester.getRect(find.byType(Brief)).height;
+      final written = height - Paper.handDrop - Paper.briefGap;
       expect(
-        (height - Paper.handDrop) % Paper.rowHeight,
+        written % Paper.rowHeight,
         closeTo(0, 0.5),
-        reason: 'brief is $height tall',
+        reason: 'written block is $written tall',
       );
     });
 

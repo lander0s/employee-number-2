@@ -17,7 +17,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gameplay_ux/model/commands.dart';
 import 'package:gameplay_ux/ui/notebook/tokens.dart';
-import 'package:gameplay_ux/ui/wireframe.dart';
 
 double _linear(double c) =>
     c <= 0.03928 ? c / 12.92 : math.pow((c + 0.055) / 1.055, 2.4).toDouble();
@@ -209,9 +208,11 @@ void main() {
   });
 
   test('the delete backdrop reads as an alert, not as a command', () {
-    // Near-white on it, like the rest of the app's furniture - the dark ink is
-    // for coloured rows.
-    expect(contrast(W.text, Paper.danger), greaterThanOrEqualTo(7));
+    // Near-white on it. This used to be asserted against `W.text`, which was
+    // near-white when the chrome was grey and is dark ink now that it is
+    // cardboard - so the assertion was passing on a token the swipe hint does
+    // not actually use. It uses [Paper.onDanger], which is what is checked.
+    expect(contrast(Paper.onDanger, Paper.danger), greaterThanOrEqualTo(7));
 
     // And it must not be mistaken for the storage family, which wears a red.
     for (final spec in commandCatalogue) {

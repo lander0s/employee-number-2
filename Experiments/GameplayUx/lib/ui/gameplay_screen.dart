@@ -170,7 +170,12 @@ class _GameplayScreenState extends State<GameplayScreen> {
 
     return Scaffold(
       backgroundColor: W.page,
+      // No SafeArea: the game runs full screen (see main.dart), so there are no
+      // bars to keep clear of, and the insets the platform still reports for
+      // them left a band of dead board across the top of the panel.
       body: SafeArea(
+        top: false,
+        bottom: false,
         child: Column(
           children: [
             Expanded(

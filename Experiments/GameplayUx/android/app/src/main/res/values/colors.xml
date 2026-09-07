@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Matches W.page in lib/ui/wireframe.dart. -->
-    <color name="wireframe_page">#FF2B2B2B</color>
+    <!-- Matches W.page in lib/ui/wireframe.dart: the deepest kraft. It is what
+         shows while the engine starts, so a stale value here flashes the old
+         palette on every cold launch. -->
+    <color name="wireframe_page">#FF5C4A35</color>
 </resources>

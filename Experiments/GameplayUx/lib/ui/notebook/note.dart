@@ -43,6 +43,12 @@ class CommandNote extends StatelessWidget {
       builder: (context, _) {
         final binning = lift.isMovingPlaced;
 
+        // What the platform says is unsafe below the note: the gesture pill, or
+        // a navigation bar if one is ever shown. `viewPadding` rather than
+        // `padding`, because the game runs full screen - which zeroes `padding`
+        // for bars that are hidden but does not move them out of the way.
+        final unsafe = MediaQuery.viewPaddingOf(context).bottom;
+
         return DragTarget<DragPayload>(
           // Only a command that is already in the program. One dragged out of
           // here has nothing to delete yet, so dropping it back is a cancel.
@@ -50,7 +56,12 @@ class CommandNote extends StatelessWidget {
           onAcceptWithDetails: (d) => onTrash((d.data as MoveNode).id),
           builder: (context, candidate, rejected) => Container(
             color: Paper.scrim,
-            padding: const EdgeInsets.fromLTRB(6, 6, 6, 10),
+            padding: EdgeInsets.fromLTRB(
+              Paper.noteSidePad,
+              Paper.notePad,
+              Paper.noteSidePad,
+              Paper.noteFoot + unsafe,
+            ),
             // The note keeps its exact height in both states. Resizing it would
             // reflow the page in the middle of a drag, which is the one moment
             // the player is tracking a moving object.

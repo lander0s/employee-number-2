@@ -16,16 +16,25 @@ void main() {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Android 15+ forces edge-to-edge, so the page colour shows behind the status
-  // and navigation bars. Transparent bars with light icons, or the system draws
-  // dark-on-dark and the clock disappears.
+  // Full screen, the way a game is: no status bar, no navigation bar, the whole
+  // panel.
+  //
+  // `manual` with no overlays rather than `immersiveSticky`: this says exactly
+  // which bars are wanted (none) instead of asking for a mode that keeps a
+  // transient overlay alive for the ones it hides. The window shape is also
+  // declared in the Android theme, so the bars are gone before Flutter starts
+  // and there is no resize on launch; this keeps it that way after one.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
+
+  // Still set, for the moment either bar is pulled back down: dark icons now,
+  // because the frame under them is kraft rather than charcoal.
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      statusBarBrightness: Brightness.dark,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
       systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
 
@@ -50,7 +59,7 @@ class GameplayUxApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        brightness: Brightness.dark,
+        brightness: Brightness.light,
         scaffoldBackgroundColor: W.page,
         splashFactory: NoSplash.splashFactory,
         highlightColor: Colors.transparent,

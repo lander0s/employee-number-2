@@ -67,6 +67,20 @@ abstract final class Paper {
   /// target.
   static const buttonTarget = 48.0;
 
+  /// The note's own margin, and extra below it.
+  ///
+  /// The bottom row of commands is the last thing before the edge of the panel,
+  /// and on a phone with rounded corners the two commands at its ends are
+  /// exactly what the curve eats. Android reports the bars and the cutout and
+  /// that inset is added on top of this - but it does not report a corner
+  /// radius, so this is the part that has to be generous on its own.
+  ///
+  /// The sides carry more than the top for the same reason: a corner curve
+  /// comes in diagonally, so it takes width as well as height.
+  static const notePad = 6.0;
+  static const noteSidePad = 10.0;
+  static const noteFoot = 18.0;
+
   /// How much empty page is kept below the last row, as a fraction of the pane.
   /// It is what makes a short program scrollable at all.
   static const tailSlack = 0.5;
@@ -98,7 +112,10 @@ abstract final class Paper {
   /// The note lies over the page and lets it through: the ruling is visible
   /// under it, which is what makes the note read as something resting on the
   /// program rather than a strip of frame bolted to the bottom of the screen.
-  static const scrim = Color(0x661C1C1C);
+  ///
+  /// Warm, not neutral. Over cream paper a grey scrim goes green, and the strip
+  /// stopped matching the cardboard the rest of the frame is cut from.
+  static const scrim = Color(0x664A3A26);
 
   /// Revealed behind a row being swiped away. Deep rather than bright: it is
   /// read in near-white like the app's own furniture, and it has to stay clear
@@ -107,7 +124,8 @@ abstract final class Paper {
   static const onDanger = Color(0xFFF2F2F2);
 
   /// The note in its bin state, and the same lit up with something over it.
-  static const binIdle = Color(0xFFBFC3C7);
+  /// Idle is board, not steel: the bin is drawn on the strip it replaces.
+  static const binIdle = Color(0xFF3E2F1F);
   static const binArmed = Color(0xFFFF8275);
 
   /// The free corner is turned up a little. Small enough to register as
@@ -235,6 +253,18 @@ abstract final class Paper {
   /// heavy, so most of the weight is in the font now and this only has to
   /// finish the job - at 0.7 it closed the counters and read as a blot.
   static const handPress = 0.4;
+
+  /// The air between the last written line and the first command.
+  ///
+  /// Half a ruled row rather than a whole one. The program's own first gap adds
+  /// [gap] under it, so the separation on screen is 30 - enough to say the note
+  /// and the work are two things, without leaving a hole in the page.
+  ///
+  /// It sits below all the writing, so unlike [handDrop] it does not move any
+  /// line off a rule; it only moves the program, which never sat on the rules
+  /// anyway (rows are [rowHeight] with [gap] between, so they run at a pitch of
+  /// 48 against the ruling's 36).
+  static const briefGap = 18.0;
 
   /// How far the whole written block is pushed down so its first baseline sits
   /// on the first rule rather than above it. One number, tuned once: every line

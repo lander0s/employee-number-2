@@ -34,7 +34,7 @@ class FloorPane extends StatelessWidget {
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: const Color(0xFF474747),
+          color: W.paneWell,
           border: Border.all(color: W.line),
         ),
         child: Stack(

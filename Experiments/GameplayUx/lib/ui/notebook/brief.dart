@@ -64,11 +64,10 @@ class Brief extends StatelessWidget {
             ),
             if (detail != null)
               Text(detail, style: Paper.handAt(Paper.handInk)),
-            // A blank line between the note and the work. One ruled row, so the
-            // program below still starts on a line - and left empty rather than
-            // ruled off, because a person separates the two by skipping a line,
-            // not by drawing across the page.
-            const SizedBox(height: Paper.rowHeight),
+            // Air between the note and the work, rather than a rule drawn
+            // across the page: a person separates the two by leaving a space,
+            // not by ruling them off.
+            const SizedBox(height: Paper.briefGap),
           ],
         ),
       ),
