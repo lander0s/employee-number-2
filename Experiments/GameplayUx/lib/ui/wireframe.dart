@@ -28,11 +28,8 @@ abstract final class W {
   /// The deepest cut: seen only in the gaps between everything else.
   static const page = Color(0xFF5C4A35);
 
-  /// The floor pane's surround.
-  static const paneFloor = Color(0xFF8A6E4C);
-
-  /// The well inside it, where the simulation will go. Recessed rather than
-  /// raised: it is a hole cut in the box, not another sheet laid on it.
+  /// The floor the simulation is drawn on. It runs edge to edge - there is no
+  /// frame of board around it any more - so this is the whole top pane.
   static const paneWell = Color(0xFF9E815B);
 
   /// The working surface: anything the player reads text off.

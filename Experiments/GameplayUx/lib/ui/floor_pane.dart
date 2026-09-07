@@ -38,36 +38,34 @@ class FloorPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // No margin and no border. Both existed to set the well apart from a
+    // frame of board around it, and with the simulation running edge to edge
+    // there is no frame left to set it apart from - the floor *is* the pane.
+    // It also buys the square the width the margin was holding: 20dp on a
+    // 448dp panel is a package and a half.
     return Container(
-      color: W.paneFloor,
-      padding: const EdgeInsets.all(10),
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: W.paneWell,
-          border: Border.all(color: W.line),
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
+      color: W.paneWell,
+      width: double.infinity,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: run,
+              builder: (context, _) => _Floor(level: level, run: run),
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Chrome(
               child: AnimatedBuilder(
                 animation: run,
-                builder: (context, _) => _Floor(level: level, run: run),
+                builder: (context, _) =>
+                    RunButton(running: run.running, onTap: onToggleRun),
               ),
             ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Chrome(
-                child: AnimatedBuilder(
-                  animation: run,
-                  builder: (context, _) =>
-                      RunButton(running: run.running, onTap: onToggleRun),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
