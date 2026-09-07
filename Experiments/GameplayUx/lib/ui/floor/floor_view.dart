@@ -1,88 +1,187 @@
 /// The floor, seen from above. Wireframe primitives, no art.
 ///
 /// Everything the machine can observe is on it: the intake belt running in from
-/// off-screen left, the outbound belt down the right, five pallets across the
-/// bottom, and UNIT-02 in the middle holding at most one package.
+/// off-screen left, the outbound belt running out off-screen right, five
+/// pallets across the bottom, and UNIT-02 between the two holding at most one
+/// package.
 ///
-/// The intake deliberately leaves the square. A shipment is not a list of six,
+/// Both belts deliberately leave the square. A shipment is not a list of six,
 /// it is a queue arriving from the rest of a warehouse the player never sees,
-/// and a belt that runs off the edge of the panel says that where a tidy column
-/// of boxes says the opposite. That is the whole world
-/// (game-design-document 6.1), and drawing it as boxes and lines first is the
-/// cheapest way to find out whether the *layout* reads before anything is
-/// animated - which way packages flow, where the robot has to reach, whether
-/// five pallets across the bottom is legible at a thumb's distance.
+/// and rails that run off the edge of the panel say that where two tidy columns
+/// of boxes say the opposite. That is the whole world (game-design-document
+/// 6.1), and drawing it as boxes and lines first is the cheapest way to find
+/// out whether the *layout* reads before anything is drawn properly.
 ///
-/// It is a square, always. See [FloorSquare] for why, and for what happens when
-/// the divider leaves it less room than that.
+/// It moves. Packages travel between the position they held on the last
+/// instruction and the one they hold on this one, which means the floor needs
+/// both states and cannot work from a single snapshot - see [FloorStage].
 library;
 
 import 'package:flutter/material.dart';
 
 import '../../model/commands.dart';
+import '../../model/level.dart';
+import '../../model/vm.dart';
+import '../run_controller.dart';
 import '../wireframe.dart';
 
-/// A square window onto the floor, anchored at the bottom.
+/// How long one instruction's movement takes.
 ///
-/// The floor is a fixed square the width of the pane, and the pane clips it
-/// rather than squashing it: pushing the divider up slides the square away like
-/// a drawer instead of distorting a world the player is trying to read. It is
-/// anchored at the *bottom* because that is where the pallets are - the drawer
-/// gives up empty air at the top first, and the last thing to go is the row of
-/// spots the program addresses by number.
-class FloorSquare extends StatelessWidget {
-  const FloorSquare({
-    super.key,
+/// Shorter than the shortest hold in [RunController], so every movement lands
+/// and then rests. Continuous motion would read as a conveyor that never stops,
+/// which is a different machine from this one: UNIT-02 does one thing at a
+/// time, and the stillness between things is how you see what it did.
+const _travel = Duration(milliseconds: 280);
+
+/// The instruction is in two phases: the unit walks, then it acts.
+///
+/// One phase would have the package leave the belt while the robot was still
+/// crossing the floor towards it - the box teleporting into claws that had not
+/// arrived. Splitting it means the walk finishes first and the hand-over
+/// happens where the unit is standing, which is the order these things happen
+/// in. It is also why nothing about a package's position is written down: it is
+/// wherever the claws are, and the claws are wherever the walk got to.
+const _walkPhase = 0.6;
+
+/// Everything on the floor at one instant.
+class FloorState {
+  const FloorState({
     required this.intake,
     required this.claws,
     required this.outbound,
     required this.pallets,
+    required this.station,
   });
+
+  FloorState.of(Tick tick)
+    : intake = tick.intake,
+      claws = tick.claws,
+      outbound = tick.outbound,
+      pallets = tick.pallets,
+      station = tick.station;
+
+  /// The batch as it arrived, before a program has touched it. Also what the
+  /// floor shows while the player is still writing: the shipment is the
+  /// question, and it should be readable the whole time.
+  FloorState.waiting(Level level)
+    : intake = level.intake,
+      claws = null,
+      outbound = const [],
+      pallets = const [],
+      station = Station.start;
 
   final List<int> intake;
   final int? claws;
   final List<int> outbound;
   final List<int?> pallets;
 
+  /// Where the unit is standing. The floor walks it between the two states.
+  final Station station;
+}
+
+/// Drives the floor's animation off a [RunController].
+///
+/// The controller advances in steps - one instruction, then a pause - so it
+/// cannot drive movement on its own. This restarts a short travel animation
+/// whenever the instruction on screen changes, and hands the painter the two
+/// states with a position between them.
+class FloorStage extends StatefulWidget {
+  const FloorStage({super.key, required this.level, required this.run});
+
+  final Level level;
+  final RunController run;
+
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final side = constraints.maxWidth;
-      return ClipRect(
-        child: OverflowBox(
-          alignment: Alignment.bottomCenter,
-          minHeight: side,
-          maxHeight: side,
-          child: SizedBox(
-            width: side,
-            height: side,
-            child: CustomPaint(
-              painter: _Floor(
-                intake: intake,
-                claws: claws,
-                outbound: outbound,
-                pallets: pallets,
+  State<FloorStage> createState() => _FloorStageState();
+}
+
+class _FloorStageState extends State<FloorStage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _anim = AnimationController(
+    vsync: this,
+    duration: _travel,
+  );
+
+  /// The instruction the current animation belongs to.
+  int _showing = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.run.addListener(_onRun);
+  }
+
+  @override
+  void dispose() {
+    widget.run.removeListener(_onRun);
+    _anim.dispose();
+    super.dispose();
+  }
+
+  void _onRun() {
+    if (!mounted) return;
+    final cursor = widget.run.cursor;
+    if (cursor != _showing) {
+      _showing = cursor;
+      // From zero every time rather than continuing: each instruction is its
+      // own movement, and one that started late should not finish early.
+      _anim.forward(from: 0);
+    }
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = widget.run.now;
+    final before = widget.run.previous;
+
+    final to = now == null
+        ? FloorState.waiting(widget.level)
+        : FloorState.of(now);
+
+    // Falling back to the waiting state is what makes the very first
+    // instruction animate: a TAKE on the first tick travels from the shipment
+    // as it arrived, rather than appearing in the claws.
+    final from = before != null
+        ? FloorState.of(before)
+        : (now == null ? to : FloorState.waiting(widget.level));
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final side = constraints.maxWidth;
+        return ClipRect(
+          child: OverflowBox(
+            alignment: Alignment.bottomCenter,
+            minHeight: side,
+            maxHeight: side,
+            child: SizedBox(
+              width: side,
+              height: side,
+              child: AnimatedBuilder(
+                animation: _anim,
+                builder: (context, _) => CustomPaint(
+                  // Linear, deliberately: a package on a belt is being carried
+                  // at the belt's speed. Easing it would be the box deciding
+                  // for itself when to set off and when to stop.
+                  painter: _Floor(from: from, to: to, t: _anim.value),
+                ),
               ),
             ),
           ),
-        ),
-      );
-    },
-  );
+        );
+      },
+    );
+  }
 }
 
 class _Floor extends CustomPainter {
-  _Floor({
-    required this.intake,
-    required this.claws,
-    required this.outbound,
-    required this.pallets,
-  });
+  _Floor({required this.from, required this.to, required this.t});
 
-  final List<int> intake;
-  final int? claws;
-  final List<int> outbound;
-  final List<int?> pallets;
+  final FloorState from;
+  final FloorState to;
+
+  /// 0 at the previous instruction, 1 at this one.
+  final double t;
 
   // Everything below is a fraction of the side, so the whole floor scales with
   // the square and there is not a single hardcoded distance in it.
@@ -98,34 +197,50 @@ class _Floor extends CustomPainter {
   /// sits where two and a half packages are on screen: enough to see what is
   /// coming and what just left, not enough to plan a whole shipment by reading
   /// it off the floor. [_beltOff] is how far past the edge of the square the
-  /// rail carries on, so neither belt ever appears to stop at the panel.
+  /// rail carries on, so neither belt appears to stop at the panel.
   ///
   /// The consequence worth naming: **the unit always drops at the same place.**
-  /// The near end of the outbound is the drop point, and whatever was there has
-  /// already travelled on, so the position never depends on how much has been
-  /// shipped. Nothing moves yet, but the layout is built for it to.
+  /// The near end of the outbound is the drop point, and by the time the unit
+  /// ships again whatever was there has travelled on, so the position never
+  /// depends on how much has been shipped.
   static const _chuteEnd = 0.235;
   static const _beltOff = 0.6;
 
   /// The pallets are pushed to the foot of the square, where they belong: they
-  /// are the floor, and everything else happens above them. It also gives the
-  /// belts and the unit the whole middle of the square instead of two thirds
-  /// of it, which is what the room freed by dropping the narration was for.
+  /// are the floor, and everything else happens above them.
   static const _palletTop = 0.805;
   static const _palletSize = 0.135;
 
-  /// Centred in the open floor between the top of the belts and the pallets.
   static const _robot = 0.17;
-  static const _robotAt = 0.42;
+
+  /// The line the belts run along. The unit no longer stands on it - it stands
+  /// *above* whatever it is working on - but everything is still measured from
+  /// it, because it is the axis the whole floor is built around.
+  static const _beltAt = 0.42;
+
+  /// The two rows the unit works from: above the belts, and above the pallets.
+  /// It reaches down into whichever it is standing over, which is why the claws
+  /// overlap the belt or the pallet rather than stopping short of it.
+  static const _beltRow = 0.245;
+  static const _palletRow = 0.705;
+
+  /// How far a binned package falls before it is gone.
+  static const _binDrop = 0.13;
 
   @override
   void paint(Canvas canvas, Size size) {
     final s = size.width;
     final beltW = s * _beltW;
+    final mid = s * _beltAt;
 
-    _grid(canvas, s);
+    final box = beltW * 0.59;
+    final step = box + s * 0.008;
 
-    final mid = s * _robotAt;
+    // The head of each queue stops short of the end of its belt by the same
+    // clearance it has along the sides, so a package sits in an even surround
+    // instead of pressed against the rail it arrived on.
+    final lip = (beltW - box) / 2;
+
     final intakeBelt = Rect.fromLTRB(
       s * -_beltOff,
       mid - beltW / 2,
@@ -139,23 +254,125 @@ class _Floor extends CustomPainter {
       mid + beltW / 2,
     );
 
-    // Both queues are drawn head-first from the end nearest the unit, and the
-    // heads mean opposite things: on the intake it is the next package to be
-    // taken, on the outbound the one most recently shipped. Which is why the
-    // outbound list is walked backwards - the newest is the one at the drop
-    // point, and the first thing shipped is furthest away.
-    _belt(canvas, intakeBelt, 'INTAKE', intake, headAtFar: true, s: s);
-    _belt(
-      canvas,
-      outBelt,
-      'OUTBOUND',
-      outbound.reversed.toList(),
-      headAtFar: false,
-      s: s,
+    // Slot 0 is the end nearest the unit on both belts; the queues run away
+    // from it in opposite directions.
+    Rect intakeSlot(int i) => Rect.fromLTWH(
+      intakeBelt.right - lip - box - i * step,
+      mid - box / 2,
+      box,
+      box,
+    );
+    Rect outSlot(int i) =>
+        Rect.fromLTWH(outBelt.left + lip + i * step, mid - box / 2, box, box);
+
+    final pad = s * _pad;
+    final palletSize = s * _palletSize;
+    final palletSpan = s - pad * 2;
+    final palletGap = palletCount > 1
+        ? (palletSpan - palletSize * palletCount) / (palletCount - 1)
+        : 0.0;
+    Rect palletSlot(int i) => Rect.fromLTWH(
+      pad + i * (palletSize + palletGap),
+      s * _palletTop,
+      palletSize,
+      palletSize,
     );
 
-    _pallets(canvas, s);
-    _unit(canvas, s);
+    /// Where the unit stands to work on something: over it, one body clear.
+    Rect stand(Station at) {
+      final side = s * _robot;
+      final centre = switch (at.kind) {
+        // Mid-floor, between the two belts. Only ever the starting position.
+        StationKind.home => Offset(s / 2, s * _beltRow),
+        StationKind.chute => Offset(intakeSlot(0).center.dx, s * _beltRow),
+        StationKind.outbound => Offset(outSlot(0).center.dx, s * _beltRow),
+        StationKind.pallet => Offset(
+          palletSlot(at.pallet).center.dx,
+          s * _palletRow,
+        ),
+      };
+      return Rect.fromCenter(center: centre, width: side, height: side);
+    }
+
+    // The walk finishes before the hand-over starts. Everything a package does
+    // is measured against [act]; everything the unit does, against [walk].
+    final walk = (t / _walkPhase).clamp(0.0, 1.0);
+    final act = ((t - _walkPhase) / (1 - _walkPhase)).clamp(0.0, 1.0);
+
+    final robot = Rect.lerp(stand(from.station), stand(to.station), walk)!;
+    final held = robot.deflate(s * _robot * 0.22);
+
+    _grid(canvas, s);
+    _rail(canvas, intakeBelt, 'INTAKE', intakeSlot(0), s);
+    _rail(canvas, outBelt, 'OUTBOUND', outSlot(0), s);
+    _pallets(canvas, s, palletSlot);
+    _unit(canvas, robot, s);
+
+    // What the instruction did, read off the two states rather than passed in.
+    // The machine already recorded the result; asking it to also describe the
+    // movement would be two sources for one fact.
+    final took = from.intake.length - to.intake.length == 1;
+    final shipped = to.outbound.length - from.outbound.length == 1;
+    final binned = took && from.claws != null;
+
+    // -------------------------------------------------------------- intake
+    //
+    // Everything still on the belt slides one slot closer when a package comes
+    // off the front, which is what a conveyor does.
+    for (var i = 0; i < to.intake.length; i++) {
+      final rect = Rect.lerp(
+        intakeSlot(i + (took ? 1 : 0)),
+        intakeSlot(i),
+        act,
+      )!;
+      if (rect.right < 0) break;
+      _package(canvas, rect, to.intake[i], s);
+    }
+
+    // ------------------------------------------------------------ outbound
+    final added = shipped ? 1 : 0;
+    for (var i = 0; i < to.outbound.length; i++) {
+      // Drawn head-first from the drop point, and the head is the *newest*:
+      // the first thing shipped is furthest away, already off the edge.
+      final value = to.outbound[to.outbound.length - 1 - i];
+      final rect = i == 0 && shipped
+          // Carried in the claws for the whole walk, then set down. `held` is
+          // the walked-to position, so it leaves the unit wherever the unit
+          // actually got to.
+          ? Rect.lerp(held, outSlot(0), act)!
+          : Rect.lerp(outSlot(i - added), outSlot(i), act)!;
+      if (rect.left > s) break;
+      _package(canvas, rect, value, s);
+    }
+
+    // --------------------------------------------------------------- claws
+    if (to.claws != null) {
+      // A package arriving from the chute is lifted once the unit is there;
+      // one already in the claws, or one changed in place by arithmetic, just
+      // rides along with it.
+      _package(
+        canvas,
+        took ? Rect.lerp(intakeSlot(0), held, act)! : held,
+        to.claws!,
+        s,
+      );
+    }
+
+    // ----------------------------------------------------------------- bin
+    //
+    // TAKE with full claws destroys what was held (game-design-document 6.3).
+    // The docs are insistent that this must not be silent, and a box dropping
+    // out of frame is the least this can do until there is a bin to drop it
+    // into and a sound to go with it.
+    if (binned) {
+      _package(
+        canvas,
+        Rect.lerp(held, held.translate(0, s * _binDrop), act)!,
+        from.claws!,
+        s,
+        fade: act,
+      );
+    }
   }
 
   void _grid(Canvas canvas, double s) {
@@ -170,22 +387,8 @@ class _Floor extends CustomPainter {
     }
   }
 
-  /// A belt, its label, and the queue on it, head first.
-  ///
-  /// Horizontal only. Both belts run off the square now, so there is no end for
-  /// a queue to fill up against and no `+n` to draw: what is off screen is off
-  /// screen, and that is the fiction rather than a limitation. The vertical
-  /// case this used to carry went with the last belt that needed it.
-  void _belt(
-    Canvas canvas,
-    Rect belt,
-    String label,
-    List<int> queue, {
-    /// True when the head sits at the belt's right end and the queue runs left
-    /// (the intake), false for the mirror of that (the outbound).
-    required bool headAtFar,
-    required double s,
-  }) {
+  /// A belt: the rail, its rollers, and its label under the near end.
+  void _rail(Canvas canvas, Rect belt, String label, Rect head, double s) {
     canvas.drawRect(belt, _stroke());
 
     // Rollers, across the direction of travel, which is what a roller is.
@@ -198,77 +401,34 @@ class _Floor extends CustomPainter {
       canvas.drawLine(Offset(x, belt.top), Offset(x, belt.bottom), rollers);
     }
 
-    final box = belt.height * 0.59;
-    final step = box + s * 0.008;
-
-    // The head stops short of the end of the belt by the same clearance it
-    // already has along the sides, so a package sits in an even surround
-    // instead of pressed against the rail it arrived on.
-    final lip = (belt.height - box) / 2;
-    final head = headAtFar ? belt.right - lip - box : belt.left + lip;
-
-    for (var i = 0; i < queue.length; i++) {
-      final x = headAtFar ? head - i * step : head + i * step;
-      // Past the edge it is clipped anyway, and painting a long shipment off
-      // into nowhere is work for nobody.
-      if (x + box < 0 || x > s) break;
-      _package(
-        canvas,
-        Rect.fromLTWH(x, belt.center.dy - box / 2, box, box),
-        queue[i],
-        s,
-      );
-    }
-
-    _label(
-      canvas,
-      label,
-      Offset(head + box / 2, belt.bottom + s * 0.037),
-      s,
-    );
+    _label(canvas, label, Offset(head.center.dx, belt.bottom + s * 0.037), s);
   }
 
-  void _pallets(Canvas canvas, double s) {
-    final pad = s * _pad;
-    final size = s * _palletSize;
-    final top = s * _palletTop;
-    final span = s - pad * 2;
-    // Evenly spaced, ends flush with the belts above them: the floor should
-    // read as one grid rather than as a row of pallets floating under it.
-    final gap = palletCount > 1
-        ? (span - size * palletCount) / (palletCount - 1)
-        : 0.0;
-
+  /// The numbered spots, and whatever is on them.
+  ///
+  /// Geometry comes from the caller because the unit needs it too - it has to
+  /// know where pallet 3 is in order to stand over it - and two places working
+  /// it out separately is how they end up disagreeing.
+  void _pallets(Canvas canvas, double s, Rect Function(int) slot) {
     for (var i = 0; i < palletCount; i++) {
-      final rect = Rect.fromLTWH(pad + i * (size + gap), top, size, size);
+      final rect = slot(i);
       canvas.drawRect(rect, _stroke());
-      _label(
-        canvas,
-        '$i',
-        Offset(rect.center.dx, rect.bottom + s * 0.012),
-        s,
-      );
+      _label(canvas, '$i', Offset(rect.center.dx, rect.bottom + s * 0.012), s);
 
-      final value = i < pallets.length ? pallets[i] : null;
+      final value = i < to.pallets.length ? to.pallets[i] : null;
       if (value != null) {
-        final inset = size * 0.16;
-        _package(canvas, rect.deflate(inset), value, s);
+        _package(canvas, rect.deflate(rect.width * 0.16), value, s);
       }
     }
   }
 
-  /// UNIT-02, and whatever is in its claws.
-  void _unit(Canvas canvas, double s) {
-    final side = s * _robot;
-    final rect = Rect.fromCenter(
-      center: Offset(s / 2, s * _robotAt),
-      width: side,
-      height: side,
-    );
-
+  /// UNIT-02. What it is holding is drawn by [paint], because that package may
+  /// be in flight rather than in the claws.
+  void _unit(Canvas canvas, Rect rect, double s) {
     canvas.drawRect(rect, _stroke(width: 2));
 
     // Two claws off the bottom edge, pointing at the floor it works over.
+    final side = rect.width;
     final claw = Paint()
       ..color = W.text
       ..strokeWidth = 2
@@ -282,10 +442,6 @@ class _Floor extends CustomPainter {
     }
 
     _label(canvas, 'UNIT-02', Offset(rect.center.dx, rect.top - s * 0.03), s);
-
-    if (claws != null) {
-      _package(canvas, rect.deflate(side * 0.22), claws!, s);
-    }
   }
 
   // ------------------------------------------------------------------ pieces
@@ -296,12 +452,22 @@ class _Floor extends CustomPainter {
     ..style = PaintingStyle.stroke;
 
   /// A package: a box with its number in it. That is all a package is.
-  void _package(Canvas canvas, Rect rect, int value, double s) {
-    canvas.drawRect(rect, Paint()..color = W.floorPackage);
+  void _package(
+    Canvas canvas,
+    Rect rect,
+    int value,
+    double s, {
+    double fade = 0,
+  }) {
+    final alpha = 1 - fade;
+    canvas.drawRect(
+      rect,
+      Paint()..color = W.floorPackage.withValues(alpha: alpha),
+    );
     canvas.drawRect(
       rect,
       Paint()
-        ..color = W.text
+        ..color = W.text.withValues(alpha: alpha)
         ..strokeWidth = 1.5
         ..style = PaintingStyle.stroke,
     );
@@ -310,7 +476,7 @@ class _Floor extends CustomPainter {
       '$value',
       rect.center,
       rect.height * 0.62,
-      W.text,
+      W.text.withValues(alpha: alpha),
       centred: true,
     );
   }
@@ -350,16 +516,5 @@ class _Floor extends CustomPainter {
 
   @override
   bool shouldRepaint(_Floor old) =>
-      old.claws != claws ||
-      !_same(old.intake, intake) ||
-      !_same(old.outbound, outbound) ||
-      !_same(old.pallets, pallets);
-
-  static bool _same(List<Object?> a, List<Object?> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
-  }
+      old.t != t || old.from != from || old.to != to;
 }

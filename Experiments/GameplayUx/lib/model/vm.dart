@@ -162,6 +162,45 @@ class Halt {
   final String message;
 }
 
+/// Where UNIT-02 is standing.
+///
+/// The machine has to record this because the floor cannot work it out: a tick
+/// says a package left the intake, not that the robot walked to the chute to
+/// fetch it. It is where the unit *is*, not where it is going, so an
+/// instruction that moves nothing - a condition - carries the station of
+/// whatever came before it and the robot stays put.
+enum StationKind {
+  /// Where a shift starts. Nothing is worked on from here.
+  home,
+
+  /// The near end of the intake belt.
+  chute,
+
+  /// The near end of the outbound belt, which never moves.
+  outbound,
+
+  /// One of the numbered floor spots.
+  pallet,
+}
+
+class Station {
+  const Station(this.kind, [this.pallet = 0]);
+
+  static const start = Station(StationKind.home);
+
+  final StationKind kind;
+
+  /// Only meaningful for [StationKind.pallet].
+  final int pallet;
+
+  @override
+  bool operator ==(Object other) =>
+      other is Station && other.kind == kind && other.pallet == pallet;
+
+  @override
+  int get hashCode => Object.hash(kind, pallet);
+}
+
 /// One instruction's worth of history, with the world as it stood after it.
 class Tick {
   const Tick({
@@ -172,6 +211,7 @@ class Tick {
     required this.outbound,
     required this.pallets,
     required this.steps,
+    required this.station,
   });
 
   /// The row that ran, for the caret.
@@ -187,6 +227,9 @@ class Tick {
 
   /// SPEED so far.
   final int steps;
+
+  /// Where the unit was standing when this instruction finished.
+  final Station station;
 }
 
 class RunResult {
@@ -232,6 +275,10 @@ class Machine {
   int _pc = 0;
   int _steps = 0;
   int _instructions = 0;
+
+  /// Updated by the instructions that send the robot somewhere, and left alone
+  /// by the ones that do not.
+  Station _station = Station.start;
 
   /// Generous, and counted in instructions rather than steps.
   ///
@@ -284,11 +331,13 @@ class Machine {
           // reference solution's SPEED is `len + 1 + positives` rather than
           // `len + positives` (level-04-briefing 6.3), and why an empty
           // shipment costs 1 rather than 0.
+          _station = const Station(StationKind.chute);
           _trace(instr, 'TAKE  (intake empty, shift ends)');
           return const Halt(HaltKind.shiftEnded, 'The intake ran dry.');
         }
         final discarded = _claws;
         _claws = _intake.removeAt(0);
+        _station = const Station(StationKind.chute);
         _trace(
           instr,
           discarded == null
@@ -299,12 +348,14 @@ class Machine {
       case Op.ship:
         if (_claws == null) return _emptyClaws('ship');
         _outbound.add(_claws!);
+        _station = const Station(StationKind.outbound);
         _trace(instr, 'SHIP ${_claws!}');
         _claws = null;
 
       case Op.copyTo:
         if (_claws == null) return _emptyClaws('copy');
         _pallets[instr.pallet] = _claws;
+        _station = Station(StationKind.pallet, instr.pallet);
         _trace(instr, 'COPY TO ${instr.pallet}  <- ${_claws!}');
 
       case Op.copyFrom:
@@ -314,6 +365,7 @@ class Machine {
         // was in them (game-design-document 6.3).
         final discarded = _claws;
         _claws = value;
+        _station = Station(StationKind.pallet, instr.pallet);
         _trace(
           instr,
           discarded == null
@@ -328,6 +380,7 @@ class Machine {
         if (operand == null) return _emptyPallet(instr.pallet);
         final before = _claws!;
         _claws = instr.op == Op.sum ? before + operand : before - operand;
+        _station = Station(StationKind.pallet, instr.pallet);
         final sign = instr.op == Op.sum ? '+' : '-';
         _trace(instr, '${instr.op == Op.sum ? 'SUM' : 'SUB'} ${instr.pallet}'
             '  $before $sign $operand = ${_claws!}');
@@ -382,6 +435,7 @@ class Machine {
         outbound: List.unmodifiable(_outbound),
         pallets: List.unmodifiable(_pallets),
         steps: _steps,
+        station: _station,
       ),
     );
   }

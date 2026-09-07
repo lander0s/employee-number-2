@@ -18,7 +18,6 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../model/commands.dart';
 import '../model/level.dart';
 import '../model/vm.dart';
 import 'floor/floor_view.dart';
@@ -82,7 +81,6 @@ class _Floor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final now = run.now;
     final result = run.result;
 
     // Before the first instruction the floor shows the batch as it arrived,
@@ -90,14 +88,10 @@ class _Floor extends StatelessWidget {
     // shipment is the question, and it should be readable the whole time.
     return Stack(
       children: [
-        Positioned.fill(
-          child: FloorSquare(
-            intake: now?.intake ?? level.intake,
-            claws: now?.claws,
-            outbound: now?.outbound ?? const [],
-            pallets: now?.pallets ?? List<int?>.filled(palletCount, null),
-          ),
-        ),
+        // The floor drives its own animation off the controller: it needs the
+        // instruction before this one to know which way anything is moving,
+        // and one rebuild per tick is not enough frames to move on.
+        Positioned.fill(child: FloorStage(level: level, run: run)),
         if (result != null && run.finished)
           Positioned(
             left: 8,

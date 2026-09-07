@@ -292,6 +292,48 @@ void main() {
     });
   });
 
+  group('where the unit is standing', () {
+    test('it walks to whatever the instruction names', () {
+      final r = exec([
+        cmd('take'),
+        cmd('copyTo', pallet: 3),
+        cmd('sum', pallet: 3),
+        cmd('ship'),
+      ], levelOf([5]));
+
+      expect(r.ticks.map((t) => t.station), [
+        const Station(StationKind.chute),
+        const Station(StationKind.pallet, 3),
+        const Station(StationKind.pallet, 3),
+        const Station(StationKind.outbound),
+      ]);
+    });
+
+    test('a condition leaves it where it was', () {
+      // The station is where the unit *is*, not where it is going, so an
+      // instruction that moves nothing carries the previous one forward and the
+      // robot stays put instead of trotting back to the middle of the floor.
+      final r = exec([
+        cmd('take'),
+        block('ifCond', [cmd('take')], cond: 'POSITIVE'),
+      ], levelOf([5, 6]));
+
+      expect(r.ticks[0].station, const Station(StationKind.chute));
+      expect(r.ticks[1].station, const Station(StationKind.chute));
+    });
+
+    test('a shift starts at home, and nothing returns there', () {
+      // Home is only ever the first position: the unit finishes standing over
+      // whatever it last touched, the way a person leaves a trolley where they
+      // stopped pushing it.
+      final r = exec(reference(), levelOf(s1));
+      expect(
+        r.ticks.map((t) => t.station.kind),
+        isNot(contains(StationKind.home)),
+      );
+    });
+  });
+
   group('the loop guard', () {
     test('counts instructions, not steps', () {
       // The one rule here that is a bug rather than a design choice. This

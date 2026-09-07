@@ -16,7 +16,6 @@ import 'package:flutter/material.dart';
 
 import '../model/level.dart';
 import '../model/program.dart';
-import 'floor/floor_view.dart';
 import 'floor_pane.dart';
 import 'run_controller.dart';
 import 'notebook/lift.dart';
@@ -27,7 +26,7 @@ import 'wireframe.dart';
 /// How far the floor is pulled out, as a fraction of a square.
 ///
 /// The floor is a square the width of the pane and can never be taller than
-/// that (see [FloorSquare]), so the splitter's whole range is 0 - shut - to 1,
+/// that (see ui/floor/floor_view.dart), so its whole range is 0 - shut - to 1,
 /// fully out. It used to be a fraction of the screen, which let the floor grow
 /// into a letterbox and made the two snap states depend on the phone.
 ///

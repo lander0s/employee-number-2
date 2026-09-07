@@ -65,9 +65,20 @@ class RunController extends ChangeNotifier {
 
   /// The world as it stands. Null before the first instruction has run, which
   /// is when the floor should show the shipment as it arrived.
-  Tick? get now =>
-      _cursor >= 0 && _cursor < (_result?.ticks.length ?? 0)
-      ? _result!.ticks[_cursor]
+  Tick? get now => _at(_cursor);
+
+  /// The world one instruction ago. The floor interpolates between this and
+  /// [now], so it needs both - a snapshot on its own cannot say which way a
+  /// package was travelling.
+  Tick? get previous => _at(_cursor - 1);
+
+  /// Which instruction is on screen. The floor watches this to know when to
+  /// start a new travel animation; the number itself means nothing to it.
+  int get cursor => _cursor;
+
+  Tick? _at(int index) =>
+      index >= 0 && index < (_result?.ticks.length ?? 0)
+      ? _result!.ticks[index]
       : null;
 
   /// Compiles and runs [doc], then starts playing the result back.
