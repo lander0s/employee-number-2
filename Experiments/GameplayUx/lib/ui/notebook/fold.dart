@@ -17,6 +17,7 @@ class StuckPaper extends StatelessWidget {
     required this.shadow,
     required this.child,
     this.folded = true,
+    this.outline,
   });
 
   final Color fill;
@@ -29,11 +30,15 @@ class StuckPaper extends StatelessWidget {
   /// the air and not stuck to anything.
   final bool folded;
 
+  /// Drawn round the sheet, over it, when something is pointing at it. Costs no
+  /// layout: see [Paper.caretBorder].
+  final Color? outline;
+
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    final paper = DecoratedBox(
       decoration: BoxDecoration(color: fill, boxShadow: shadow),
       child: folded
           ? Stack(
@@ -54,6 +59,18 @@ class StuckPaper extends StatelessWidget {
               ],
             )
           : child,
+    );
+
+    if (outline == null) return paper;
+
+    // Foreground, so it paints over the fold as well: a corner turning up in
+    // front of the outline would break the box the mark is drawing.
+    return DecoratedBox(
+      position: DecorationPosition.foreground,
+      decoration: BoxDecoration(
+        border: Border.all(color: outline!, width: Paper.caretBorder),
+      ),
+      child: paper,
     );
   }
 }

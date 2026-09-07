@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 
 import '../../model/program.dart';
 import 'brief.dart';
+import 'caret.dart';
 import 'fold.dart';
 import 'lift.dart';
 import 'page.dart';
@@ -33,6 +34,7 @@ class ProgramEditor extends StatefulWidget {
     required this.onChanged,
     required this.onRemove,
     this.running = false,
+    this.executing,
     this.bottomInset = 0,
   });
 
@@ -57,6 +59,10 @@ class ProgramEditor extends StatefulWidget {
   /// taps. The gaps stay in the layout though - removing them reflowed the
   /// whole program at the exact moment you want to watch it.
   final bool running;
+
+  /// The node the robot is on, while [running]. Marked in the margin rather
+  /// than highlighted in place - see [CaretGutter].
+  final String? executing;
 
   /// How much of the page's bottom edge the note covers.
   final double bottomInset;
@@ -178,8 +184,10 @@ class ProgramEditorState extends State<ProgramEditor> {
   }
 
   Widget _node(Node node, int depth) {
+    final marked = widget.executing == node.id;
+
     final body = node.isBlock
-        ? _block(node, depth)
+        ? _block(node, depth, marked: marked)
         : Padding(
             // A command at the root has no container to end against, so it
             // stops short of the page's edge: its lifted end needs somewhere to
@@ -190,17 +198,25 @@ class ProgramEditorState extends State<ProgramEditor> {
               node: node,
               dimmed: _lifted == node.id,
               interactive: !widget.running,
+              outline: marked ? Paper.caret : null,
               onCycle: (slot) => _mutate(() => doc.cycleArg(node.id, slot)),
             ),
           );
 
-    return _swipeable(node, _liftable(node, body));
+    // Wrapped inside the gestures rather than around them: while running they
+    // pass the row straight through, but a caret that swallowed them would be a
+    // silent trap the day anything marks a line outside a run.
+    final pointed = marked
+        ? CaretGutter(header: node.isBlock, depth: depth, child: body)
+        : body;
+
+    return _swipeable(node, _liftable(node, pointed));
   }
 
   /// A container: a note of its own colour, wrapping its children on all four
   /// sides. The left arm carries the nesting; the right and bottom arms are
   /// what make it a note rather than a bracket.
-  Widget _block(Node node, int depth) {
+  Widget _block(Node node, int depth, {bool marked = false}) {
     final fill = Paper.fillFor(node.spec.colour, depth);
 
     return Opacity(
@@ -208,11 +224,16 @@ class ProgramEditorState extends State<ProgramEditor> {
       child: StuckPaper(
         fill: fill,
         shadow: Paper.noteShadow,
+        // The whole block, not just its title: a container is one object
+        // everywhere else in this editor - lifting carries its body, swiping
+        // deletes it - and an outline round the header alone would be the only
+        // place that says otherwise.
+        outline: marked ? Paper.caret : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 7),
+              padding: const EdgeInsets.only(top: Paper.headerTop),
               child: CommandTab(
                 node: node,
                 header: true,
@@ -345,7 +366,7 @@ class _Ghost extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 7),
+            padding: const EdgeInsets.only(top: Paper.headerTop),
             child: CommandTab(
               node: node,
               header: true,

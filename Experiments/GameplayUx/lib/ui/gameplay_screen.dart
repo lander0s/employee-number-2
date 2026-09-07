@@ -11,6 +11,7 @@
 library;
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -136,6 +137,24 @@ class _GameplayScreenState extends State<GameplayScreen> {
   /// Nothing executes.
   bool _running = false;
 
+  /// Which line the caret is beside. There is no VM yet, so a run picks one row
+  /// at random and stays there - enough to judge whether a mark in the margin
+  /// reads as "here", which is the question this is for. When the VM lands this
+  /// becomes its program counter and nothing else on this screen changes.
+  String? _executing;
+  final _rng = Random();
+
+  void _toggleRun() => setState(() {
+    _running = !_running;
+    if (!_running) {
+      _executing = null;
+      return;
+    }
+    // Closers are rendered but are not commands, so the robot is never on one.
+    final rows = _doc.flatten().where((r) => !r.isCloser).toList();
+    _executing = rows.isEmpty ? null : rows[_rng.nextInt(rows.length)].node.id;
+  });
+
   @override
   void initState() {
     super.initState();
@@ -205,8 +224,7 @@ class _GameplayScreenState extends State<GameplayScreen> {
                         child: floorVisible
                             ? FloorPane(
                                 running: _running,
-                                onToggleRun: () =>
-                                    setState(() => _running = !_running),
+                                onToggleRun: _toggleRun,
                               )
                             : const SizedBox.shrink(),
                       ),
@@ -248,6 +266,7 @@ class _GameplayScreenState extends State<GameplayScreen> {
                                 onChanged: _refresh,
                                 onRemove: _remove,
                                 running: _running,
+                                executing: _executing,
                                 bottomInset: _noteHeight,
                               ),
                             ),

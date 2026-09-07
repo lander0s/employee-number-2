@@ -57,6 +57,11 @@ abstract final class Paper {
   /// inside the page - its lifted end needs somewhere to fall.
   static const rootEnd = 16.0;
 
+  /// A container's only vertical padding, above its title. There is none below:
+  /// the gap between the title and the first child does that job, and unlike
+  /// padding it answers a drop.
+  static const headerTop = 7.0;
+
   /// Cyclable words: padded to the word, with the target carried by transparent
   /// space around them.
   static const chipPadH = 8.0;
@@ -127,6 +132,30 @@ abstract final class Paper {
   /// Idle is board, not steel: the bin is drawn on the strip it replaces.
   static const binIdle = Color(0xFF3E2F1F);
   static const binArmed = Color(0xFFFF8275);
+
+  // ------------------------------------------------------------------- run
+
+  /// The mark in the margin beside the line being run.
+  ///
+  /// Red pen: it picks up [margin], the rule it stands against, and it is
+  /// deliberately not [ink]. The program is what the player wrote; this is
+  /// somebody else reading it back to them.
+  static const caret = Color(0xFFC2453F);
+  static const caretSize = Size(14, 16);
+
+  /// From the page's left edge. It has the strip between there and [marginInset]
+  /// to itself, and stops clear of the rule rather than touching it.
+  static const caretInset = 6.0;
+
+  /// The marked command is also outlined, in the caret's own colour, so the
+  /// mark and the thing it marks are obviously one statement rather than an
+  /// arrow near a row.
+  ///
+  /// Drawn as a foreground decoration, which paints over the paper inside the
+  /// box it already occupies. A real border would be layout: every marked row
+  /// would grow by 4dp and shove the rest of the program down the page at the
+  /// exact moment the player is trying to follow it.
+  static const caretBorder = 2.0;
 
   /// The free corner is turned up a little. Small enough to register as
   /// physical rather than as a graphic.

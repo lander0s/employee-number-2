@@ -14,6 +14,8 @@ import 'package:gameplay_ux/model/commands.dart';
 import 'package:gameplay_ux/model/program.dart';
 import 'package:gameplay_ux/ui/gameplay_screen.dart';
 import 'package:gameplay_ux/ui/notebook/brief.dart';
+import 'package:gameplay_ux/ui/notebook/caret.dart';
+import 'package:gameplay_ux/ui/notebook/fold.dart';
 import 'package:gameplay_ux/ui/notebook/note.dart';
 import 'package:gameplay_ux/ui/notebook/program.dart';
 import 'package:gameplay_ux/ui/notebook/slot.dart';
@@ -515,6 +517,104 @@ void main() {
         greaterThan(Paper.marginInset),
         reason: 'nothing is written over the margin',
       );
+    });
+  });
+
+  group('a run says which line it is on', () {
+    Future<void> run(WidgetTester tester) async {
+      await tester.tap(find.text('RUN'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('no caret until one starts, and none after it stops', (
+      tester,
+    ) async {
+      await boot(tester);
+      expect(find.byType(RunCaret), findsNothing);
+
+      await run(tester);
+      expect(find.byType(RunCaret), findsOneWidget);
+
+      await tester.tap(find.text('STOP'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RunCaret), findsNothing);
+    });
+
+    testWidgets('it marks exactly one line', (tester) async {
+      await boot(tester);
+      await run(tester);
+
+      // The stand-in picks at random, so this cannot assert *which* row - only
+      // that whatever it picked is marked once. Loop, because a bug that marks
+      // every row or none would otherwise pass whenever the roll was kind.
+      for (var i = 0; i < 12; i++) {
+        expect(find.byType(RunCaret), findsOneWidget);
+        await tester.tap(find.text('STOP'));
+        await tester.pumpAndSettle();
+        await run(tester);
+      }
+    });
+
+    testWidgets('the marked command is outlined, and costs no layout', (
+      tester,
+    ) async {
+      await boot(tester);
+      const rows = ['REPEAT', 'TAKE', 'IF', 'SHIP'];
+      final before = {for (final r in rows) r: tester.getRect(boxOf(onPage(r)))};
+
+      // Every row, not one of them: the stand-in marks a random line, and an
+      // outline that reserved space would only shift the program on the runs
+      // that happened to pick a row above the one being watched.
+      await run(tester);
+      for (final r in rows) {
+        expect(tester.getRect(boxOf(onPage(r))), before[r], reason: r);
+      }
+
+      final outlined = tester
+          .widgetList<StuckPaper>(find.byType(StuckPaper))
+          .where((p) => p.outline != null)
+          .toList();
+      expect(outlined, hasLength(1));
+      expect(outlined.single.outline, Paper.caret);
+    });
+
+    testWidgets('it sits in the margin, left of the rule', (tester) async {
+      await boot(tester);
+      await run(tester);
+
+      final caret = tester.getRect(find.byType(RunCaret));
+      final page = tester.getRect(find.byType(ProgramEditor));
+
+      // The strip between the page's edge and the margin rule is the caret's
+      // alone: it must clear the rule, and it must not hang off the page.
+      expect(caret.left - page.left, greaterThanOrEqualTo(0));
+      expect(caret.right - page.left, lessThanOrEqualTo(Paper.marginInset));
+    });
+
+    testWidgets('level with the line it marks, not the block it opens', (
+      tester,
+    ) async {
+      // A container is as tall as everything it owns, so a mark centred on the
+      // marked widget would sit halfway down the body instead of beside the
+      // title. Whatever the roll picked, the caret belongs in its first row.
+      await boot(tester);
+      await run(tester);
+
+      for (var i = 0; i < 8; i++) {
+        final caret = tester.getRect(find.byType(RunCaret));
+        final marked = tester.getRect(find.byType(CaretGutter));
+        expect(
+          caret.center.dy - marked.top,
+          lessThan(Paper.headerTop + Paper.rowHeight),
+          reason: 'the caret drifted below the row it marks',
+        );
+
+        // Re-roll rather than re-boot: pumping the screen again reuses its
+        // State, so it would still be mid-run and the button would say STOP.
+        await tester.tap(find.text('STOP'));
+        await tester.pumpAndSettle();
+        await run(tester);
+      }
     });
   });
 

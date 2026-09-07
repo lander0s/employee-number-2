@@ -19,6 +19,7 @@ class CommandTab extends StatelessWidget {
     this.header = false,
     this.dimmed = false,
     this.interactive = true,
+    this.outline,
   });
 
   final Node node;
@@ -36,6 +37,9 @@ class CommandTab extends StatelessWidget {
   /// False while the program runs, and for the drag ghost: renders identically,
   /// answers nothing.
   final bool interactive;
+
+  /// Drawn round the row when the caret is pointing at it.
+  final Color? outline;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +84,7 @@ class CommandTab extends StatelessWidget {
     return StuckPaper(
       fill: node.spec.colour,
       shadow: Paper.tabShadow,
+      outline: outline,
       child: box,
     );
   }
