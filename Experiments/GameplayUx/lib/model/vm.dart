@@ -347,10 +347,16 @@ class Machine {
 
       case Op.ship:
         if (_claws == null) return _emptyClaws('ship');
-        _outbound.add(_claws!);
-        _station = const Station(StationKind.outbound);
-        _trace(instr, 'SHIP ${_claws!}');
+        // Emptied *before* the trace. A tick is the world as it stands after
+        // the instruction, and this one was recording the claws still holding
+        // what had just been shipped - so anything reading the trace saw a
+        // package in two places at once. The floor did exactly that, and left
+        // the unit standing at the belt holding a box it had put down.
+        final shipped = _claws!;
+        _outbound.add(shipped);
         _claws = null;
+        _station = const Station(StationKind.outbound);
+        _trace(instr, 'SHIP $shipped');
 
       case Op.copyTo:
         if (_claws == null) return _emptyClaws('copy');
@@ -382,8 +388,11 @@ class Machine {
         _claws = instr.op == Op.sum ? before + operand : before - operand;
         _station = Station(StationKind.pallet, instr.pallet);
         final sign = instr.op == Op.sum ? '+' : '-';
-        _trace(instr, '${instr.op == Op.sum ? 'SUM' : 'SUB'} ${instr.pallet}'
-            '  $before $sign $operand = ${_claws!}');
+        _trace(
+          instr,
+          '${instr.op == Op.sum ? 'SUM' : 'SUB'} ${instr.pallet}'
+          '  $before $sign $operand = ${_claws!}',
+        );
 
       case Op.branchUnless:
         // A condition asks about the package in the claws. With nothing in them
@@ -397,7 +406,10 @@ class Machine {
           );
         }
         final yes = holds(instr.comparator!, _claws!);
-        _trace(instr, '${instr.comparator}? ${_claws!} -> ${yes ? 'yes' : 'no'}');
+        _trace(
+          instr,
+          '${instr.comparator}? ${_claws!} -> ${yes ? 'yes' : 'no'}',
+        );
         if (!yes) {
           _pc = instr.target!;
           return null;

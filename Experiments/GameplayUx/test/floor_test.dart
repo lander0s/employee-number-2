@@ -52,17 +52,17 @@ void main() {
       }
     });
 
-    test('including the claws, not just the body', () {
-      // The body cleared the belts at the old working row and the claws did
-      // not, which is the bug this catches: they hang below it, and they swept
-      // the rollers on every walk past.
+    test('measured on the art, not just the body', () {
+      // These were different when the unit was a box with drawn claws hanging
+      // below it: the body cleared the belt and the claws swept the rollers.
+      // The sprite is contained in its square so they coincide again, and the
+      // check is written against [sweep] so that it survives art that is not.
       final standing = g.stand(const Station(StationKind.chute));
-      expect(g.body(standing).overlaps(g.intakeBelt), isFalse);
       expect(g.sweep(standing).overlaps(g.intakeBelt), isFalse);
       expect(
         g.sweep(standing).bottom,
         lessThanOrEqualTo(g.intakeBelt.top),
-        reason: 'the claws should stop at the belt, not inside it',
+        reason: 'the unit should stop at the belt, not stand on it',
       );
     });
   });

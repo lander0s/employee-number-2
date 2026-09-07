@@ -27,7 +27,12 @@ class FloorGeometry {
   static const pad = 0.045;
 
   /// The belts' thickness, and the line they run along.
-  static const beltThickness = 0.145;
+  ///
+  /// Thinner than it was, which is what makes the packages smaller: a box is
+  /// sized from the belt it rides on, so shrinking the rail shrinks the cargo
+  /// and keeps the two in proportion. It also frees the height the unit needed
+  /// to grow into.
+  static const beltThickness = 0.125;
   static const beltAt = 0.42;
 
   /// Where each belt meets the floor: the right end of the intake, the left
@@ -43,21 +48,24 @@ class FloorGeometry {
   static const palletTop = 0.805;
   static const palletSize = 0.135;
 
-  static const robot = 0.17;
-
-  /// How far the claws hang below the body. They are part of the unit for
-  /// collision purposes: clearing a belt with the body and dragging the claws
-  /// through it is still walking through it.
-  static const clawReach = robot * 0.22;
+  /// The unit's footprint, and the box its sprite is drawn in.
+  ///
+  /// It has grown twice. The wireframe version was a box with two drawn claws
+  /// hanging below it, so the footprint had to allow for the reach; the sprite
+  /// is contained in this square instead, which gave that room back. Then the
+  /// belts got thinner, which gave more.
+  ///
+  /// It is the one thing on the floor with a face, so it earns the space: the
+  /// belts and the pallets are furniture and read fine small, and the unit is
+  /// what the player is actually watching.
+  static const robot = 0.26;
 
   /// The two rows the unit works from: clear above the belts, and clear above
-  /// the pallets.
-  ///
-  /// Both are set so the claws stop at the edge of what they are reaching for
-  /// rather than inside it. Body clearance alone was not enough - the claws
-  /// hang below it, and they swept the rollers on every walk past.
-  static const beltRow = 0.215;
-  static const palletRow = 0.675;
+  /// the pallets. It stops at the edge of whatever it is reaching for rather
+  /// than standing on it, and both are derived from that - grow [robot] and
+  /// these have to come up to meet it, which the collision test enforces.
+  static const beltRow = 0.222;
+  static const palletRow = 0.67;
 
   // ------------------------------------------------------------------ absolute
 
@@ -138,17 +146,23 @@ class FloorGeometry {
   Rect body(Offset centre) =>
       Rect.fromCenter(center: centre, width: robotSide, height: robotSide);
 
-  /// The unit's whole footprint, claws included. This is what must not meet a
+  /// The package in the unit's claws.
+  ///
+  /// The same size it is on a belt, deliberately: a package does not grow when
+  /// it is picked up. It was being drawn as a fraction of the *unit* instead,
+  /// which made it half again as big as a belt package and large enough to
+  /// cover the whole sprite - the box was the only thing you could see.
+  Rect carried(Offset centre) =>
+      Rect.fromCenter(center: centre, width: boxSize, height: boxSize);
+
+  /// The unit's whole footprint, art included. This is what must not meet a
   /// belt.
-  Rect sweep(Offset centre) {
-    final it = body(centre);
-    return Rect.fromLTRB(
-      it.left,
-      it.top,
-      it.right,
-      it.bottom + side * clawReach,
-    );
-  }
+  ///
+  /// Identical to [body] while the sprite is contained in its square, which it
+  /// is. Kept as its own name because that is a property of the art, not of the
+  /// rule: the day a sprite hangs an arm past the box, this is where the
+  /// overhang goes, and the collision test keeps working without being rewritten.
+  Rect sweep(Offset centre) => body(centre);
 
   /// A hair of daylight between the unit and a belt it is passing.
   ///

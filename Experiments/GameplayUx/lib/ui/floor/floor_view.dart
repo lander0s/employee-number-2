@@ -26,6 +26,7 @@ import '../../model/vm.dart';
 import '../run_controller.dart';
 import '../wireframe.dart';
 import 'floor_geometry.dart';
+import 'unit_sprite.dart';
 
 /// How long one instruction's movement takes.
 ///
@@ -107,6 +108,28 @@ class _FloorStageState extends State<FloorStage>
   /// The instruction the current animation belongs to.
   int _showing = -1;
 
+  /// The act phase on its own, for driving the grab.
+  ///
+  /// It stops a thousandth short of the end on purpose: a Lottie layer's out
+  /// point is *exclusive*, so driving a 70-frame composition to exactly 1.0
+  /// asks for frame 70 - one past the last frame the layer exists on.
+  late final Animation<double> _act = Tween<double>(
+    begin: 0,
+    end: 0.999,
+  ).animate(_actPhase);
+
+  /// The same, from the far end: putting a package down is the grab in
+  /// reverse, so it is the same composition read backwards.
+  late final Animation<double> _actBack = Tween<double>(
+    begin: 0.999,
+    end: 0,
+  ).animate(_actPhase);
+
+  late final Animation<double> _actPhase = CurvedAnimation(
+    parent: _anim,
+    curve: const Interval(_walkPhase, 1),
+  );
+
   @override
   void initState() {
     super.initState();
@@ -130,6 +153,66 @@ class _FloorStageState extends State<FloorStage>
       _anim.forward(from: 0);
     }
     setState(() {});
+  }
+
+  /// Ground, then the unit, then cargo.
+  ///
+  /// The unit is a widget and everything else is painted, so it has to be a
+  /// layer rather than a draw call. Cargo goes on top of it deliberately: a
+  /// package carries a number and the number is the game, so it must never end
+  /// up behind an arm.
+  Widget _layers(FloorGeometry g, FloorState from, FloorState to, double t) {
+    // Linear, deliberately: a package on a belt is being carried at the belt's
+    // speed, and the unit walks at the unit's. Easing either would be the thing
+    // deciding for itself when to set off and when to stop.
+    final walk = (t / _walkPhase).clamp(0.0, 1.0);
+    final at = g.walkBetween(from.station, to.station, walk);
+
+    final moving = from.station != to.station;
+    final took = from.intake.length - to.intake.length == 1;
+    final shipped = to.outbound.length - from.outbound.length == 1;
+
+    // What it is carrying depends on which phase this is, not just on where the
+    // instruction ended: during the walk it still has whatever it set off with.
+    //
+    // That distinction is the whole of it for SHIP. The instruction ends with
+    // empty claws, so a single `to.claws` reading walked the unit across the
+    // floor empty-handed with a numbered box stuck to it, and then set nothing
+    // down. It carries the box over, and puts it down.
+    final carrying = (t < _walkPhase ? from.claws : to.claws) != null;
+
+    // The grab and its reverse are transients: they play while the instruction
+    // is in flight and give way to the resting pose the moment it lands. A
+    // one-shot's last frame is the end of a movement, not a pose to stand in.
+    final settled = t >= 1;
+    final pose = moving && t < _walkPhase
+        ? (carrying ? UnitPose.walkingHolding : UnitPose.walking)
+        : (took && !settled)
+        ? UnitPose.pickup
+        : (shipped && !settled)
+        ? UnitPose.putdown
+        : (carrying ? UnitPose.holding : UnitPose.idle);
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: CustomPaint(
+            painter: _Floor(from: from, to: to, t: t, layer: _Layer.ground),
+          ),
+        ),
+        UnitOnFloor(
+          geometry: g,
+          at: at,
+          pose: pose,
+          driver: pose == UnitPose.putdown ? _actBack : _act,
+        ),
+        Positioned.fill(
+          child: CustomPaint(
+            painter: _Floor(from: from, to: to, t: t, layer: _Layer.cargo),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -161,13 +244,8 @@ class _FloorStageState extends State<FloorStage>
               height: side,
               child: AnimatedBuilder(
                 animation: _anim,
-                builder: (context, _) => CustomPaint(
-                  // Linear, deliberately: a package on a belt is being carried
-                  // at the belt's speed, and the unit walks at the unit's. Easing
-                  // either would be the thing deciding for itself when to set
-                  // off and when to stop.
-                  painter: _Floor(from: from, to: to, t: _anim.value),
-                ),
+                builder: (context, _) =>
+                    _layers(FloorGeometry(side), from, to, _anim.value),
               ),
             ),
           ),
@@ -177,11 +255,20 @@ class _FloorStageState extends State<FloorStage>
   }
 }
 
+/// Which pass of the floor is being drawn. See [_FloorStageState._layers].
+enum _Layer { ground, cargo }
+
 class _Floor extends CustomPainter {
-  _Floor({required this.from, required this.to, required this.t});
+  _Floor({
+    required this.from,
+    required this.to,
+    required this.t,
+    required this.layer,
+  });
 
   final FloorState from;
   final FloorState to;
+  final _Layer layer;
 
   /// 0 at the previous instruction, 1 at this one.
   final double t;
@@ -199,14 +286,15 @@ class _Floor extends CustomPainter {
     final walk = (t / _walkPhase).clamp(0.0, 1.0);
     final act = ((t - _walkPhase) / (1 - _walkPhase)).clamp(0.0, 1.0);
 
-    final unit = g.body(g.walkBetween(from.station, to.station, walk));
-    final held = unit.deflate(g.robotSide * 0.22);
+    final held = g.carried(g.walkBetween(from.station, to.station, walk));
 
-    _grid(canvas, s);
-    _rail(canvas, g.intakeBelt, 'INTAKE', g.intakeSlot(0), s);
-    _rail(canvas, g.outBelt, 'OUTBOUND', g.outSlot(0), s);
-    _pallets(canvas, g);
-    _unit(canvas, unit, s);
+    if (layer == _Layer.ground) {
+      _grid(canvas, s);
+      _rail(canvas, g.intakeBelt, 'INTAKE', g.intakeSlot(0), s);
+      _rail(canvas, g.outBelt, 'OUTBOUND', g.outSlot(0), s);
+      _pallets(canvas, g);
+      return;
+    }
 
     // What the instruction did, read off the two states rather than passed in.
     // The machine already recorded the result; asking it to also describe the
@@ -321,28 +409,6 @@ class _Floor extends CustomPainter {
     }
   }
 
-  /// UNIT-02. What it is holding is drawn by [paint], because that package may
-  /// be in flight rather than in the claws.
-  void _unit(Canvas canvas, Rect rect, double s) {
-    canvas.drawRect(rect, _stroke(width: 2));
-
-    // Two claws off the bottom edge, pointing at the floor it works over.
-    final side = rect.width;
-    final claw = Paint()
-      ..color = W.text
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-    for (final x in [rect.left + side * 0.25, rect.right - side * 0.25]) {
-      canvas.drawLine(
-        Offset(x, rect.bottom),
-        Offset(x, rect.bottom + side * 0.22),
-        claw,
-      );
-    }
-
-    _label(canvas, 'UNIT-02', Offset(rect.center.dx, rect.top - s * 0.03), s);
-  }
-
   // ------------------------------------------------------------------ pieces
 
   Paint _stroke({double width = 1.5}) => Paint()
@@ -396,5 +462,5 @@ class _Floor extends CustomPainter {
 
   @override
   bool shouldRepaint(_Floor old) =>
-      old.t != t || old.from != from || old.to != to;
+      old.t != t || old.from != from || old.to != to || old.layer != layer;
 }

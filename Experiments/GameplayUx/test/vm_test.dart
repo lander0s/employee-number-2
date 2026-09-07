@@ -237,6 +237,31 @@ void main() {
     });
   });
 
+  group('a tick is the world after the instruction, not during it', () {
+    test('a shipped package is out of the claws by the time it is recorded', () {
+      // It was not, and nothing about the shipment was wrong - the goal is
+      // checked against live state - so only something *reading the trace*
+      // could notice. The floor did: it left the unit standing at the belt
+      // holding a box it had just put down.
+      final r = exec([cmd('take'), cmd('ship')], levelOf([5]));
+      expect(r.ticks[1].line, contains('SHIP 5'));
+      expect(r.ticks[1].claws, isNull, reason: 'it let go of it');
+      expect(r.ticks[1].outbound, [5]);
+    });
+
+    test('and a taken one is in them', () {
+      final r = exec([cmd('take')], levelOf([5]));
+      expect(r.ticks[0].claws, 5);
+      expect(r.ticks[0].intake, isEmpty);
+    });
+
+    test('COPY TO leaves it in both, which is what copying means', () {
+      final r = exec([cmd('take'), cmd('copyTo', pallet: 2)], levelOf([5]));
+      expect(r.ticks[1].claws, 5);
+      expect(r.ticks[1].pallets[2], 5);
+    });
+  });
+
   group('the discard rule', () {
     test('TAKE with full claws bins what was held', () {
       // Silent in the fiction, loud in the trace: the line has to say so, or
