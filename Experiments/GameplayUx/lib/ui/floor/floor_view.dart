@@ -1,8 +1,13 @@
 /// The floor, seen from above. Wireframe primitives, no art.
 ///
-/// Everything the machine can observe is on it: the intake belt down the left,
-/// the outbound belt down the right, five pallets across the bottom, and
-/// UNIT-02 in the middle holding at most one package. That is the whole world
+/// Everything the machine can observe is on it: the intake belt running in from
+/// off-screen left, the outbound belt down the right, five pallets across the
+/// bottom, and UNIT-02 in the middle holding at most one package.
+///
+/// The intake deliberately leaves the square. A shipment is not a list of six,
+/// it is a queue arriving from the rest of a warehouse the player never sees,
+/// and a belt that runs off the edge of the panel says that where a tidy column
+/// of boxes says the opposite. That is the whole world
 /// (game-design-document 6.1), and drawing it as boxes and lines first is the
 /// cheapest way to find out whether the *layout* reads before anything is
 /// animated - which way packages flow, where the robot has to reach, whether
@@ -84,17 +89,23 @@ class _Floor extends CustomPainter {
   static const _pad = 0.045;
   static const _beltW = 0.145;
 
-  /// The belts run from the top of the square to just above the pallets, and
-  /// their labels sit at the *foot* of each belt rather than the head.
+  /// Both belts run horizontally at the unit's own height, so intake, unit and
+  /// outbound are one straight line across the square and the reach at either
+  /// end is a movement the player can see.
   ///
-  /// Labelling the heads was the obvious way round and it collided with the RUN
-  /// button, which lives in the top-right corner and landed square on the word
-  /// OUTBOUND. Moving the labels down also let the belts start at the top edge,
-  /// which is what makes room for six packages - the longest shipment the
-  /// briefing's set contains. Past six a belt shows a `+n` rather than
-  /// shrinking the boxes until nobody can read a number.
-  static const _beltTop = 0.05;
-  static const _beltEnd = 0.72;
+  /// They are the same belt mirrored. [_chuteEnd] is where each one meets the
+  /// floor - the right end of the intake, the left end of the outbound - and it
+  /// sits where two and a half packages are on screen: enough to see what is
+  /// coming and what just left, not enough to plan a whole shipment by reading
+  /// it off the floor. [_beltOff] is how far past the edge of the square the
+  /// rail carries on, so neither belt ever appears to stop at the panel.
+  ///
+  /// The consequence worth naming: **the unit always drops at the same place.**
+  /// The near end of the outbound is the drop point, and whatever was there has
+  /// already travelled on, so the position never depends on how much has been
+  /// shipped. Nothing moves yet, but the layout is built for it to.
+  static const _chuteEnd = 0.235;
+  static const _beltOff = 0.6;
 
   /// The pallets are pushed to the foot of the square, where they belong: they
   /// are the floor, and everything else happens above them. It also gives the
@@ -110,29 +121,38 @@ class _Floor extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final s = size.width;
-    final pad = s * _pad;
     final beltW = s * _beltW;
 
     _grid(canvas, s);
 
+    final mid = s * _robotAt;
     final intakeBelt = Rect.fromLTRB(
-      pad,
-      s * _beltTop,
-      pad + beltW,
-      s * _beltEnd,
+      s * -_beltOff,
+      mid - beltW / 2,
+      s * _chuteEnd,
+      mid + beltW / 2,
     );
     final outBelt = Rect.fromLTRB(
-      s - pad - beltW,
-      s * _beltTop,
-      s - pad,
-      s * _beltEnd,
+      s * (1 - _chuteEnd),
+      mid - beltW / 2,
+      s * (1 + _beltOff),
+      mid + beltW / 2,
     );
 
-    // Packages queue at the *bottom* of the intake belt: that end is the chute,
-    // the one TAKE reaches into, so the next package to arrive is the one
-    // nearest the robot rather than the one furthest from it.
-    _belt(canvas, intakeBelt, 'INTAKE', intake, fromBottom: true, s: s);
-    _belt(canvas, outBelt, 'OUTBOUND', outbound, fromBottom: true, s: s);
+    // Both queues are drawn head-first from the end nearest the unit, and the
+    // heads mean opposite things: on the intake it is the next package to be
+    // taken, on the outbound the one most recently shipped. Which is why the
+    // outbound list is walked backwards - the newest is the one at the drop
+    // point, and the first thing shipped is furthest away.
+    _belt(canvas, intakeBelt, 'INTAKE', intake, headAtFar: true, s: s);
+    _belt(
+      canvas,
+      outBelt,
+      'OUTBOUND',
+      outbound.reversed.toList(),
+      headAtFar: false,
+      s: s,
+    );
 
     _pallets(canvas, s);
     _unit(canvas, s);
@@ -150,53 +170,62 @@ class _Floor extends CustomPainter {
     }
   }
 
-  /// A belt, its label, and the packages on it.
+  /// A belt, its label, and the queue on it, head first.
+  ///
+  /// Horizontal only. Both belts run off the square now, so there is no end for
+  /// a queue to fill up against and no `+n` to draw: what is off screen is off
+  /// screen, and that is the fiction rather than a limitation. The vertical
+  /// case this used to carry went with the last belt that needed it.
   void _belt(
     Canvas canvas,
     Rect belt,
     String label,
-    List<int> packages, {
-    required bool fromBottom,
+    List<int> queue, {
+    /// True when the head sits at the belt's right end and the queue runs left
+    /// (the intake), false for the mirror of that (the outbound).
+    required bool headAtFar,
     required double s,
   }) {
     canvas.drawRect(belt, _stroke());
 
-    // Rollers, so a belt reads as a belt and not as an empty column.
+    // Rollers, across the direction of travel, which is what a roller is.
+    // Without them a belt reads as an empty channel.
     final rollers = Paint()
       ..color = W.floorGrid
       ..strokeWidth = 1;
     final pitch = s * 0.05;
-    for (var y = belt.top + pitch; y < belt.bottom; y += pitch) {
-      canvas.drawLine(Offset(belt.left, y), Offset(belt.right, y), rollers);
+    for (var x = belt.left + pitch; x < belt.right; x += pitch) {
+      canvas.drawLine(Offset(x, belt.top), Offset(x, belt.bottom), rollers);
     }
 
-    _label(canvas, label, Offset(belt.center.dx, belt.bottom + s * 0.037), s);
-
-    final box = belt.width * 0.59;
+    final box = belt.height * 0.59;
     final step = box + s * 0.008;
-    final room = (belt.height / step).floor();
-    final shown = packages.length < room ? packages.length : room;
 
-    for (var i = 0; i < shown; i++) {
-      final y = fromBottom
-          ? belt.bottom - box - i * step
-          : belt.top + i * step;
+    // The head stops short of the end of the belt by the same clearance it
+    // already has along the sides, so a package sits in an even surround
+    // instead of pressed against the rail it arrived on.
+    final lip = (belt.height - box) / 2;
+    final head = headAtFar ? belt.right - lip - box : belt.left + lip;
+
+    for (var i = 0; i < queue.length; i++) {
+      final x = headAtFar ? head - i * step : head + i * step;
+      // Past the edge it is clipped anyway, and painting a long shipment off
+      // into nowhere is work for nobody.
+      if (x + box < 0 || x > s) break;
       _package(
         canvas,
-        Rect.fromLTWH(belt.center.dx - box / 2, y, box, box),
-        packages[i],
+        Rect.fromLTWH(x, belt.center.dy - box / 2, box, box),
+        queue[i],
         s,
       );
     }
 
-    if (packages.length > shown) {
-      _label(
-        canvas,
-        '+${packages.length - shown}',
-        Offset(belt.center.dx, belt.top + s * 0.01),
-        s,
-      );
-    }
+    _label(
+      canvas,
+      label,
+      Offset(head + box / 2, belt.bottom + s * 0.037),
+      s,
+    );
   }
 
   void _pallets(Canvas canvas, double s) {
