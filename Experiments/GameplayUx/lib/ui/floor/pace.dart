@@ -63,7 +63,12 @@ class Pace {
   static const _merge = Duration(milliseconds: 2200);
   static const _thinking = Duration(milliseconds: 700);
 
-  static Duration _actFor(Op op, {required bool took}) => switch (op) {
+  /// How long [op]'s gesture runs for.
+  ///
+  /// Public because the sound cues are authored as offsets into these, and a
+  /// cue placed past the end of its own gesture is a mistake worth a test - see
+  /// floor/cues.dart.
+  static Duration actFor(Op op, {required bool took}) => switch (op) {
     // A TAKE that finds nothing walks over and comes away empty. Nothing to
     // play, so nothing to wait for.
     Op.take => took ? _pickup : Duration.zero,
@@ -87,7 +92,7 @@ class Pace {
       microseconds: (distance / walkSpeed * Duration.microsecondsPerSecond)
           .round(),
     );
-    final act = _actFor(now.op, took: took);
+    final act = actFor(now.op, took: took);
 
     if (walk == Duration.zero && act == Duration.zero) {
       return const Pace.thinking();

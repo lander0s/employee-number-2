@@ -94,10 +94,7 @@ class _Caret extends CustomPainter {
       paint,
     );
 
-    canvas.drawRect(
-      Rect.fromLTRB(0, h * 0.34, w * 0.5, h * 0.66),
-      paint,
-    );
+    canvas.drawRect(Rect.fromLTRB(0, h * 0.34, w * 0.5, h * 0.66), paint);
   }
 
   @override

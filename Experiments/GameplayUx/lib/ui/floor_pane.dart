@@ -22,6 +22,7 @@ import '../model/level.dart';
 import '../model/vm.dart';
 import 'floor/floor_view.dart';
 import 'run_controller.dart';
+import 'sfx.dart';
 import 'wireframe.dart';
 
 class FloorPane extends StatelessWidget {
@@ -29,11 +30,13 @@ class FloorPane extends StatelessWidget {
     super.key,
     required this.level,
     required this.run,
+    required this.sfx,
     required this.onToggleRun,
   });
 
   final Level level;
   final RunController run;
+  final Sfx sfx;
   final VoidCallback onToggleRun;
 
   @override
@@ -51,7 +54,7 @@ class FloorPane extends StatelessWidget {
           Positioned.fill(
             child: AnimatedBuilder(
               animation: run,
-              builder: (context, _) => _Floor(level: level, run: run),
+              builder: (context, _) => _Floor(level: level, run: run, sfx: sfx),
             ),
           ),
           Positioned(
@@ -72,10 +75,11 @@ class FloorPane extends StatelessWidget {
 }
 
 class _Floor extends StatelessWidget {
-  const _Floor({required this.level, required this.run});
+  const _Floor({required this.level, required this.run, required this.sfx});
 
   final Level level;
   final RunController run;
+  final Sfx sfx;
 
   @override
   Widget build(BuildContext context) {
@@ -89,13 +93,17 @@ class _Floor extends StatelessWidget {
         // The floor drives its own animation off the controller: it needs the
         // instruction before this one to know which way anything is moving,
         // and one rebuild per tick is not enough frames to move on.
-        Positioned.fill(child: FloorStage(level: level, run: run)),
+        Positioned.fill(
+          child: FloorStage(level: level, run: run, sfx: sfx),
+        ),
         if (result != null && run.finished)
           Positioned(
             left: 8,
             right: 8,
             bottom: 8,
-            child: Chrome(child: _Verdict(result: result, size: run.size)),
+            child: Chrome(
+              child: _Verdict(result: result, size: run.size),
+            ),
           ),
       ],
     );
@@ -132,9 +140,7 @@ class _Verdict extends StatelessWidget {
             ),
           ),
           Text(
-            good
-                ? 'SIZE $size   SPEED ${result.steps}'
-                : result.verdict,
+            good ? 'SIZE $size   SPEED ${result.steps}' : result.verdict,
             style: W.console.copyWith(color: good ? W.textDim : W.onDanger),
           ),
         ],

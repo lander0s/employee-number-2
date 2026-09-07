@@ -24,6 +24,8 @@ import '../../model/commands.dart';
 import '../../model/level.dart';
 import '../../model/vm.dart';
 import '../run_controller.dart';
+import '../sfx.dart';
+import 'cues.dart';
 import '../wireframe.dart';
 import 'floor_geometry.dart';
 import 'pace.dart';
@@ -97,10 +99,20 @@ class FloorState {
 /// whenever the instruction on screen changes, and hands the painter the two
 /// states with a position between them.
 class FloorStage extends StatefulWidget {
-  const FloorStage({super.key, required this.level, required this.run});
+  const FloorStage({
+    super.key,
+    required this.level,
+    required this.run,
+    required this.sfx,
+  });
 
   final Level level;
   final RunController run;
+
+  /// Sounds fire from here because this is the only place that knows *when*:
+  /// a gesture's noise belongs to the moment the gesture starts, which for
+  /// anything with a walk in front of it is not when the instruction did.
+  final Sfx sfx;
 
   @override
   State<FloorStage> createState() => _FloorStageState();
@@ -116,6 +128,14 @@ class _FloorStageState extends State<FloorStage>
   /// Where this instruction's walk ends and its act begins.
   double _walkPhase = 0.6;
 
+  /// The noises this instruction makes once it gets to the acting part, and
+  /// which of them have been made. Indexes match.
+  List<Cue> _cues = const [];
+  List<bool> _fired = const [];
+
+  /// The verdict already announced, so a failed shift is only mourned once.
+  RunResult? _judged;
+
   /// The act phase on its own, for driving the grab, and the same read from the
   /// far end - putting a package down is the grab in reverse, so it is the same
   /// composition backwards.
@@ -130,7 +150,35 @@ class _FloorStageState extends State<FloorStage>
   void initState() {
     super.initState();
     _retime();
+    _anim.addListener(_onFrame);
     widget.run.addListener(_onRun);
+  }
+
+  /// Fires this instruction's sounds as the gesture reaches each one.
+  ///
+  /// Spent against the animation clock rather than by timer, deliberately: a
+  /// cue then cannot arrive at a moment the picture is not at, however the
+  /// playback is being driven - stepped by hand in a test, or held still.
+  void _onFrame() {
+    if (_cues.isEmpty) return;
+    final total = _anim.duration;
+    if (total == null) return;
+
+    // How long the gesture has been going. Zero at the frame the walk ends,
+    // which is the anchor every delay is measured from.
+    final since = total * (_anim.value - _walkPhase);
+    if (since < Duration.zero) return;
+
+    final gesture = total * (1 - _walkPhase);
+    for (var i = 0; i < _cues.length; i++) {
+      if (_fired[i]) continue;
+      // A cue authored past the end of its own gesture plays at the end of it
+      // rather than being dropped, because dropping it is silent twice over.
+      final delay = _cues[i].delay;
+      if (since < (delay < gesture ? delay : gesture)) continue;
+      _fired[i] = true;
+      widget.sfx.play(_cues[i].sound);
+    }
   }
 
   /// Fits the clock to the instruction, instead of the instruction to the
@@ -148,6 +196,10 @@ class _FloorStageState extends State<FloorStage>
 
     _anim.duration = pace.total;
     _walkPhase = pace.walkFraction;
+    _cues = now == null
+        ? const []
+        : Cues.of(now.op, acts: pace.act > Duration.zero);
+    _fired = List.filled(_cues.length, false);
 
     final phase = CurvedAnimation(
       parent: _anim,
@@ -160,12 +212,22 @@ class _FloorStageState extends State<FloorStage>
   @override
   void dispose() {
     widget.run.removeListener(_onRun);
+    _anim.removeListener(_onFrame);
     _anim.dispose();
     super.dispose();
   }
 
   void _onRun() {
     if (!mounted) return;
+
+    // The verdict, once. Compared by identity rather than by a flag, because a
+    // second run makes a second result and that one deserves its own say.
+    final result = widget.run.result;
+    if (widget.run.finished && result != null && result != _judged) {
+      _judged = result;
+      if (!result.passed) widget.sfx.play(Sound.error);
+    }
+
     final cursor = widget.run.cursor;
     if (cursor != _showing) {
       _showing = cursor;

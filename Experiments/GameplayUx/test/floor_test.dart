@@ -7,13 +7,20 @@
 // a canvas, which is why lib/ui/floor/floor_geometry.dart exists as its own
 // file.
 
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gameplay_ux/model/commands.dart';
 import 'package:gameplay_ux/model/level.dart';
 import 'package:gameplay_ux/model/vm.dart';
+import 'package:gameplay_ux/ui/floor/cues.dart';
 import 'package:gameplay_ux/ui/floor/floor_geometry.dart';
 import 'package:gameplay_ux/ui/floor/pace.dart';
 import 'package:gameplay_ux/ui/floor/payload.dart';
+import 'package:gameplay_ux/ui/sfx.dart';
+
+/// Closer than this and two sounds read as one event rather than two.
+const _audiblyApart = Duration(milliseconds: 120);
 
 /// A realistic square: the panel is 448dp wide on the device this is built on.
 const g = FloorGeometry(448);
@@ -521,4 +528,115 @@ void main() {
       );
     });
   });
+
+  group('sounds are cued off the gesture', () {
+    // An action can make more than one noise. COPY TO is why: the unit splits a
+    // package in two and sets one half down, which is a magical sound and then
+    // a wooden one, and they are most of a second apart.
+
+    /// Everything that reaches the floor.
+    const ops = Op.values;
+
+    test('only the ops that move something make a sound', () {
+      for (final op in ops) {
+        final cues = Cues.of(op, acts: true);
+        final moves = op != Op.branchUnless && op != Op.jump;
+        expect(
+          cues.isNotEmpty,
+          moves,
+          reason: '${op.name} ${moves ? 'moves and should' : 'does not'} sound',
+        );
+      }
+    });
+
+    test('a TAKE that finds the chute empty stays quiet', () {
+      // It walks over and comes away with nothing. There is no gesture, so
+      // there is nothing for a sound to be the sound *of*.
+      expect(Cues.of(Op.take, acts: false), isEmpty);
+      expect(Cues.of(Op.take, acts: true), isNotEmpty);
+    });
+
+    test('the merge animation sounds twice, both ways round', () {
+      // Forwards the unit grabs the second operand and smashes the two
+      // together; backwards it splits one package and sets half down.
+      expect(Cues.of(Op.sum, acts: true).map((c) => c.sound), [
+        Sound.pickup,
+        Sound.merge,
+      ]);
+      expect(Cues.of(Op.sub, acts: true).map((c) => c.sound), [
+        Sound.pickup,
+        Sound.merge,
+      ]);
+      expect(Cues.of(Op.copyTo, acts: true).map((c) => c.sound), [
+        Sound.copyTo,
+        Sound.putDown,
+      ]);
+    });
+
+    test('the two are mirrors: each pair spans the whole gesture', () {
+      // COPY TO plays the same composition backwards, so its offsets are the
+      // forward ones subtracted from the length. Asserted because it is the
+      // reason both rows can be read off one pair of keyframes - if someone
+      // nudges one row by ear, this says out loud that the other did not
+      // follow.
+      final forward = Cues.of(Op.sub, acts: true);
+      final backward = Cues.of(Op.copyTo, acts: true);
+      final gesture = Pace.actFor(Op.sub, took: true);
+
+      expect(forward.first.delay + backward.last.delay, gesture);
+      expect(forward.last.delay + backward.first.delay, gesture);
+    });
+
+    test('sounds within an action are ordered, and far enough apart', () {
+      // Two landing together would read as one event, which is the thing this
+      // mechanism exists to avoid.
+      for (final op in ops) {
+        final cues = Cues.of(op, acts: true);
+        for (var i = 1; i < cues.length; i++) {
+          expect(
+            cues[i].delay - cues[i - 1].delay,
+            greaterThan(_audiblyApart),
+            reason:
+                '${op.name}: ${cues[i].sound.name} treads on '
+                '${cues[i - 1].sound.name}',
+          );
+        }
+      }
+    });
+
+    test('no cue is authored past the end of its own gesture', () {
+      // FloorStage clamps one that is, so it still plays - but at the wrong
+      // moment, and silently. The clamp is a safety net, not a design.
+      for (final op in ops) {
+        final gesture = Pace.actFor(op, took: true);
+        for (final cue in Cues.of(op, acts: true)) {
+          expect(
+            cue.delay,
+            lessThanOrEqualTo(gesture),
+            reason:
+                '${cue.sound.name} is cued at ${cue.delay.inMilliseconds}ms '
+                'into a ${gesture.inMilliseconds}ms ${op.name}',
+          );
+        }
+      }
+    });
+
+    test('every sound in the catalogue has a file behind it', () {
+      // A name with no file fails on the device rather than here, and silently
+      // - Sfx swallows the failure so a missing plugin cannot stop a run.
+      //
+      // The reverse is not asserted. A sound the table does not cue is dead
+      // weight in the bundle, but it is also what auditioning samples looks
+      // like, and a test that fails while someone is swapping one noise for
+      // another is just in the way.
+      for (final sound in Sound.values) {
+        expect(
+          File('assets/${sound.asset}').existsSync(),
+          isTrue,
+          reason: '${sound.name} points at ${sound.asset}, which is missing',
+        );
+      }
+    });
+  });
+
 }

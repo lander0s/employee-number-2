@@ -306,5 +306,4 @@ abstract final class Paper {
   /// on the first rule rather than above it. One number, tuned once: every line
   /// below it is a whole [rowHeight] further down and keeps the same relation.
   static const handDrop = 6.0;
-
 }

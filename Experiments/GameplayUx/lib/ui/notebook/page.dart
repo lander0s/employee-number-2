@@ -82,4 +82,3 @@ class _Ruling extends CustomPainter {
   @override
   bool shouldRepaint(_Ruling old) => old.offset != offset;
 }
-

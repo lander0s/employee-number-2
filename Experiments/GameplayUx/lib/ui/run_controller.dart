@@ -22,8 +22,6 @@ const _verdictFor = Duration(milliseconds: 2500);
 class RunController extends ChangeNotifier {
   RunController({required this.level});
 
-
-
   final Level level;
 
   RunResult? _result;
@@ -68,8 +66,7 @@ class RunController extends ChangeNotifier {
   /// start a new travel animation; the number itself means nothing to it.
   int get cursor => _cursor;
 
-  Tick? _at(int index) =>
-      index >= 0 && index < (_result?.ticks.length ?? 0)
+  Tick? _at(int index) => index >= 0 && index < (_result?.ticks.length ?? 0)
       ? _result!.ticks[index]
       : null;
 

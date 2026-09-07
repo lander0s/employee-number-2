@@ -244,11 +244,7 @@ class ProgramEditorState extends State<ProgramEditor> {
     final pointed = marked
         ? KeyedSubtree(
             key: _marked,
-            child: CaretGutter(
-              header: node.isBlock,
-              depth: depth,
-              child: body,
-            ),
+            child: CaretGutter(header: node.isBlock, depth: depth, child: body),
           )
         : body;
 

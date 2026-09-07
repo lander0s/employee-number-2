@@ -18,6 +18,7 @@ import '../model/level.dart';
 import '../model/program.dart';
 import 'floor_pane.dart';
 import 'run_controller.dart';
+import 'sfx.dart';
 import 'notebook/lift.dart';
 import 'notebook/note.dart';
 import 'notebook/program.dart';
@@ -138,6 +139,7 @@ class _GameplayScreenState extends State<GameplayScreen> {
     _toastTimer?.cancel();
     _run.removeListener(_refresh);
     _run.dispose();
+    _sfx.dispose();
     _autoScroll.dispose();
     _lift.dispose();
     _scroll.dispose();
@@ -155,6 +157,10 @@ class _GameplayScreenState extends State<GameplayScreen> {
   /// verdict exists before the first frame of playback - and this walks the
   /// trace so the page and the floor can show the same instruction.
   late final RunController _run = RunController(level: widget.level);
+
+  /// Owned here so it is disposed with the screen. The floor decides *when*
+  /// each sound plays; this only decides how long the players live.
+  final _sfx = Sfx();
 
   bool get _running => _run.running;
 
@@ -253,6 +259,7 @@ class _GameplayScreenState extends State<GameplayScreen> {
                             ? FloorPane(
                                 level: widget.level,
                                 run: _run,
+                                sfx: _sfx,
                                 onToggleRun: _toggleRun,
                               )
                             : const SizedBox.shrink(),
