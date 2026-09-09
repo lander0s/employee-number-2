@@ -289,7 +289,7 @@ class _GameplayScreenState extends State<GameplayScreen> {
                       Expanded(
                         // The tray is laid over the page rather than beside it.
                         // Two things fall out of that, and both are the point:
-                        // the ruled sheet shows through the tray's translucency,
+                        // the page shows through the tray's translucency,
                         // and pressing RUN does not resize the program - the
                         // pane was already the full height, so the tray simply
                         // stops covering part of it. It used to shrink the pane,

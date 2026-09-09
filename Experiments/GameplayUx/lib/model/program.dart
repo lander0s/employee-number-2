@@ -83,7 +83,9 @@ class Node {
   /// The cyclable words this row carries, in reading order.
   List<ArgChip> get chips => switch (spec.argKind) {
     ArgKind.none => const [],
-    ArgKind.pallet => [ArgChip(ArgSlot.object, 'PALLET $palletArg')],
+    ArgKind.pallet => [
+      ArgChip(ArgSlot.object, 'PALLET ${palletName(palletArg)}'),
+    ],
     ArgKind.condition => [ArgChip(ArgSlot.comparator, comparator)],
   };
 

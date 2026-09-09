@@ -620,20 +620,15 @@ class _Floor extends CustomPainter {
       canvas.drawLine(Offset(x, belt.top), Offset(x, belt.bottom), rollers);
     }
 
-    _label(canvas, label, Offset(head.center.dx, belt.bottom + s * 0.037), s);
+    _label(canvas, label, head.center.dx, belt.bottom, s);
   }
 
-  /// The numbered spots, and whatever is on them.
+  /// The lettered spots, and whatever is on them.
   void _pallets(Canvas canvas, FloorGeometry g, {int? hide}) {
     for (var i = 0; i < palletCount; i++) {
       final rect = g.palletSlot(i);
       canvas.drawRect(rect, _stroke());
-      _label(
-        canvas,
-        '$i',
-        Offset(rect.center.dx, rect.bottom + g.side * 0.012),
-        g.side,
-      );
+      _label(canvas, palletName(i), rect.center.dx, rect.bottom, g.side);
 
       final value = i == hide || i >= to.pallets.length ? null : to.pallets[i];
       if (value != null) {
@@ -675,8 +670,21 @@ class _Floor extends CustomPainter {
     );
   }
 
-  void _label(Canvas canvas, String text, Offset at, double s) =>
-      _text(canvas, text, at, s * 0.036, W.floorLabel);
+  /// A label hanging under [below], centred on [x].
+  ///
+  /// The gap is measured from the edge it hangs off rather than to the middle
+  /// of the glyphs - see [FloorGeometry.labelCentreUnder], which is where both
+  /// numbers live so that they cannot be set independently of each other.
+  void _label(Canvas canvas, String text, double x, double below, double s) {
+    final g = FloorGeometry(s);
+    _text(
+      canvas,
+      text,
+      Offset(x, g.labelCentreUnder(below)),
+      g.labelHeight,
+      W.floorLabel,
+    );
+  }
 
   void _text(Canvas canvas, String text, Offset at, double size, Color colour) {
     final painter = TextPainter(

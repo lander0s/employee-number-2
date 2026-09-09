@@ -27,7 +27,7 @@ void main() {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
 
   // Still set, for the moment either bar is pulled back down: dark icons now,
-  // because the frame under them is kraft rather than charcoal.
+  // because the frame under them is light rather than charcoal.
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -60,10 +60,7 @@ class GameplayUxApp extends StatelessWidget {
       // in this experiment: it opens on the one level and that is the whole
       // app (see model/levels.dart), with its solution already on the page so
       // that RUN does something on the first tap.
-      home: GameplayScreen(
-        level: levels.first,
-        program: referenceSolution(),
-      ),
+      home: GameplayScreen(level: levels.first, program: referenceSolution()),
     );
   }
 }

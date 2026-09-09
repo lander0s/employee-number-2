@@ -59,8 +59,6 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # The instruction font. See assets/fonts/Sniglet-LICENSE.txt (SIL Open Font
-  # License). Only the Regular face is shipped; an ExtraBold exists upstream.
   assets:
     # UNIT-02, from Animations/ - authored as SVG and converted by
     # Animations/tools/lottiegen.py. Copied rather than referenced across the
@@ -71,15 +69,10 @@ flutter:
     # ui/floor/cues.dart for which fires when.
     - assets/sfx/
 
-  fonts:
-    - family: Sniglet
-      fonts:
-        - asset: assets/fonts/Sniglet-Regular.ttf
-    # The player's own handwriting: the level brief is written at the top of the
-    # page, in the same notebook the program is written in.
-    - family: Schoolbell
-      fonts:
-        - asset: assets/fonts/Schoolbell-Regular.ttf
+  # No custom faces while the style is parked - the commands and the brief are
+  # set in the platform's own. Sniglet and Schoolbell are still in
+  # assets/fonts/ with their licences; re-declaring them here is how they come
+  # back.
 
   # To add assets to your application, add an assets section, like this:
   # assets:

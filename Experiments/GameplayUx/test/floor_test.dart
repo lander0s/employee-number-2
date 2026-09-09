@@ -529,6 +529,33 @@ void main() {
     });
   });
 
+  group('a label hangs clear of what it labels', () {
+    test('under the edge, not across it', () {
+      // Text is painted centred on the point it is given, so a label placed a
+      // hair under an edge is drawn half its own height back inside it. The
+      // pallet letters were doing exactly that, on the bottom stroke of their
+      // own square, because the offset was picked by eye against a size that
+      // was picked separately.
+      for (final bottom in [0.0, g.side * 0.5, g.side]) {
+        final top = g.labelCentreUnder(bottom) - g.labelHeight / 2;
+        expect(
+          top - bottom,
+          closeTo(g.side * FloorGeometry.labelGap, 0.001),
+          reason: 'label under $bottom starts at $top',
+        );
+        expect(top, greaterThan(bottom), reason: 'label under $bottom overlaps');
+      }
+    });
+
+    test('every pallet letter clears its square', () {
+      for (var i = 0; i < palletCount; i++) {
+        final square = g.palletSlot(i);
+        final top = g.labelCentreUnder(square.bottom) - g.labelHeight / 2;
+        expect(top, greaterThan(square.bottom), reason: 'pallet $i');
+      }
+    });
+  });
+
   group('sounds are cued off the gesture', () {
     // An action can make more than one noise. COPY TO is why: the unit splits a
     // package in two and sets one half down, which is a magical sound and then

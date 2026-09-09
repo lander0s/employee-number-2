@@ -373,7 +373,7 @@ class Machine {
         if (_claws == null) return _emptyClaws('copy');
         _pallets[instr.pallet] = _claws;
         _station = Station(StationKind.pallet, instr.pallet);
-        _trace(instr, 'COPY TO ${instr.pallet}  <- ${_claws!}');
+        _trace(instr, 'COPY TO ${palletName(instr.pallet)}  <- ${_claws!}');
 
       case Op.copyFrom:
         final value = _pallets[instr.pallet];
@@ -386,8 +386,9 @@ class Machine {
         _trace(
           instr,
           discarded == null
-              ? 'COPY FROM ${instr.pallet}  -> $value'
-              : 'COPY FROM ${instr.pallet}  -> $value  (binned $discarded)',
+              ? 'COPY FROM ${palletName(instr.pallet)}  -> $value'
+              : 'COPY FROM ${palletName(instr.pallet)}  -> $value'
+                    '  (binned $discarded)',
         );
 
       case Op.sum:
@@ -401,7 +402,8 @@ class Machine {
         final sign = instr.op == Op.sum ? '+' : '-';
         _trace(
           instr,
-          '${instr.op == Op.sum ? 'SUM' : 'SUB'} ${instr.pallet}'
+          '${instr.op == Op.sum ? 'SUM' : 'SUBTRACT'} '
+          '${palletName(instr.pallet)}'
           '  $before $sign $operand = ${_claws!}',
         );
 
@@ -441,7 +443,7 @@ class Machine {
   );
 
   Halt _emptyPallet(int pallet) =>
-      Halt(HaltKind.failed, 'Pallet $pallet is empty.');
+      Halt(HaltKind.failed, 'Pallet ${palletName(pallet)} is empty.');
 
   void _trace(Instr instr, String line) {
     if (instr.costsStep) _steps++;

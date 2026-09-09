@@ -8,7 +8,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../model/program.dart';
-import 'fold.dart';
+import 'panel.dart';
 import 'tokens.dart';
 
 class CommandTab extends StatelessWidget {
@@ -81,12 +81,7 @@ class CommandTab extends StatelessWidget {
 
     if (header) return box;
 
-    return StuckPaper(
-      fill: node.spec.colour,
-      shadow: Paper.tabShadow,
-      outline: outline,
-      child: box,
-    );
+    return Panel(fill: node.spec.colour, outline: outline, child: box);
   }
 }
 

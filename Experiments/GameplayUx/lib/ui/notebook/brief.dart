@@ -1,10 +1,9 @@
-/// The level brief, written at the top of the page in the player's own hand.
+/// The level brief, at the top of the page.
 ///
 /// It replaces the task card that used to be pinned above the floor. That card
 /// was chrome: a strip of app furniture, a label, and a button to re-open a
-/// sheet nobody opened twice. This is the same information as a note somebody
-/// wrote down before starting work - which is what the rest of this pane has
-/// been pretending to be since it became paper.
+/// sheet nobody opened twice. This is the same information written where the
+/// work is.
 ///
 /// Two consequences fall out of it and both are the point. The brief costs no
 /// screen height of its own, because it scrolls away with the program once you
@@ -30,34 +29,31 @@ class Brief extends StatelessWidget {
       container: true,
       label: 'Task. ${brief.task}${detail == null ? '' : '. $detail'}',
       excludeSemantics: true,
-      child: Padding(
-        padding: const EdgeInsets.only(top: Paper.handDrop),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text.rich(
-              TextSpan(
-                children: [
-                  // Written first and underlined by the stroke below, the way a
-                  // person labels a note to themselves.
-                  TextSpan(
-                    text: 'Task: ',
-                    style: Paper.handAt(Paper.handInkFaint),
-                  ),
-                  TextSpan(text: brief.task),
-                ],
-              ),
-              style: Paper.handAt(Paper.handInk),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Above the writing, matching the air under it: the brief is a note
+          // with room round it, not a caption stuck to the top of the pane.
+          const SizedBox(height: Paper.briefTop),
+          Text.rich(
+            TextSpan(
+              children: [
+                // Dimmer than what follows it: it is the label on the sentence,
+                // not part of what the sentence says.
+                TextSpan(
+                  text: 'Task: ',
+                  style: Paper.brief.copyWith(color: Paper.inkFaint),
+                ),
+                TextSpan(text: brief.task),
+              ],
             ),
-            if (detail != null)
-              Text(detail, style: Paper.handAt(Paper.handInk)),
-            // Air between the note and the work, rather than a rule drawn
-            // across the page: a person separates the two by leaving a space,
-            // not by ruling them off.
-            const SizedBox(height: Paper.briefGap),
-          ],
-        ),
+            style: Paper.brief,
+          ),
+          if (detail != null) Text(detail, style: Paper.brief),
+          // Air between the brief and the work rather than a line drawn across.
+          const SizedBox(height: Paper.briefGap),
+        ],
       ),
     );
   }

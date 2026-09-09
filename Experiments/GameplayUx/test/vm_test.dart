@@ -335,7 +335,7 @@ void main() {
     test('reading an empty pallet fails', () {
       final r = exec([cmd('copyFrom', pallet: 3)], levelOf(s1));
       expect(r.halt.kind, HaltKind.failed);
-      expect(r.verdict, contains('Pallet 3 is empty'));
+      expect(r.verdict, contains('Pallet D is empty'));
     });
   });
 

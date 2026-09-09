@@ -89,12 +89,12 @@ void main() {
       doc.insert('take');
       doc.insert('ship');
       doc.insert('sum');
-      expect(render(doc), 'TAKE\nSHIP\nSUM PALLET 1');
+      expect(render(doc), 'TAKE\nSHIP\nSUM PALLET B');
 
       // Move the first row to the end.
       final take = doc.root.first;
       doc.move(take.id, const Slot(null, 3, 0));
-      expect(render(doc), 'SHIP\nSUM PALLET 1\nTAKE');
+      expect(render(doc), 'SHIP\nSUM PALLET B\nTAKE');
     });
 
     test('moving into an empty block body works', () {

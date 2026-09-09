@@ -25,7 +25,7 @@ enum ArgKind {
   /// No argument.
   none,
 
-  /// A pallet index: the numbered floor spots a package can be copied to or
+  /// A pallet index: the lettered floor spots a package can be copied to or
   /// from, and the operands of SUM and SUB.
   pallet,
 
@@ -171,8 +171,8 @@ const commandCatalogue = <CommandSpec>[
   ),
   CommandSpec(
     id: 'sub',
-    label: 'SUB',
-    trayLabel: 'SUB',
+    label: 'SUBTRACT',
+    trayLabel: 'SUBTRACT',
     argKind: ArgKind.pallet,
     colour: _arithmetic,
   ),
@@ -180,3 +180,16 @@ const commandCatalogue = <CommandSpec>[
 
 CommandSpec specFor(String id) =>
     commandCatalogue.firstWhere((c) => c.id == id);
+
+/// What a pallet is called: A, B, C...
+///
+/// Letters rather than the indices they are stored as, everywhere a person
+/// reads them. A pallet is a place, and numbering places invites arithmetic on
+/// them - the one thing this machine cannot do, since a pallet argument is
+/// fixed when the program is written and never computed. Names cannot be added
+/// up, so the language stops implying they can.
+///
+/// The index is still the truth underneath. This is the only place that knows
+/// how one is spelled, so the floor and the program cannot disagree about which
+/// square is which.
+String palletName(int index) => String.fromCharCode(65 + index);

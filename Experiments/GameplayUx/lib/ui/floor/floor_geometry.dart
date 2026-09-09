@@ -66,6 +66,11 @@ class FloorGeometry {
   /// samples every journey, so it fails before a screenshot would show it.
   static const robot = 0.34;
 
+  /// A label under a piece of furniture - INTAKE, OUTBOUND, a pallet letter -
+  /// and the air between the two.
+  static const labelSize = 0.036;
+  static const labelGap = 0.018;
+
   /// The sprite's own canvas, and where its wheels sit inside it.
   ///
   /// From Animations/README.md: the comp is 300x240 and the casters plant on
@@ -78,6 +83,18 @@ class FloorGeometry {
   static const groundLine = 195 / 240;
 
   // ------------------------------------------------------------------ absolute
+
+  double get labelHeight => side * labelSize;
+
+  /// Where the *centre* of a label hanging under [bottom] goes.
+  ///
+  /// Derived from the label's own height, which is the whole point of it being
+  /// here. Text is painted centred on the point it is given, so an offset
+  /// smaller than half a label draws it *inside* the thing it labels - and at
+  /// 0.012 against a 0.036 label, the pallet letters were sitting 0.006 up
+  /// inside their own square, on the bottom stroke. Every belt label was fine
+  /// on a hand-picked number that happened to be big enough, which is exactly
+  /// the kind of luck that runs out when a size changes.
 
   double get _beltW => side * beltThickness;
   double get _mid => side * beltAt;
@@ -92,6 +109,9 @@ class FloorGeometry {
   /// clearance it has along the sides, so a package sits in an even surround
   /// instead of pressed against the rail it arrived on.
   double get _lip => (_beltW - boxSize) / 2;
+
+  double labelCentreUnder(double bottom) =>
+      bottom + labelHeight / 2 + side * labelGap;
 
   Rect get intakeBelt => Rect.fromLTRB(
     side * -beltOff,

@@ -179,10 +179,12 @@ void main() {
     }
   });
 
-  test('the paper is legible, and the commands still sit on it', () {
-    // The program surface went from a dark pane to a light sheet, which changes
-    // what has to be checked: ink on paper for the pane's own text, and the
-    // command colours no longer disappearing into their background.
+  test('the surface is legible, and the commands still sit on it', () {
+    // The two things a program surface has to do, whatever it is made of: carry
+    // its own text, and not swallow a command laid on it. Both were checked
+    // when it was a cream sheet and both are checked now that it is a white
+    // panel - the assertion outlived the style, which is the point of writing
+    // it against the token rather than against a colour.
     expect(contrast(Paper.ink, Paper.sheet), greaterThanOrEqualTo(7));
 
     for (final spec in commandCatalogue) {
@@ -192,19 +194,6 @@ void main() {
         reason: '${spec.id} is too close to the paper to read as a card on it',
       );
     }
-
-    // The rules are a hint, not a grid to read: faint against the sheet, and
-    // never competing with a word written over them. Measured composited, since
-    // they are painted at low alpha - the raw colour is a strong blue and says
-    // nothing about what lands on the page.
-    expect(
-      contrast(Paper.sheet, Color.alphaBlend(Paper.rule, Paper.sheet)),
-      lessThan(2),
-    );
-    expect(
-      contrast(Paper.sheet, Color.alphaBlend(Paper.margin, Paper.sheet)),
-      lessThan(3),
-    );
   });
 
   test('the delete backdrop reads as an alert, not as a command', () {

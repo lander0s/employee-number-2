@@ -16,7 +16,7 @@ import 'package:gameplay_ux/model/level.dart';
 import 'package:gameplay_ux/ui/gameplay_screen.dart';
 import 'package:gameplay_ux/ui/notebook/brief.dart';
 import 'package:gameplay_ux/ui/notebook/caret.dart';
-import 'package:gameplay_ux/ui/notebook/fold.dart';
+import 'package:gameplay_ux/ui/notebook/panel.dart';
 import 'package:gameplay_ux/ui/notebook/note.dart';
 import 'package:gameplay_ux/ui/notebook/program.dart';
 import 'package:gameplay_ux/ui/notebook/slot.dart';
@@ -90,8 +90,14 @@ Finder onNote(String text) =>
     find.descendant(of: find.byType(CommandNote), matching: find.text(text));
 
 /// The painted box behind a word.
+/// The block a label is drawn in.
+///
+/// [Panel], not DecoratedBox: a plain fill needs no decoration, so a flat block
+/// no longer builds one and this used to resolve to whatever box happened to be
+/// further up the tree. Naming the widget says what is meant and cannot drift
+/// with how the fill is painted.
 Finder boxOf(Finder label) =>
-    find.ancestor(of: label, matching: find.byType(DecoratedBox)).first;
+    find.ancestor(of: label, matching: find.byType(Panel)).first;
 
 /// Every gap on the page, in layout order; the tail is the last of them. Scoped
 /// to the editor, because the note is a drop target too - that is how deleting
@@ -291,7 +297,7 @@ void main() {
       final note = tester.getRect(find.byType(CommandNote));
 
       final gesture = await tester.startGesture(
-        tester.getCenter(onNote('SUB')),
+        tester.getCenter(onNote('SUBTRACT')),
       );
       await tester.pump(const Duration(milliseconds: 40));
       await gesture.moveBy(const Offset(0, -30));
@@ -302,7 +308,7 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
 
-      final dropped = tester.getRect(boxOf(onPage('SUB')));
+      final dropped = tester.getRect(boxOf(onPage('SUBTRACT')));
       final block = tester.getRect(boxOf(onPage('REPEAT')));
       expect(dropped.top, greaterThan(block.top));
       expect(dropped.left, closeTo(block.left, 0.5), reason: 'at the root');
@@ -490,10 +496,8 @@ void main() {
     });
   });
 
-  group('11 and 12. paper: where the glue is, and where the edges are', () {
-    testWidgets('a command ends on the page, a container runs to it', (
-      tester,
-    ) async {
+  group('11 and 12. where the edges are', () {
+    testWidgets('a command ends against its container', (tester) async {
       await boot(tester);
       final page = tester.getRect(find.byType(ProgramEditor));
 
@@ -508,24 +512,20 @@ void main() {
       expect(block.right - take.right, closeTo(Paper.armEnd, 0.5));
     });
 
-    testWidgets('a container is glued at the top, a command at the left', (
-      tester,
-    ) async {
+    testWidgets('the column has the same air either side', (tester) async {
       await boot(tester);
+      final page = tester.getRect(find.byType(ProgramEditor));
+      final block = tester.getRect(boxOf(onPage('REPEAT')));
 
-      BoxShadow shadowOf(String word) {
-        final box = tester.widget<DecoratedBox>(boxOf(onPage(word)));
-        return (box.decoration as BoxDecoration).boxShadow!.single;
-      }
-
-      // The glued edge casts nothing. That is the whole grammar.
-      expect(shadowOf('REPEAT').offset.dx, 0, reason: 'note: falls downwards');
-      expect(shadowOf('REPEAT').offset.dy, greaterThan(0));
-      expect(shadowOf('TAKE').offset.dx, greaterThan(0), reason: 'tab: right');
-
-      // Negative spread, or the blur bleeds back over the glued edge.
-      expect(shadowOf('REPEAT').spreadRadius, lessThan(0));
-      expect(shadowOf('TAKE').spreadRadius, lessThan(0));
+      // The whole point of the inset being [Paper.rootEnd] == [Paper.gutter]:
+      // measured rather than assumed, because the two are applied by different
+      // widgets at different depths and only meet on screen.
+      expect(
+        block.left - page.left,
+        closeTo(page.right - block.right, 0.5),
+        reason: 'left ${block.left - page.left}, '
+            'right ${page.right - block.right}',
+      );
     });
 
     testWidgets('the program starts right of the margin line', (tester) async {
@@ -533,10 +533,13 @@ void main() {
       final page = tester.getRect(find.byType(ProgramEditor));
       final block = tester.getRect(boxOf(onPage('REPEAT')));
 
+      // The margin rule is not drawn any more, but the strip it stood in is
+      // still reserved - the caret is what uses it now, and a command written
+      // over it would be written over the mark saying which line is running.
       expect(
         block.left - page.left,
         greaterThan(Paper.marginInset),
-        reason: 'nothing is written over the margin',
+        reason: 'nothing is written in the caret strip',
       );
     });
   });
@@ -592,7 +595,7 @@ void main() {
       }
 
       final outlined = tester
-          .widgetList<StuckPaper>(find.byType(StuckPaper))
+          .widgetList<Panel>(find.byType(Panel))
           .where((p) => p.outline != null)
           .toList();
       expect(outlined, hasLength(1));
@@ -758,27 +761,44 @@ void main() {
       expect(tester.getRect(find.byType(Brief)).top, lessThan(before - 80));
     });
 
-    testWidgets('it takes a whole number of ruled rows', (tester) async {
+    testWidgets('it is set as prose, not on the row pitch', (tester) async {
       await boot(tester, brief: brief);
 
-      // Otherwise the written lines land between the rules instead of on
-      // them, which is the tell that a page is a picture of paper rather than
-      // paper. Measured on the writing alone: the drop above it and the gap
-      // below it are both outside the block that has to stay on the grid.
-      final height = tester.getRect(find.byType(Brief)).height;
-      final written = height - Paper.handDrop - Paper.briefGap;
+      // It used to be a whole number of 36dp rows, because each line had to
+      // fill a ruled row and land on the rule under it. That is what made it
+      // airy: a 17pt line in a 36pt box is nearly double-spaced. The ruling is
+      // gone and so is the constraint - what is checked now is the opposite,
+      // that a line takes the room the text needs and no more.
+      final line = Paper.briefSize * Paper.briefLine;
+      expect(line, lessThan(Paper.rowHeight));
 
-      // Distance to the nearest whole number of rows, not the remainder: a
-      // block a hair *under* two rows has a remainder of almost a whole row,
-      // which reads as maximally wrong when it is as close as floating point
-      // gets to right.
-      final rows = written / Paper.rowHeight;
-      final off = (rows - rows.roundToDouble()).abs() * Paper.rowHeight;
+      final height = tester.getRect(find.byType(Brief)).height;
+      final written = height - Paper.briefGap - Paper.briefTop;
       expect(
-        off,
-        lessThan(0.5),
-        reason: 'written block is $written tall, ${off}px off the grid',
+        written / line,
+        closeTo((written / line).roundToDouble(), 0.02),
+        reason: 'written block is $written tall, not a whole number of lines',
       );
+    });
+
+    testWidgets('it has the same air above it as below it', (tester) async {
+      await boot(tester, brief: brief);
+
+      // Measured on screen rather than against the tokens, because the two
+      // sides are built by different widgets: above is one box inside the
+      // brief, below is the brief's own trailing box *plus* the first gap of
+      // the program, which belongs to the editor. They only meet as whitespace.
+      final box = tester.getRect(find.byType(Brief));
+      final lines = find.descendant(
+        of: find.byType(Brief),
+        matching: find.byType(Text),
+      );
+      final above = tester.getRect(lines.first).top - box.top;
+      final below =
+          tester.getRect(boxOf(onPage('REPEAT'))).top -
+          tester.getRect(lines.last).bottom;
+
+      expect(above, closeTo(below, 0.5), reason: 'above $above, below $below');
     });
 
     testWidgets('it is writing, not a row: nothing can be done to it', (

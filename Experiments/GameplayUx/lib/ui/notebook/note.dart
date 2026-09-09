@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 
 import '../../model/commands.dart';
 import '../../model/program.dart';
-import 'fold.dart';
+import 'panel.dart';
 import 'lift.dart';
 import 'tokens.dart';
 
@@ -137,7 +137,7 @@ class _Bin extends StatelessWidget {
   );
 }
 
-/// Drawn as a path, like the paperclip. No assets.
+/// Drawn as a path. No assets.
 class _TrashCan extends CustomPainter {
   const _TrashCan(this.colour);
 
@@ -233,7 +233,7 @@ class _Button extends StatelessWidget {
   }
 }
 
-/// The button as it sits on the note: the same colour and the same paper as the
+/// The button as it sits on the note: the same colour and the same shape as the
 /// thing it becomes, so the note reads as a shelf of exactly what you are about
 /// to place.
 class _Face extends StatelessWidget {
@@ -242,10 +242,8 @@ class _Face extends StatelessWidget {
   final CommandSpec spec;
 
   @override
-  Widget build(BuildContext context) => StuckPaper(
+  Widget build(BuildContext context) => Panel(
     fill: spec.colour,
-    shadow: Paper.tabShadow,
-    folded: false,
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Center(

@@ -17,7 +17,7 @@ import '../../model/level.dart';
 import '../../model/program.dart';
 import 'brief.dart';
 import 'caret.dart';
-import 'fold.dart';
+import 'panel.dart';
 import 'lift.dart';
 import 'page.dart';
 import 'row.dart';
@@ -121,26 +121,24 @@ class ProgramEditorState extends State<ProgramEditor> {
   @override
   Widget build(BuildContext context) {
     return NotebookPage(
-      controller: widget.controller,
       child: LayoutBuilder(
         builder: (context, constraints) => CustomScrollView(
           controller: widget.controller,
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                // Everything written on the page starts right of the margin.
-                padding: const EdgeInsets.only(left: Paper.gutter),
+                // The column, and the only place its width is decided. It used
+                // to be a left inset here and a right one applied per root
+                // node, which meant a root *block* got none at all and ran to
+                // the edge of the page - deliberate when a container was a
+                // sheet of paper laid across it, and lopsided now. One padding
+                // round everything cannot come apart that way, and the brief
+                // is inside it for free.
+                padding: const EdgeInsets.symmetric(horizontal: Paper.gutter),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                      // Not [Paper.rootEnd]: that inset exists to give a note's
-                      // lifted right end somewhere to fall, and writing has no
-                      // lifted end. It runs nearly to the edge of the paper,
-                      // the way writing does.
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Brief(brief: widget.brief),
-                    ),
+                    Brief(brief: widget.brief),
                     _list(doc.root, null, 0),
                   ],
                 ),
@@ -152,7 +150,7 @@ class ProgramEditorState extends State<ProgramEditor> {
             SliverFillRemaining(
               hasScrollBody: false,
               child: Padding(
-                padding: const EdgeInsets.only(left: Paper.gutter),
+                padding: const EdgeInsets.symmetric(horizontal: Paper.gutter),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
                     minHeight: constraints.maxHeight * Paper.tailSlack,
@@ -221,21 +219,17 @@ class ProgramEditorState extends State<ProgramEditor> {
   Widget _node(Node node, int depth) {
     final marked = widget.executing == node.id;
 
+    // No inset of its own at either depth: at the root the column's padding
+    // has already set the width, and inside a container it fills the body and
+    // ends against the container's own right arm.
     final body = node.isBlock
         ? _block(node, depth, marked: marked)
-        : Padding(
-            // A command at the root has no container to end against, so it
-            // stops short of the page's edge: its lifted end needs somewhere to
-            // fall. Inside a container it fills the body, and ends against the
-            // container's own right arm.
-            padding: EdgeInsets.only(right: depth == 0 ? Paper.rootEnd : 0),
-            child: CommandTab(
-              node: node,
-              dimmed: _lifted == node.id,
-              interactive: !widget.running,
-              outline: marked ? Paper.caret : null,
-              onCycle: (slot) => _mutate(() => doc.cycleArg(node.id, slot)),
-            ),
+        : CommandTab(
+            node: node,
+            dimmed: _lifted == node.id,
+            interactive: !widget.running,
+            outline: marked ? Paper.caret : null,
+            onCycle: (slot) => _mutate(() => doc.cycleArg(node.id, slot)),
           );
 
     // Wrapped inside the gestures rather than around them: while running they
@@ -259,9 +253,8 @@ class ProgramEditorState extends State<ProgramEditor> {
 
     return Opacity(
       opacity: _lifted == node.id ? 0.35 : 1,
-      child: StuckPaper(
+      child: Panel(
         fill: fill,
-        shadow: Paper.noteShadow,
         // The whole block, not just its title: a container is one object
         // everywhere else in this editor - lifting carries its body, swiping
         // deletes it - and an outline round the header alone would be the only
@@ -387,18 +380,14 @@ class _Ghost extends StatelessWidget {
 
   Widget _ghostFor(Node node, int depth) {
     if (!node.isBlock) {
-      return StuckPaper(
+      return Panel(
         fill: node.spec.colour,
-        shadow: Paper.tabShadow,
-        folded: false,
         child: CommandTab(node: node, interactive: false, onCycle: (_) {}),
       );
     }
 
-    return StuckPaper(
+    return Panel(
       fill: Paper.fillFor(node.spec.colour, depth),
-      shadow: Paper.noteShadow,
-      folded: false,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
