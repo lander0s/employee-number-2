@@ -72,6 +72,18 @@ class FloorGeometry {
   /// lines of the square it stands in.
   static const palletPad = 0.006;
 
+  /// Where the rack starts, measured from the left of the square.
+  ///
+  /// Its own number rather than the square's [pad], which is what it used to
+  /// share. The rack is a block standing *on* the floor, not an element
+  /// aligned to the frame - pinned to the same margin as everything else it
+  /// read as pushed up against the wall. Twice the margin gives it room to be
+  /// standing there.
+  ///
+  /// Only the group moves. The spacing inside it is [palletGap] and is
+  /// untouched by this.
+  static const palletLeft = 0.09;
+
   /// Between one pallet and the next.
   ///
   /// Enough to see the two squares as two, and no more: they are a rack, and a
@@ -273,7 +285,7 @@ class FloorGeometry {
   /// was picked up. A package is one size everywhere; the furniture adapts.
   double get palletSide => side * pallet;
 
-  /// A row of pallets packed to the left, a [palletGap] apart.
+  /// A row of pallets packed together at [palletLeft], a [palletGap] apart.
   ///
   /// They used to be spread across the whole width with their ends flush to
   /// the margins, on the idea that the floor should read as one grid. It read
@@ -287,7 +299,7 @@ class FloorGeometry {
   Rect palletSlot(int i) {
     final size = palletSide;
     return Rect.fromLTWH(
-      side * pad + i * (size + side * palletGap),
+      side * palletLeft + i * (size + side * palletGap),
       side * palletTop,
       size,
       size,

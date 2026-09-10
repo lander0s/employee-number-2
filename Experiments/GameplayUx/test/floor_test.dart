@@ -372,7 +372,15 @@ void main() {
         lessThanOrEqualTo(g.side - g.side * FloorGeometry.pad),
         reason: 'the rack runs off the right of the square',
       );
-      expect(g.palletSlot(0).left, closeTo(g.side * FloorGeometry.pad, 0.001));
+      expect(
+        g.palletSlot(0).left,
+        closeTo(g.side * FloorGeometry.palletLeft, 0.001),
+      );
+      expect(
+        g.palletSlot(0).left,
+        greaterThan(g.side * FloorGeometry.pad),
+        reason: 'the rack stands on the floor, it is not pinned to the wall',
+      );
 
       // And they are a rack, not a row of separate places: the gap between two
       // has to be smaller than the pallets it separates.
