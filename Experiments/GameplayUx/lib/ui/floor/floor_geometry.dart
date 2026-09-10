@@ -32,7 +32,33 @@ class FloorGeometry {
   /// and keeps the two in proportion. It also frees the height the unit needed
   /// to grow into.
   static const beltThickness = 0.125;
-  static const beltAt = 0.42;
+
+  /// The line each belt runs along. They are not the same line any more.
+  ///
+  /// The outbound belt sits lower, which opens up the top-right of the floor -
+  /// the corner the run controls live in. It also costs the floor its
+  /// symmetry, and costs the routing its simplest case: [route] treats two
+  /// stations on one line as a straight walk, and the chute and the outbound
+  /// belt are no longer on one line, so that journey is now an L through the
+  /// corridor like any other change of row. Which is correct rather than
+  /// merely acceptable - a straight line between them would drag the unit's
+  /// footprint across the end of the intake belt.
+  static const intakeAt = 0.42;
+
+  /// Below the middle of the floor, which took untangling: the belt's depth was
+  /// bounded by the *pallet* row, of all things.
+  ///
+  /// The unit standing at pallet 4 is 152dp wide, and its right shoulder used
+  /// to reach under the outbound belt's left end - so the belt had to stop
+  /// above the unit's head, and could not come down without the pallets coming
+  /// down with it. Trading depth for the pallets' bottom margin ran out almost
+  /// at once: reaching the middle of the floor that way left the rack 5dp off
+  /// the bottom edge.
+  ///
+  /// What freed it was moving the rack far enough left that the unit never
+  /// gets under the belt at all - see [palletLeft]. Horizontally clear, the
+  /// two stop constraining each other and this number is free.
+  static const outAt = 0.58;
 
   /// Where each belt meets the floor: the right end of the intake, the left
   /// end of the outbound. Placed so two and a half packages are on screen -
@@ -74,15 +100,24 @@ class FloorGeometry {
 
   /// Where the rack starts, measured from the left of the square.
   ///
-  /// Its own number rather than the square's [pad], which is what it used to
-  /// share. The rack is a block standing *on* the floor, not an element
-  /// aligned to the frame - pinned to the same margin as everything else it
-  /// read as pushed up against the wall. Twice the margin gives it room to be
-  /// standing there.
+  /// Its own number rather than the square's [pad], and currently a hair over
+  /// it - which is not where it wants to be.
+  ///
+  /// It was twice the margin, so the rack read as standing on the floor rather
+  /// than shoved against the wall. That is the nicer look and it is not what
+  /// this is for any more: the ceiling here is whatever keeps the unit at
+  /// pallet 4 clear of the outbound belt's left end, because the moment its
+  /// shoulder reaches under that belt, the belt's depth is chained to the
+  /// pallets' bottom margin and [outAt] cannot reach the middle of the floor.
+  /// 0.048 is that ceiling; the belt being where it is costs 19dp here.
+  ///
+  /// Buying the look back means buying room on the right: a narrower rack, a
+  /// narrower unit, or an outbound belt that starts further over - and the
+  /// last of those drags the drop point off the edge of the square with it.
   ///
   /// Only the group moves. The spacing inside it is [palletGap] and is
   /// untouched by this.
-  static const palletLeft = 0.09;
+  static const palletLeft = 0.048;
 
   /// Between one pallet and the next.
   ///
@@ -122,10 +157,16 @@ class FloorGeometry {
   /// couple of dp away, so anything close to the bottom reads as though it
   /// were printed on the divider rather than standing on the floor.
   ///
-  /// The number grew when the letters moved *inside* the squares, and the air
-  /// below the row did not change at all: it used to be this margin plus a
+  /// The number grew when the letters moved *inside* the squares, because the
+  /// air below the row did not change: it used to be this margin plus a
   /// label's height and its gap, and now the whole of it is margin.
-  static const palletFoot = 0.129;
+  ///
+  /// Then it shrank, to let the outbound belt down while the two were still
+  /// tied together. They are not any more - see [outAt] - so this is free to
+  /// grow again; it stays at 40dp because the low belt wants the pallets low
+  /// with it, and 40 is still twice the margin the square keeps at its other
+  /// three edges.
+  static const palletFoot = 0.09;
 
   /// Where the pallet row sits.
   ///
@@ -185,7 +226,8 @@ class FloorGeometry {
   /// the kind of luck that runs out when a size changes.
 
   double get _beltW => side * beltThickness;
-  double get _mid => side * beltAt;
+  double get _intakeMid => side * intakeAt;
+  double get _outMid => side * outAt;
   double get spriteWidth => side * robot;
   double get spriteHeight => spriteWidth / spriteAspect;
 
@@ -249,30 +291,30 @@ class FloorGeometry {
 
   Rect get intakeBelt => Rect.fromLTRB(
     side * -beltOff,
-    _mid - _beltW / 2,
+    _intakeMid - _beltW / 2,
     side * chuteEnd,
-    _mid + _beltW / 2,
+    _intakeMid + _beltW / 2,
   );
 
   Rect get outBelt => Rect.fromLTRB(
     side * (1 - chuteEnd),
-    _mid - _beltW / 2,
+    _outMid - _beltW / 2,
     side * (1 + beltOff),
-    _mid + _beltW / 2,
+    _outMid + _beltW / 2,
   );
 
   /// Slot 0 is the end nearest the unit on both belts; the queues run away from
   /// it in opposite directions.
   Rect intakeSlot(int i) => Rect.fromLTWH(
     intakeBelt.right - _lip - boxSize - i * _step,
-    _mid - boxSize / 2,
+    _intakeMid - boxSize / 2,
     boxSize,
     boxSize,
   );
 
   Rect outSlot(int i) => Rect.fromLTWH(
     outBelt.left + _lip + i * _step,
-    _mid - boxSize / 2,
+    _outMid - boxSize / 2,
     boxSize,
     boxSize,
   );
@@ -313,16 +355,19 @@ class FloorGeometry {
   /// Derived rather than tuned: just clear of the thing it reaches for. They
   /// were two hand-picked constants, which meant growing the unit silently
   /// stood it on the rollers until the collision test said so.
-  double get beltFeet => intakeBelt.top - side * clearance;
+  double get chuteFeet => intakeBelt.top - side * clearance;
+  double get outFeet => outBelt.top - side * clearance;
   double get palletFeet => palletSlot(0).top - side * clearance;
 
   /// Where the unit stands to work on something. This is its *ground line* -
   /// where the casters touch - not the middle of its sprite.
   Offset stand(Station at) => switch (at.kind) {
     // Mid-floor, between the two belts. Only ever the starting position.
-    StationKind.home => Offset(side / 2, beltFeet),
-    StationKind.chute => Offset(intakeSlot(0).center.dx, beltFeet),
-    StationKind.outbound => Offset(outSlot(0).center.dx, beltFeet),
+    // Home is on the intake's line: it is only ever where a shift starts, and
+    // the first thing any shift does is TAKE.
+    StationKind.home => Offset(side / 2, chuteFeet),
+    StationKind.chute => Offset(intakeSlot(0).center.dx, chuteFeet),
+    StationKind.outbound => Offset(outSlot(0).center.dx, outFeet),
     StationKind.pallet => Offset(palletSlot(at.pallet).center.dx, palletFeet),
   };
 

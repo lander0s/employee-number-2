@@ -79,13 +79,35 @@ void main() {
 
   group('the route', () {
     test('is a straight line when the row does not change', () {
-      // Chute to outbound runs along the belt row, which is clear above both
-      // belts - so there is nothing to route around and no corner to turn.
+      // Home and the chute are on one line - home is only ever a starting
+      // position, and a shift starts by taking.
+      final path = g.route(
+        g.stand(Station.start),
+        g.stand(const Station(StationKind.chute)),
+      );
+      expect(path, hasLength(2));
+    });
+
+    test('chute to outbound turns corners, since the belts are not level', () {
+      // They used to be, and this was the straight-line case. The outbound
+      // belt sits lower now, so the two are on different lines and the walk
+      // goes through the corridor like any other change of row.
+      //
+      // Which is not a formality. A straight line between them would drag the
+      // unit's footprint across the end of the intake belt - the very thing
+      // the corridor exists to prevent - so the route being longer than it
+      // looks is the route being right.
       final path = g.route(
         g.stand(const Station(StationKind.chute)),
         g.stand(const Station(StationKind.outbound)),
       );
-      expect(path, hasLength(2));
+      expect(path, hasLength(4));
+      expect(path[1].dx, path[2].dx, reason: 'it crosses at one x');
+      expect(
+        path[1].dx,
+        greaterThanOrEqualTo(g.corridorLo - 0.5),
+        reason: 'and that x is in the corridor',
+      );
     });
 
     test('turns two corners when it does', () {
@@ -359,6 +381,27 @@ void main() {
         lessThan(g.side * FloorGeometry.beltThickness),
         reason: 'back to reading as a crate the package sits inside',
       );
+    });
+
+    test('the rack keeps the unit out from under the outbound belt', () {
+      // This is what lets the belt sit as low as it does. While the unit's
+      // shoulder reached under the belt's left end, the belt's depth was
+      // chained to the pallets' bottom margin: it could only come down as far
+      // as the rack could be pushed, and that ran out well above the middle of
+      // the floor.
+      //
+      // Clear of it horizontally, the two stop constraining each other. So
+      // this is the assertion holding [outAt] free, and the thing that breaks
+      // if the rack is ever widened or nudged right.
+      final furthest = g.stand(Station(StationKind.pallet, palletCount - 1));
+      expect(
+        g.sweep(furthest).right + g.side * FloorGeometry.clearance,
+        lessThanOrEqualTo(g.outBelt.left),
+        reason: 'the unit at the last pallet is under the outbound belt',
+      );
+
+      // And the belt really is lower than the intake one, which was the point.
+      expect(g.outBelt.top, greaterThan(g.intakeBelt.top));
     });
 
     test('the whole rack fits on the floor', () {

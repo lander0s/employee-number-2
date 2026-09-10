@@ -74,7 +74,15 @@ class FloorPane extends StatelessWidget {
           ),
         ),
         Positioned(
-          top: 8,
+          // Clear of whatever the device keeps for itself up there - a notch,
+          // a camera, a status bar. `viewPadding` rather than `padding`,
+          // because the game runs full screen: that zeroes `padding` for bars
+          // it has hidden, but a camera is still a camera.
+          //
+          // Worth saying what this is *not* for: the outbound belt was never
+          // crowding these. There were 108dp of clear floor between them
+          // before it moved down, and there are more now.
+          top: 8 + MediaQuery.viewPaddingOf(context).top,
           right: 8,
           child: Chrome(
             child: AnimatedBuilder(
