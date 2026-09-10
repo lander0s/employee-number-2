@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gameplay_ux/model/commands.dart';
 import 'package:gameplay_ux/ui/notebook/tokens.dart';
+import 'package:gameplay_ux/ui/wireframe.dart';
 
 double _linear(double c) =>
     c <= 0.03928 ? c / 12.92 : math.pow((c + 0.055) / 1.055, 2.4).toDouble();
@@ -211,6 +212,23 @@ void main() {
         reason: '${spec.id} is too close to the delete backdrop',
       );
     }
+  });
+
+  test('the transport reads on its own button, and disabled does not', () {
+    // Icons rather than text, so the floor is 1.4.11's 3:1 for non-text
+    // content and not the 7:1 the words in this app carry.
+    //
+    // The familiar VS Code values are the dark-theme ones and score under 2:1
+    // on a near-white button - which is how the light-theme set came to be
+    // used here instead. Written down because "the VS Code colours" is an
+    // ambiguous instruction and this is which ones.
+    for (final colour in [W.runGo, W.runStop, W.runStep]) {
+      expect(contrast(colour, W.button), greaterThanOrEqualTo(3));
+    }
+
+    // And the inverse, which matters as much: a disabled control has to fail
+    // the same floor, or faint reads as merely a darker shade of on.
+    expect(contrast(W.lineSoft, W.button), lessThan(3));
   });
 
   test('the caret is legible on every block colour', () {

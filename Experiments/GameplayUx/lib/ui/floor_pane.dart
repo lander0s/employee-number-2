@@ -19,6 +19,8 @@
 /// pane, and only one of them is part of the world.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../model/level.dart';
@@ -247,7 +249,13 @@ class _Control extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final on = onTap != null;
-    final ink = on ? W.text : W.lineSoft;
+
+    // Colour says what the control *does*; the border says whether it does
+    // anything. Keeping those on separate features is what stops a disabled
+    // stop button from reading as a quieter shade of red - it goes grey
+    // outright, and grey is the one thing here that means nothing.
+    final ink = on ? glyph.ink : W.lineSoft;
+    final edge = on ? W.line : W.lineSoft;
 
     return Semantics(
       button: true,
@@ -263,13 +271,13 @@ class _Control extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: W.button,
-            border: Border.all(color: ink),
+            border: Border.all(color: edge),
           ),
           // Painted rather than set as a glyph, for the same reason as the
           // splitter's handle: at this size an icon font's built-in padding
           // fights the layout.
           child: CustomPaint(
-            size: const Size(16, 16),
+            size: Size.square(RunControls.height * glyph.box),
             painter: _RunGlyph(glyph: glyph, color: ink),
           ),
         ),
@@ -279,6 +287,30 @@ class _Control extends StatelessWidget {
 }
 
 enum _Glyph { play, pause, stop, prev, next }
+
+extension on _Glyph {
+  /// How much of the control this glyph's box takes.
+  ///
+  /// Not one number for all five. The tape-deck shapes are solid and square -
+  /// they use their box in both directions, and at much more than half the
+  /// button a filled triangle starts to look like a warning sign. The curved
+  /// arrows are wide and flat: they use their box in one direction, so a box
+  /// that gives them the same visual weight has to be bigger.
+  double get box => switch (this) {
+    _Glyph.prev || _Glyph.next => 0.86,
+    _Glyph.play || _Glyph.pause || _Glyph.stop => 0.58,
+  };
+
+  /// What this control does, in the colour a programmer already reads it in.
+  Color get ink => switch (this) {
+    _Glyph.play => W.runGo,
+    _Glyph.stop => W.runStop,
+    // Blue with the steps rather than green with play: pausing does not start
+    // anything, it moves you about inside a run, which is what blue is for
+    // here.
+    _Glyph.pause || _Glyph.prev || _Glyph.next => W.runStep,
+  };
+}
 
 /// The transport symbols, drawn rather than typed.
 class _RunGlyph extends CustomPainter {
@@ -296,10 +328,6 @@ class _RunGlyph extends CustomPainter {
 
     final w = size.width;
     final h = size.height;
-
-    // The bar on a step control, and the width left for its triangle.
-    const barW = 2.5;
-    const gap = 1.5;
 
     switch (glyph) {
       case _Glyph.play:
@@ -322,28 +350,99 @@ class _RunGlyph extends CustomPainter {
       case _Glyph.stop:
         canvas.drawRect(Rect.fromLTWH(1, 1, w - 2, h - 2), paint);
 
+      // Curved, like undo and redo, not the tape deck's skip-to-track. A
+      // program is a document being read back and forth, and a step is far
+      // closer to undo than to jumping a track: it moves *one* instruction,
+      // reversibly, and the trace it walks is a history. The two skip arrows
+      // said "go to the end", which is the one thing they do not do.
       case _Glyph.prev:
-        canvas.drawRect(Rect.fromLTWH(1, 0, barW, h), paint);
-        canvas.drawPath(
-          Path()
-            ..moveTo(w - 1, 0)
-            ..lineTo(1 + barW + gap, h / 2)
-            ..lineTo(w - 1, h)
-            ..close(),
-          paint,
-        );
+        _turn(canvas, size, paint, back: true);
 
       case _Glyph.next:
-        canvas.drawRect(Rect.fromLTWH(w - 1 - barW, 0, barW, h), paint);
-        canvas.drawPath(
-          Path()
-            ..moveTo(1, 0)
-            ..lineTo(w - 1 - barW - gap, h / 2)
-            ..lineTo(1, h)
-            ..close(),
-          paint,
-        );
+        _turn(canvas, size, paint, back: false);
     }
+  }
+
+  /// A shallow bow with a head on one end: undo and redo, mirrored.
+  ///
+  /// It was the top *half* of a circle, which is a small loop wherever you put
+  /// it - a half turn spends all its length on height, and height is the axis
+  /// with the least of it. [_sweep] spends the length on width instead.
+  ///
+  /// The tail is deliberately short of what the arc could be, and shorter than
+  /// looks right in isolation. A long tail is the part of an arrow that
+  /// carries no meaning - the head says which way - and it costs twice: the
+  /// head cannot have those dp, and because the glyph is centred on its own
+  /// ink, a tail trailing off one side pushes the head out to the other. The
+  /// head is now the larger half of the arrow and sits near the middle of the
+  /// button rather than against its edge.
+  ///
+  /// The cost of a flat arc is that the curve alone no longer says "back" - at
+  /// this angle it reads as a line with a bend - which is the other reason the
+  /// head is this size, and why it is set along the tangent rather than square
+  /// to the world.
+  static const _sweep = 45 * math.pi / 180;
+
+  static void _turn(
+    Canvas canvas,
+    Size size,
+    Paint fill, {
+    required bool back,
+  }) {
+    final s = size.width;
+    const half = _sweep / 2;
+
+    final chord = s * 0.32;
+    final r = chord / 2 / math.sin(half);
+    final stroke = s * 0.15;
+
+    // Anywhere; the whole thing is re-centred on its own ink below, so these
+    // only have to be right relative to each other.
+    final centre = Offset(s / 2, s / 2 + r * math.cos(half));
+    final from = -math.pi / 2 - half;
+    final arc = Path()
+      ..addArc(Rect.fromCircle(center: centre, radius: r), from, _sweep);
+
+    // The head sits at the end the arrow travels *to*, pointing along the
+    // tangent there - reversed, because it is arriving rather than leaving.
+    final at = back ? from : from + _sweep;
+    final tip = centre + Offset(math.cos(at), math.sin(at)) * r;
+    final along = back
+        ? Offset(math.sin(at), -math.cos(at))
+        : Offset(-math.sin(at), math.cos(at));
+    final across = Offset(-along.dy, along.dx);
+
+    final length = s * 0.46;
+    final width = s * 0.24;
+    final head = Path()
+      ..moveTo(tip.dx + along.dx * length, tip.dy + along.dy * length)
+      ..lineTo(tip.dx + across.dx * width, tip.dy + across.dy * width)
+      ..lineTo(tip.dx - across.dx * width, tip.dy - across.dy * width)
+      ..close();
+
+    // Centred on what is actually drawn, not on the arc's geometry. The head
+    // hangs off one end only, so the ink is lopsided by most of a head length
+    // - which is exactly the amount the glyph used to sit off to one side, and
+    // is unfixable by choosing better angles. Inflated by half the stroke,
+    // since a path's bounds are its centreline.
+    final ink = arc
+        .getBounds()
+        .inflate(stroke / 2)
+        .expandToInclude(head.getBounds());
+
+    canvas.save();
+    canvas.translate(s / 2 - ink.center.dx, size.height / 2 - ink.center.dy);
+    canvas.drawPath(
+      arc,
+      Paint()
+        ..color = fill.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..strokeCap = StrokeCap.round
+        ..isAntiAlias = true,
+    );
+    canvas.drawPath(head, fill);
+    canvas.restore();
   }
 
   @override

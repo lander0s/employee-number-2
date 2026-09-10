@@ -134,6 +134,27 @@ abstract final class W {
   /// thing out there that moves and the eye should find it first.
   static const floorPackage = Color(0xFFFFFFFF);
 
+  // ------------------------------------------------------------- transport
+  //
+  // The run controls are the other place colour survives the wireframe, and
+  // for the same reason the command families do: it carries meaning. Green
+  // starts, red ends, blue moves you around inside - a set every programmer
+  // already knows, so it does not have to be learned here.
+  //
+  // These are VS Code's *light* debug icon colours, not its dark ones. The
+  // familiar values are tuned for a dark toolbar and score under 2:1 on a
+  // near-white button; these are the same palette's answer for a light one.
+  // Measured against [button], the face they sit on, in colour_test.dart.
+
+  /// 3.87:1. `debugIcon.restartForeground`.
+  static const runGo = Color(0xFF388A34);
+
+  /// 6.70:1. `debugIcon.stopForeground`.
+  static const runStop = Color(0xFFA1260D);
+
+  /// 4.03:1. `debugIcon.continueForeground`, used here for the two steps.
+  static const runStep = Color(0xFF007ACC);
+
   /// A failed shift, and text on it. Shared with the page's own delete
   /// backdrop, which is the same idea: this went wrong.
   ///
