@@ -12,6 +12,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../model/level.dart';
 import '../../model/program.dart';
@@ -94,23 +95,74 @@ class ProgramEditorState extends State<ProgramEditor> {
     }
   }
 
-  /// Puts the running line in the middle of the page.
+  /// Keeps the running line on screen, and otherwise leaves the page alone.
   ///
-  /// `alignment: 0.5` is the centring, and `ensureVisible` clamps it to what
-  /// the scroll extent allows - so the first lines of a program sit above
-  /// centre and the last ones below it, which is the only thing the page can
-  /// honestly do at the ends.
+  /// It used to centre the line on every instruction, which meant the page
+  /// moved under the player on almost every step - including the many where
+  /// the line was already sitting in plain view. A run should read like a
+  /// debugger following code, not like a teleprompter holding one line against
+  /// the middle.
+  ///
+  /// So the page moves only when it must, and then only as far as it must:
+  /// down to the line if the line is above, up to it if below, plus
+  /// [Paper.caretSlack]. Already visible is the case that does nothing at all,
+  /// and it is the common one.
   void _follow() {
     final context = _marked.currentContext;
     if (!mounted || context == null) return;
-    Scrollable.ensureVisible(
-      context,
-      alignment: 0.5,
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : Paper.caretFollow,
-      curve: Curves.easeOut,
+
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final viewport = RenderAbstractViewport.maybeOf(box);
+    if (viewport == null || !widget.controller.hasClients) return;
+    final position = widget.controller.position;
+
+    // The marked *line*, not the marked object. A container is marked as one
+    // block - that is the editor's rule everywhere else, and the right one -
+    // but a block can easily be taller than the page, and what has to be on
+    // screen is the line the caret is against, which for a block is its
+    // header. [Paper.headerTop] is where a header's caret sits; on a plain
+    // command those few dp are slack and cost nothing.
+    final line = Rect.fromLTWH(
+      0,
+      0,
+      box.size.width,
+      Paper.headerTop + Paper.rowHeight,
     );
+
+    // The two offsets that would put the line flush against each edge of the
+    // page. Between them the line is already showing, which is the case that
+    // must not scroll. `atBottom` is the smaller of the two: showing something
+    // at the foot of the page takes less scrolling than showing it at the head.
+    final atTop = viewport.getOffsetToReveal(box, 0, rect: line).offset;
+    final atBottom = viewport.getOffsetToReveal(box, 1, rect: line).offset;
+    final here = position.pixels;
+
+    final double target;
+    if (atBottom > atTop) {
+      // No offset shows the whole line: the page is shorter than one row, so
+      // there is no "minimum" to find. Show its top and let the rest go.
+      target = atTop;
+    } else if (here > atTop) {
+      target = atTop - Paper.caretSlack;
+    } else if (here < atBottom) {
+      target = atBottom + Paper.caretSlack;
+    } else {
+      return;
+    }
+
+    final to = target.clamp(position.minScrollExtent, position.maxScrollExtent);
+    // `animateTo` asserts a non-zero duration, so reduced motion is a jump
+    // rather than a zero-length animation.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      position.jumpTo(to);
+    } else {
+      position.animateTo(
+        to,
+        duration: Paper.caretFollow,
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   void _mutate(void Function() change) {

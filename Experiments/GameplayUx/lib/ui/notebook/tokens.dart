@@ -150,12 +150,22 @@ abstract final class Paper {
   /// to itself, and stops clear of the rule rather than touching it.
   static const caretInset = 6.0;
 
-  /// How long the page takes to bring the running line back to the middle.
+  /// How long the page takes to bring the running line back into view.
   ///
   /// Shorter than the fastest instruction holds for, so the page has settled
   /// before the next line is marked. Any longer and a fast stretch of program
   /// leaves the scroll permanently chasing a caret it never catches.
   static const caretFollow = Duration(milliseconds: 180);
+
+  /// How much page is kept past the running line when the page does have to
+  /// move.
+  ///
+  /// One row's pitch. Bringing the line exactly flush with the edge would put
+  /// the *next* instruction off screen again, so a run down a long program
+  /// would scroll on every single step - a row of slack buys several steps of
+  /// stillness for one movement. It also stops the marked line reading as half
+  /// cut off by the edge it was pushed against.
+  static const caretSlack = rowHeight + gap;
 
   /// The marked command is also outlined, in the caret's own colour, so the
   /// mark and the thing it marks are obviously one statement rather than an

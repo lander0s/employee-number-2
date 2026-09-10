@@ -760,22 +760,141 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('it scrolls the running line to the middle', (tester) async {
-      await boot(tester, level: longLevel(), program: longProgram());
+    /// Where the caret is.
+    Rect caretOf(WidgetTester tester) =>
+        tester.getRect(find.byType(CaretGutter));
 
-      // Long enough to be a dozen or so rows in, where the row would be well
-      // off the bottom of the page if nothing had scrolled. Every TAKE here
-      // costs one pickup and no walk - the unit never leaves the chute after
-      // the first instruction - so this is comfortably mid-program.
+    /// The page's scroll offset.
+    ///
+    /// Read off the position rather than inferred from a row's rect: the rows
+    /// are two dozen identical TAKEs, so there is no one of them to measure
+    /// against, and this is the number the rule is actually about.
+    double offsetOf(WidgetTester tester) => tester
+        .state<ScrollableState>(
+          find.descendant(
+            of: find.byType(ProgramEditor),
+            matching: find.byType(Scrollable),
+          ),
+        )
+        .position
+        .pixels;
+
+    /// Drives one instruction, exactly, by hand.
+    Future<void> step(WidgetTester tester, String which) async {
+      await tester.tap(find.bySemanticsLabel(which));
+      await tester.pump();
+      // The follow is scheduled post-frame, so the step needs a second frame
+      // before the page has had its chance to move.
+      await tester.pump();
+    }
+
+    testWidgets('it does not move while the line is already showing', (
+      tester,
+    ) async {
+      // This is the case the old centring rule got wrong: it moved the page on
+      // every step, including the many where the player could already see the
+      // line perfectly well.
+      //
+      // Measured with the caret parked well clear of both edges, which is what
+      // makes it a real test. Doing it near the top of the program proves
+      // nothing - the page is already at offset zero there, so centring is
+      // clamped to no movement and the old rule passes by accident.
+      await boot(tester, level: longLevel(), program: longProgram());
+      await runFor(tester, const Duration(seconds: 12));
+      await tester.tap(find.bySemanticsLabel('Pause the shift'));
+      await tester.pump();
+
+      // Back up the page a few rows, so the next line forward cannot possibly
+      // need the page to move.
+      for (var i = 0; i < 3; i++) {
+        await step(tester, 'Previous instruction');
+      }
+
+      final page = pageOf(tester);
+      final before = offsetOf(tester);
+      final caret = caretOf(tester);
+      expect(caret.top, greaterThan(page.top + Paper.rowHeight));
+      expect(caret.bottom, lessThan(page.bottom - Paper.rowHeight));
+
+      await step(tester, 'Next instruction');
+
+      expect(
+        caretOf(tester).top,
+        greaterThan(caret.top),
+        reason: 'the caret did not advance, so nothing was tested',
+      );
+      expect(
+        offsetOf(tester),
+        before,
+        reason: 'the page moved for a line that was already in view',
+      );
+    });
+
+    testWidgets('it scrolls the minimum once the line reaches the foot', (
+      tester,
+    ) async {
+      // Long enough that the caret would be well off the bottom if nothing had
+      // scrolled. Every TAKE here costs one pickup and no walk - the unit
+      // never leaves the chute after the first instruction - so this is
+      // comfortably mid-program.
+      await boot(tester, level: longLevel(), program: longProgram());
       await runFor(tester, const Duration(seconds: 12));
 
       final page = pageOf(tester);
-      final caret = tester.getRect(find.byType(CaretGutter));
+      final caret = caretOf(tester);
+
+      // On screen, which is the whole requirement...
+      expect(caret.top, greaterThanOrEqualTo(page.top - 0.5));
+      expect(caret.bottom, lessThanOrEqualTo(page.bottom + 0.5));
+
+      // ...and no further in than it had to come. Walking *down* the program,
+      // the minimum move leaves the line near the foot of the page - centring
+      // it would mean having scrolled about half a page more than necessary.
       expect(
         caret.center.dy,
-        closeTo(page.center.dy, Paper.rowHeight),
-        reason: 'the running line drifted off centre',
+        greaterThan(page.center.dy),
+        reason: 'the page scrolled further than it needed to',
       );
+    });
+
+    testWidgets('and it keeps a row of slack off the edge', (tester) async {
+      // Flush against the edge would put the next instruction off screen
+      // again, so a long program would scroll on every single step.
+      await boot(tester, level: longLevel(), program: longProgram());
+      await runFor(tester, const Duration(seconds: 12));
+
+      final page = pageOf(tester);
+      expect(
+        page.bottom - caretOf(tester).bottom,
+        greaterThanOrEqualTo(Paper.caretSlack - 0.5),
+      );
+    });
+
+    testWidgets('it comes back up for a line stepped back to', (tester) async {
+      // The other direction, which only the debugger reaches: step back far
+      // enough and the marked line goes off the *top* of the page.
+      await boot(tester, level: longLevel(), program: longProgram());
+      await runFor(tester, const Duration(seconds: 12));
+
+      await tester.tap(find.bySemanticsLabel('Pause the shift'));
+      await tester.pump();
+
+      final scrolled = pageOf(tester);
+      for (var i = 0; i < rows; i++) {
+        final prev = find.bySemanticsLabel('Previous instruction');
+        if (prev.evaluate().isEmpty) break;
+        await tester.tap(prev);
+        await tester.pump();
+        await tester.pump();
+
+        final caret = find.byType(CaretGutter);
+        if (caret.evaluate().isEmpty) break; // stepped back before line one
+        expect(
+          tester.getRect(caret).top,
+          greaterThanOrEqualTo(scrolled.top - 0.5),
+          reason: 'the line went off the top after $i steps back',
+        );
+      }
     });
 
     testWidgets('and does not fight the top of the page', (tester) async {
