@@ -22,6 +22,7 @@ import 'sfx.dart';
 import 'notebook/lift.dart';
 import 'notebook/note.dart';
 import 'notebook/program.dart';
+import 'notebook/tokens.dart';
 import 'wireframe.dart';
 
 /// How far the floor is pulled out, as a fraction of a square.
@@ -346,13 +347,23 @@ class _GameplayScreenState extends State<GameplayScreen> {
   void _refresh() => setState(() {});
 }
 
-/// The draggable divider. Its hit area is 34 tall even though the visible rule
-/// is 2, because a 2px drag target is unusable with a thumb. No text in it, so a
-/// fixed height is safe here.
+/// The draggable divider: a short bar, and nothing else.
 ///
-/// The grip carries a small up and down arrow: a bare line reads as decoration,
-/// and nothing else on this screen moves vertically, so the affordance has to say
-/// so rather than waiting to be discovered.
+/// It was a full-width rule with a bordered 52x26 grip and a pair of arrows
+/// painted in it, on the reasoning that a bare line reads as decoration and the
+/// affordance had to announce itself. The box was the heavy part of that, and a
+/// centred handle is the one shape a person already reads as "drag me" - so the
+/// announcement can be made much more quietly.
+///
+/// It sits on the same surface as the tray below it, deliberately. The tray is
+/// the bottom lip of the splitter: they move together, so they should look like
+/// one thing being moved rather than a bar with a panel stuck under it. That
+/// also takes a stripe of grey out of the middle of the screen, which is most
+/// of what made this read as thick.
+///
+/// The *hit* area stays [W.dividerHitHeight] regardless of how thin the bar
+/// looks. What is easy to see and what is easy to hit are different questions,
+/// and only the first one was asked.
 class _Divider extends StatelessWidget {
   const _Divider({
     required this.active,
@@ -380,76 +391,17 @@ class _Divider extends StatelessWidget {
         onVerticalDragUpdate: (d) => onDragUpdate(d.delta.dy),
         onVerticalDragEnd: (_) => onDragEnd(),
         onDoubleTap: onDoubleTap,
-        child: SizedBox(
+        child: Container(
           height: W.dividerHitHeight,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // The rule, running the full width behind the grip.
-              Container(
-                height: active ? 3 : 2,
-                color: active ? W.text : W.lineSoft,
-              ),
-              Container(
-                width: 52,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: W.chrome,
-                  border: Border.all(color: active ? W.text : W.line),
-                ),
-                child: CustomPaint(
-                  painter: _GripArrows(color: active ? W.text : W.textDim),
-                ),
-              ),
-            ],
+          color: Paper.sheet,
+          alignment: Alignment.center,
+          child: Container(
+            width: 40,
+            height: active ? 4 : 3,
+            color: active ? W.text : W.lineSoft,
           ),
         ),
       ),
     );
   }
-}
-
-/// Two small triangles, up and down, painted rather than drawn with an icon
-/// font: at this size a glyph's built-in padding makes the pair too tall for the
-/// grip, and painting keeps them crisp on every platform.
-class _GripArrows extends CustomPainter {
-  const _GripArrows({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const width = 11.0;
-    const height = 6.0;
-    const gap = 6.0;
-
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill
-      ..isAntiAlias = true;
-
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-
-    canvas.drawPath(
-      Path()
-        ..moveTo(cx, cy - gap / 2 - height)
-        ..lineTo(cx - width / 2, cy - gap / 2)
-        ..lineTo(cx + width / 2, cy - gap / 2)
-        ..close(),
-      paint,
-    );
-
-    canvas.drawPath(
-      Path()
-        ..moveTo(cx, cy + gap / 2 + height)
-        ..lineTo(cx - width / 2, cy + gap / 2)
-        ..lineTo(cx + width / 2, cy + gap / 2)
-        ..close(),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_GripArrows oldDelegate) => oldDelegate.color != color;
 }

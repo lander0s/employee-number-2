@@ -20,6 +20,38 @@ class NotebookPage extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) =>
-      Container(color: Paper.sheet, child: child);
+  Widget build(BuildContext context) => Container(
+    color: Paper.sheet,
+    child: Stack(
+      children: [
+        Positioned.fill(child: child),
+        // The shadow the tray casts on the page, drawn by the page. See
+        // [Paper.surfaceShadow] for why it is this way round.
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: Paper.surfaceShadowDepth,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Paper.surfaceShadow,
+                    // The same colour at zero alpha, not a bare transparent:
+                    // fading to `Colors.transparent` fades through black's
+                    // *hue* as well as its alpha, which greys the middle of
+                    // the ramp on some platforms.
+                    Paper.surfaceShadow.withAlpha(0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }

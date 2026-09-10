@@ -48,8 +48,11 @@ class CommandNote extends StatelessWidget {
           // here has nothing to delete yet, so dropping it back is a cancel.
           onWillAcceptWithDetails: (d) => d.data is MoveNode,
           onAcceptWithDetails: (d) => onTrash((d.data as MoveNode).id),
+          // The same surface the program is written on, raised above it. It
+          // was a translucent scrim, which is what something laid *over* a page
+          // has to be; sitting beside the page instead, it is simply the page.
           builder: (context, candidate, rejected) => Container(
-            color: Paper.scrim,
+            color: Paper.sheet,
             // Even top and bottom. The note used to sit on the bottom edge
             // of the screen, so it carried the system's gesture area and a
             // deep foot to keep the last row of buttons off a rounded corner.
@@ -83,21 +86,37 @@ class CommandNote extends StatelessWidget {
         if (row != _rows.first) const SizedBox(height: 4),
         // IntrinsicHeight gives the row a height to stretch into: without it,
         // stretch asks for infinity inside a Column sizing to its children.
-        // Stretch is what keeps a row even when a long label has to scale down.
+        // Stretch is what keeps the buttons in a row the same height as each
+        // other, which they no longer get from being the same width.
         IntrinsicHeight(
           child: Row(
+            // Each button is as wide as its own word, with equal air between
+            // them *and* at both ends. They used to be [Expanded] - every
+            // button in a row the same width - which made SUM as wide as COPY
+            // FROM and read as a keypad. A word's own width is a better handle
+            // on it.
+            //
+            // Evenly rather than between: `between` pins the first and last
+            // words hard against the note's edges, so a row of five and a row
+            // of four line up at their ends and nowhere else, and the gaps
+            // differ between the two rows. Evenly gives the shelf one rhythm.
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final id in row) ...[
-                if (id != row.first) const SizedBox(width: 4),
-                Expanded(
+              for (final id in row)
+                // Loose, which is the whole trick: a button takes its natural
+                // width when the row has room and is squeezed only when it has
+                // not - and [_Face] scales its word down rather than clipping
+                // it. Natural width alone overflows, because nothing bounds the
+                // sum of nine words: a narrow phone, a long label, or the 1.3x
+                // the chrome still scales to are each enough.
+                Flexible(
                   child: _Button(
                     spec: specFor(id),
                     lift: lift,
                     autoScroll: autoScroll,
                   ),
                 ),
-              ],
             ],
           ),
         ),
@@ -250,7 +269,11 @@ class _Face extends StatelessWidget {
           fit: BoxFit.scaleDown,
           child: Text(
             spec.trayLabel,
-            style: Paper.command.copyWith(fontSize: 17),
+            // Smaller than the program's own rows, and smaller than the 17
+            // that 7.3 sets as the floor for functional text. Deliberate: the
+            // tray is a shelf of things to pick up, read at a glance rather
+            // than followed line by line. The program itself keeps 17 and up.
+            style: Paper.command.copyWith(fontSize: 15),
             maxLines: 1,
           ),
         ),

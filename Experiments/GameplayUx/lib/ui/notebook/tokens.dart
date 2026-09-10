@@ -117,10 +117,19 @@ abstract final class Paper {
   /// under it, which is what makes the note read as something resting on the
   /// program rather than a strip of frame bolted to the bottom of the screen.
   ///
-  /// Neutral, like everything else holding the wireframe together. It was warm
-  /// because a grey scrim over cream paper went green; over a white panel there
-  /// is nothing left for it to go green against.
-  static const scrim = Color(0x66333333);
+  /// What separates the tray from the page.
+  ///
+  /// They are the same colour now - the tray is the same surface the program is
+  /// written on, raised - so an edge is the only thing left to tell them apart,
+  /// and it has to be a cast shadow rather than a line. A line would read as a
+  /// third thing between two surfaces; a shadow reads as one of them being on
+  /// top of the other, which is what is true.
+  ///
+  /// Drawn by the *page*, at its top, not by the tray. A [Column] paints its
+  /// children in order, so a shadow the tray tried to cast downward would be
+  /// painted over by the page a moment later. The surface it falls on draws it.
+  static const surfaceShadow = Color(0x30000000);
+  static const surfaceShadowDepth = 9.0;
 
   /// Revealed behind a row being swiped away. Deep rather than bright: it is
   /// read in near-white like the app's own furniture, and it has to stay clear

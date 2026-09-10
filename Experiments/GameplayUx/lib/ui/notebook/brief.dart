@@ -36,20 +36,13 @@ class Brief extends StatelessWidget {
           // Above the writing, matching the air under it: the brief is a note
           // with room round it, not a caption stuck to the top of the pane.
           const SizedBox(height: Paper.briefTop),
-          Text.rich(
-            TextSpan(
-              children: [
-                // Dimmer than what follows it: it is the label on the sentence,
-                // not part of what the sentence says.
-                TextSpan(
-                  text: 'Task: ',
-                  style: Paper.brief.copyWith(color: Paper.inkFaint),
-                ),
-                TextSpan(text: brief.task),
-              ],
-            ),
-            style: Paper.brief,
-          ),
+          // No label in front of it. The brief is the only prose on the page
+          // and it sits at the top of it, so a word announcing that this is
+          // the task was saying what its position already said.
+          //
+          // The screen reader still hears it: [Semantics] above names this
+          // block, because a listener has no position to read it from.
+          Text(brief.task, style: Paper.brief),
           if (detail != null) Text(detail, style: Paper.brief),
           // Air between the brief and the work rather than a line drawn across.
           const SizedBox(height: Paper.briefGap),
