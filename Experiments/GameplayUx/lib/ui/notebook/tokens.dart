@@ -89,22 +89,28 @@ abstract final class Paper {
   static const chipPadV = 2.0;
   static const chipTarget = 36.0;
 
-  /// The tray's buttons are dragged from cold, so they keep the full target.
+  /// How tall a tray button is, so a finger can start a drag on it.
   ///
-  /// This was written down and then never applied: the buttons were their text
-  /// plus 2dp, about 19dp tall, and a drag that has to start inside 19dp is a
-  /// drag that misses. A declared guarantee nothing implements is worse than no
-  /// guarantee, so there is now a test measuring it.
+  /// It said 48 - [W.minTarget], the app's full target - and was never applied
+  /// to anything: the buttons were their own text plus 2dp, about 19dp, and a
+  /// drag that has to start inside 19dp is a drag that misses. A guarantee
+  /// written in a doc comment and implemented nowhere is worse than none, and
+  /// there is now a test that measures whatever this says.
   ///
-  /// It costs real height - two rows of it, out of a shelf that shares a phone
-  /// screen with the program. Worth it here because the tray is the one thing
-  /// on screen whose entire job is to be grabbed, and because it collapses
-  /// while a run is playing, so the cost is only paid while editing.
-  static const buttonTarget = 48.0;
+  /// **It is below 48 deliberately, which is a real deviation.** Wired up at
+  /// the full target it worked but cost two rows of 48 out of a shelf that
+  /// shares a phone screen with the program - about 58dp - and the blocks read
+  /// as chunky, IF and SUM close to square. 34 is the midpoint. What makes it
+  /// defensible rather than just smaller: the target is the whole coloured
+  /// block, not an icon inside it, so it is wide as well as tall; and the
+  /// gesture is a drag rather than a tap, which forgives a near miss because
+  /// the finger is already moving.
+  static const buttonTarget = 34.0;
 
-  /// A tray button's word, kept off the edges of its own block. Wider than it
-  /// was: a finger lands on the middle of a word, and the block should extend
-  /// past where the finger thinks the word is.
+  /// A tray button's word, kept off the edges of its own block.
+  ///
+  /// Wider than the 8 it was: a finger lands on the middle of a word, and the
+  /// block should extend past where the finger thinks the word is.
   static const buttonPadH = 12.0;
 
   /// The air above the first command and below the last.
