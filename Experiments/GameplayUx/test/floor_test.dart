@@ -334,14 +334,34 @@ void main() {
       );
     });
 
-    test('and a pallet gives it the surround a belt does', () {
-      // Which is why the pallet is derived from the package rather than the
-      // other way round.
+    test('and a pallet is barely bigger than the package on it', () {
+      // It was the belt's whole thickness, which made it half again as wide as
+      // the box and read as a crate the box sat inside. A lip is enough.
+      expect(g.palletSide, greaterThan(g.boxSize));
       expect(
         g.palletSide,
-        closeTo(g.side * FloorGeometry.beltThickness, 0.001),
+        closeTo(g.boxSize + g.side * FloorGeometry.palletLip * 2, 0.001),
       );
-      expect(g.palletSide, greaterThan(g.boxSize));
+      expect(
+        g.palletSide / g.boxSize,
+        lessThan(1.2),
+        reason: 'the pallet is meant to be the size of what stands on it',
+      );
+    });
+
+    test('the pallet row keeps its letters off the bottom edge', () {
+      // The splitter is a couple of dp below this edge, so a letter near it
+      // reads as printed on the divider. Derived, so shrinking the pallet or
+      // resizing the label cannot silently eat the margin - which is how it
+      // came to be 7dp before.
+      final bottom =
+          g.labelCentreUnder(g.palletSlot(0).bottom) + g.labelHeight / 2;
+      expect(g.side - bottom, closeTo(g.side * FloorGeometry.palletFoot, 0.5));
+      expect(
+        g.side - bottom,
+        greaterThan(g.side * FloorGeometry.pad),
+        reason: 'this edge needs more air than the other three, not less',
+      );
     });
 
     test('a package on a pallet sits inside it', () {

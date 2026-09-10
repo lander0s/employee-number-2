@@ -45,7 +45,32 @@ class FloorGeometry {
   /// appears to stop at the panel.
   static const beltOff = 0.6;
 
-  static const palletTop = 0.805;
+  /// A package, and the pallet it sits on, as fractions of the side.
+  ///
+  /// The pallet is a package with a lip round it and nothing more. It used to
+  /// be the belt's whole thickness - the same surround a belt gives a package -
+  /// which made it half again as wide as the box and read as a crate the box
+  /// was sitting *in*. A place to put something down only needs to be big
+  /// enough to say "here".
+  static const box = beltThickness * 0.59;
+  static const palletLip = 0.006;
+  static const pallet = box + palletLip * 2;
+
+  /// The air left under the pallet row's *labels*, before the edge.
+  ///
+  /// More than [pad], which is the margin the square keeps at its other three
+  /// edges. This edge is different: the splitter is immediately below it, a
+  /// couple of dp away, so a letter close to the bottom reads as though it were
+  /// printed on the divider rather than standing on the floor.
+  static const palletFoot = 0.075;
+
+  /// Where the pallet row sits.
+  ///
+  /// Derived from the foot rather than set by eye, so it cannot drift when the
+  /// pallet or its label changes size - which is exactly what happened last
+  /// time both were touched. It was 0.805, and by then the labels were 7dp off
+  /// the bottom of the square.
+  static const palletTop = 1 - palletFoot - labelSize - labelGap - pallet;
 
   /// The unit's footprint, and the box its sprite is drawn in.
   ///
@@ -102,7 +127,7 @@ class FloorGeometry {
   double get spriteHeight => spriteWidth / spriteAspect;
 
   /// A package on a belt, and the gap between two of them.
-  double get boxSize => _beltW * 0.59;
+  double get boxSize => side * box;
   double get _step => boxSize + side * 0.008;
 
   /// The head of each queue stops short of the end of its belt by the same
@@ -143,13 +168,13 @@ class FloorGeometry {
     boxSize,
   );
 
-  /// A pallet is a package-sized spot with the same surround a belt gives one.
+  /// A pallet is a package with a lip round it. See [pallet].
   ///
-  /// Derived, not chosen. It was a constant a fifth larger than this, and a
-  /// package drawn to fit it came out a fifth bigger than the same package on a
-  /// belt - so a box grew when it was set down and shrank when it was picked
-  /// up. A package is one size everywhere; the furniture is what adapts.
-  double get palletSide => boxSize + _lip * 2;
+  /// Derived from the package, not chosen. It was once a constant of its own,
+  /// and a package drawn to fit it came out a fifth bigger than the same
+  /// package on a belt - so a box grew when it was set down and shrank when it
+  /// was picked up. A package is one size everywhere; the furniture adapts.
+  double get palletSide => side * pallet;
 
   Rect palletSlot(int i) {
     final size = palletSide;
