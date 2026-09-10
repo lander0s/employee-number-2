@@ -13,10 +13,12 @@ import 'dart:ui' show Tristate;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gameplay_ux/model/commands.dart';
+import 'package:gameplay_ux/model/levels.dart';
 import 'package:gameplay_ux/model/program.dart';
 import 'package:gameplay_ux/model/level.dart';
 import 'package:gameplay_ux/ui/gameplay_screen.dart';
 import 'package:gameplay_ux/ui/notebook/brief.dart';
+import 'package:gameplay_ux/ui/floor_pane.dart';
 import 'package:gameplay_ux/ui/notebook/caret.dart';
 import 'package:gameplay_ux/ui/notebook/panel.dart';
 import 'package:gameplay_ux/ui/notebook/note.dart';
@@ -90,6 +92,17 @@ const forwardControl = 'Next instruction';
 List<String> controlRow(String middle) => [backControl, middle, forwardControl];
 
 Finder control(String label) => find.bySemanticsLabel(label);
+
+/// Ends a run, whichever state it is in.
+///
+/// A finished run puts a modal over the screen and its scrim eats the taps, so
+/// reaching for stop underneath does nothing at all - which is the modal doing
+/// its job, and a trap for any test that assumed stop is always reachable.
+Future<void> endRun(WidgetTester tester) async {
+  final dismiss = find.byKey(const Key('verdict-dismiss'));
+  await tester.tap(dismiss.evaluate().isEmpty ? control(stopControl) : dismiss);
+  await tester.pumpAndSettle();
+}
 
 /// Whether a control does anything, as the control itself reports it.
 bool controlEnabled(WidgetTester tester, String label) =>
@@ -264,8 +277,7 @@ void main() {
         reason: 'moved up by something other than the tray height',
       );
 
-      await tester.tap(control(stopControl));
-      await tester.pumpAndSettle();
+      await endRun(tester);
       expect(
         tester.getRect(boxOf(onPage('TAKE'))),
         before,
@@ -623,6 +635,100 @@ void main() {
     });
   });
 
+  group('a shift ends in a verdict', () {
+    /// A shift that goes out.
+    ///
+    /// The level and the program come as a pair from the model, rather than
+    /// being written here: `vm_test` already proves this one passes, and a
+    /// hand-rolled program that turns out to fail would make these tests
+    /// silently assert the wrong verdict. The first attempt did exactly that -
+    /// REPEAT { TAKE; SHIP } ships the negatives too.
+    Future<void> playPassing(WidgetTester tester) async {
+      await boot(tester, level: noNegatives, program: referenceSolution());
+      await tester.tap(control(playControl));
+      await tester.pumpAndSettle();
+    }
+
+    /// A shift that ships nothing at all.
+    Future<void> playFailing(WidgetTester tester) async {
+      final doc = ProgramDocument();
+      doc.insertAt('take', Slot(null, 0, 0));
+      await boot(tester, level: noNegatives, program: doc);
+      await tester.tap(control(playControl));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a shift that goes out says so', (tester) async {
+      await playPassing(tester);
+
+      expect(find.text('SHIFT COMPLETE'), findsOneWidget);
+      expect(find.text('SHIFT FAILED'), findsNothing);
+      expect(find.textContaining('SIZE'), findsOneWidget);
+      expect(find.textContaining('SPEED'), findsOneWidget);
+    });
+
+    testWidgets('a shift that does not says why', (tester) async {
+      await playFailing(tester);
+
+      expect(find.text('SHIFT FAILED'), findsOneWidget);
+      expect(find.text('SHIFT COMPLETE'), findsNothing);
+      // The reason, not just the fact: a picture of a warehouse cannot say
+      // what went wrong, which is the whole reason this text exists.
+      expect(find.byKey(const Key('verdict-dismiss')), findsOneWidget);
+    });
+
+    testWidgets('it is modal: the program cannot be touched behind it', (
+      tester,
+    ) async {
+      // The trace on screen describes the program as it was compiled, so
+      // editing underneath it would leave the two disagreeing. The scrim is
+      // what enforces that rather than each widget checking a flag.
+      await playPassing(tester);
+      final before = tester.getRect(boxOf(onPage('TAKE')));
+
+      // A tap where the tray would be, and a tap on a row.
+      await tester.tapAt(tester.getCenter(boxOf(onPage('TAKE'))));
+      await tester.pumpAndSettle();
+
+      expect(find.text('SHIFT COMPLETE'), findsOneWidget, reason: 'still up');
+      expect(tester.getRect(boxOf(onPage('TAKE'))), before);
+    });
+
+    testWidgets('and it waits: nothing dismisses it but the button', (
+      tester,
+    ) async {
+      // It used to be a strip along the floor that took itself away after two
+      // and a half seconds. A modal on a timer is a modal you can miss.
+      await playPassing(tester);
+
+      await tester.pump(const Duration(seconds: 10));
+      expect(find.text('SHIFT COMPLETE'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('verdict-dismiss')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('SHIFT COMPLETE'), findsNothing);
+      expect(find.byType(RunCaret), findsNothing, reason: 'the run unloaded');
+      expect(find.byType(CommandNote), findsOneWidget, reason: 'editing again');
+    });
+
+    testWidgets('nothing is drawn on the floor itself any more', (
+      tester,
+    ) async {
+      // The verdict used to be inside the floor pane, which put it under the
+      // bloom - graded to 40% along with the warehouse.
+      await playPassing(tester);
+
+      expect(
+        find.descendant(
+          of: find.byType(FloorPane),
+          matching: find.text('SHIFT COMPLETE'),
+        ),
+        findsNothing,
+      );
+    });
+  });
+
   group('the transport is three controls that never move', () {
     /// Starts a run and leaves it *playing*.
     ///
@@ -671,8 +777,7 @@ void main() {
       await step(tester, forwardControl);
       expect(control(stopControl), findsOneWidget);
 
-      await tester.tap(control(stopControl));
-      await tester.pumpAndSettle();
+      await endRun(tester);
       expect(control(playControl), findsOneWidget, reason: 'back to editing');
     });
 
@@ -785,8 +890,7 @@ void main() {
       await run(tester);
       expect(find.byType(RunCaret), findsOneWidget);
 
-      await tester.tap(control(stopControl));
-      await tester.pumpAndSettle();
+      await endRun(tester);
       expect(find.byType(RunCaret), findsNothing);
     });
 
@@ -799,8 +903,7 @@ void main() {
       // every row or none would otherwise pass whenever the roll was kind.
       for (var i = 0; i < 12; i++) {
         expect(find.byType(RunCaret), findsOneWidget);
-        await tester.tap(control(stopControl));
-        await tester.pumpAndSettle();
+        await endRun(tester);
         await run(tester);
       }
     });
@@ -877,8 +980,7 @@ void main() {
 
         // Re-roll rather than re-boot: pumping the screen again reuses its
         // State, so it would still be mid-run and the button would say STOP.
-        await tester.tap(control(stopControl));
-        await tester.pumpAndSettle();
+        await endRun(tester);
         await run(tester);
       }
     });

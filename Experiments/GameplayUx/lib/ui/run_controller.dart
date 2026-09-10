@@ -28,9 +28,6 @@ import '../model/program.dart';
 import '../model/vm.dart';
 import 'floor/pace.dart';
 
-/// How long the verdict sits before an *uninterrupted* run lets go.
-const _verdictFor = Duration(milliseconds: 2500);
-
 class RunController extends ChangeNotifier {
   RunController({required this.level, required this.program});
 
@@ -55,15 +52,6 @@ class RunController extends ChangeNotifier {
   int _cursor = -1;
   Timer? _timer;
   bool _finished = false;
-
-  /// Whether the run still tidies itself away when it reaches the end.
-  ///
-  /// True for a run that plays start to finish untouched, which is the flow
-  /// worth keeping: watch it, read the verdict, carry on editing. The moment
-  /// the player pauses or steps they are reading the trace rather than
-  /// watching it, and having it vanish under them would be hostile - so the
-  /// first deliberate control turns this off and STOP becomes the way out.
-  bool _autoRelease = true;
 
   /// How long the instruction on screen has been up. Measured rather than
   /// assumed so that a pause halfway through an instruction resumes halfway
@@ -136,7 +124,6 @@ class RunController extends ChangeNotifier {
     _timer!.cancel();
     _timer = null;
     _spent.stop();
-    _autoRelease = false;
     notifyListeners();
   }
 
@@ -184,7 +171,6 @@ class RunController extends ChangeNotifier {
     _result = null;
     _cursor = -1;
     _finished = false;
-    _autoRelease = true;
     notifyListeners();
   }
 
@@ -203,20 +189,18 @@ class RunController extends ChangeNotifier {
     _result = Machine(compile(doc.root), level).run();
     _cursor = -1;
     _finished = false;
-    _autoRelease = true;
     _spent
       ..reset()
       ..stop();
   }
 
-  /// The player took the wheel: stop the clock, and stop tidying up.
+  /// The player took the wheel: stop the clock.
   void _byHand() {
     _timer?.cancel();
     _timer = null;
     _spent
       ..reset()
       ..stop();
-    _autoRelease = false;
   }
 
   void _schedule() {
@@ -224,17 +208,17 @@ class RunController extends ChangeNotifier {
     final next = _cursor + 1;
 
     if (next >= ticks.length) {
-      // Out of trace: raise the verdict. An empty program has no ticks at all
-      // and lands here immediately, which is right - it failed before the
-      // robot moved.
+      // Out of trace: raise the verdict and stop there. An empty program has
+      // no ticks at all and lands here immediately, which is right - it failed
+      // before the robot moved.
+      //
+      // Nothing tidies itself away any more. A run used to hold its verdict
+      // for two and a half seconds and then unload itself, which was the
+      // right shape while the verdict was a strip along the floor; it is a
+      // modal now, and a modal that dismissed itself on a timer would be a
+      // modal you could miss.
       _finished = true;
       notifyListeners();
-      if (_autoRelease) {
-        _timer = Timer(_verdictFor, () {
-          _timer = null;
-          stop();
-        });
-      }
       return;
     }
 

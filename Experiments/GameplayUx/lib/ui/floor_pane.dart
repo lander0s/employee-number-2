@@ -1,13 +1,7 @@
-/// The floor pane: the simulation, and the control that starts it.
+/// The floor pane: the simulation, and the controls that drive it.
 ///
-/// The simulation itself is [FloorSquare] - a wireframe seen from above. This
-/// wraps it in the pane, adds the line of narration along the top, and puts the
-/// verdict over it when a shift ends.
-///
-/// The narration is what is left of the console this pane used to be. The floor
-/// now shows the *state*, which is most of what the text was for, but not the
-/// *reason*: "POSITIVE? 0 -> no" is the one thing a picture of a warehouse
-/// cannot say, and it is exactly the thing a player gets wrong.
+/// Nothing else. The verdict used to be drawn along the bottom of this pane and
+/// is a modal on the screen now - see `_Verdict` in gameplay_screen.dart.
 ///
 /// It carries the run controls, top-right, because that is where the thing
 /// being run lives. A consequence worth knowing: the divider can hide the floor
@@ -24,7 +18,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../model/level.dart';
-import '../model/vm.dart';
 import 'bloom.dart';
 import 'floor/floor_view.dart';
 import 'run_controller.dart';
@@ -67,10 +60,13 @@ class FloorPane extends StatelessWidget {
         BloomLayer(
           child: Container(
             color: W.paneWell,
-            child: AnimatedBuilder(
-              animation: run,
-              builder: (context, _) => _Floor(level: level, run: run, sfx: sfx),
-            ),
+            // [FloorStage] listens to the controller itself, so there is
+            // nothing here to rebuild on its behalf. There was, when the
+            // verdict was drawn along the bottom of this pane - and being in
+            // here is exactly why it moved out. The bloom grades its whole
+            // subtree, so the one thing the player had been waiting for was
+            // arriving at 40% brightness.
+            child: FloorStage(level: level, run: run, sfx: sfx),
           ),
         ),
         Positioned(
@@ -92,81 +88,6 @@ class FloorPane extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _Floor extends StatelessWidget {
-  const _Floor({required this.level, required this.run, required this.sfx});
-
-  final Level level;
-  final RunController run;
-  final Sfx sfx;
-
-  @override
-  Widget build(BuildContext context) {
-    final result = run.result;
-
-    // Before the first instruction the floor shows the batch as it arrived,
-    // which is also what it shows while the player is still writing: the
-    // shipment is the question, and it should be readable the whole time.
-    return Stack(
-      children: [
-        // The floor drives its own animation off the controller: it needs the
-        // instruction before this one to know which way anything is moving,
-        // and one rebuild per tick is not enough frames to move on.
-        Positioned.fill(
-          child: FloorStage(level: level, run: run, sfx: sfx),
-        ),
-        if (result != null && run.finished)
-          Positioned(
-            left: 8,
-            right: 8,
-            bottom: 8,
-            child: Chrome(
-              child: _Verdict(result: result, size: run.size),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _Verdict extends StatelessWidget {
-  const _Verdict({required this.result, required this.size});
-
-  final RunResult result;
-
-  /// Command rows. Closers are free, so this is not the number of lines on the
-  /// page (level-04-briefing 5.1, rule 1).
-  final int size;
-
-  @override
-  Widget build(BuildContext context) {
-    final good = result.passed;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: good ? W.button : W.danger,
-        border: Border.all(color: good ? W.line : W.danger),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            good ? 'SHIFT COMPLETE' : 'SHIFT FAILED',
-            style: W.console.copyWith(
-              fontWeight: FontWeight.w700,
-              color: good ? W.text : W.onDanger,
-            ),
-          ),
-          Text(
-            good ? 'SIZE $size   SPEED ${result.steps}' : result.verdict,
-            style: W.console.copyWith(color: good ? W.textDim : W.onDanger),
-          ),
-        ],
-      ),
     );
   }
 }

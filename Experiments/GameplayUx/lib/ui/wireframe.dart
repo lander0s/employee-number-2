@@ -155,6 +155,11 @@ abstract final class W {
   /// 4.03:1. `debugIcon.continueForeground`, used here for the two steps.
   static const runStep = Color(0xFF007ACC);
 
+  /// Behind a modal. Dark, so a flat grey panel on a flat grey app still
+  /// reads as being *in front*: a wireframe has no elevation to lean on, so
+  /// the only thing that can say "on top" is what is behind it.
+  static const scrim = Color(0x99000000);
+
   /// A failed shift, and text on it. Shared with the page's own delete
   /// backdrop, which is the same idea: this went wrong.
   ///

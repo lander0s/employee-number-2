@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 
 import '../model/level.dart';
 import '../model/program.dart';
+import '../model/vm.dart';
 import 'floor_pane.dart';
 import 'run_controller.dart';
 import 'sfx.dart';
@@ -199,161 +200,274 @@ class _GameplayScreenState extends State<GameplayScreen> {
   Widget build(BuildContext context) {
     // The note's height is only knowable once it has laid out.
 
+    final verdict = _run.finished ? _run.result : null;
+
     return Scaffold(
       backgroundColor: W.page,
       // No SafeArea: the game runs full screen (see main.dart), so there are no
       // bars to keep clear of, and the insets the platform still reports for
       // them left a band of dead board across the top of the panel.
-      body: SafeArea(
-        top: false,
-        bottom: false,
-        child: Column(
-          children: [
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  // Floored at zero before it is used as a clamp bound: on the
-                  // first frame the incoming height is 0, which made `available`
-                  // negative and `clamp(0, available)` throw. No room means no
-                  // floor, not an error.
-                  final available = (constraints.maxHeight - W.dividerHitHeight)
-                      .clamp(0.0, double.infinity);
+      body: Stack(
+        children: [
+          SafeArea(
+            top: false,
+            bottom: false,
+            child: Column(
+              children: [
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Floored at zero before it is used as a clamp bound: on the
+                      // first frame the incoming height is 0, which made `available`
+                      // negative and `clamp(0, available)` throw. No room means no
+                      // floor, not an error.
+                      final available =
+                          (constraints.maxHeight - W.dividerHitHeight).clamp(
+                            0.0,
+                            double.infinity,
+                          );
 
-                  // The hard limit: a square. The floor is as wide as the panel
-                  // and the simulation is seen from above, so a floor taller
-                  // than it is wide would be a world stretched in one axis -
-                  // and pulling the splitter past that point would give the
-                  // player empty board rather than more warehouse.
-                  //
-                  // On a phone short enough that a square will not fit, the
-                  // screen wins and the square is clipped from the top.
-                  final square = constraints.maxWidth;
-                  final maxFloor = square < available ? square : available;
-                  final floorHeight = (maxFloor * _floorOpen).clamp(
-                    0.0,
-                    maxFloor,
-                  );
+                      // The hard limit: a square. The floor is as wide as the panel
+                      // and the simulation is seen from above, so a floor taller
+                      // than it is wide would be a world stretched in one axis -
+                      // and pulling the splitter past that point would give the
+                      // player empty board rather than more warehouse.
+                      //
+                      // On a phone short enough that a square will not fit, the
+                      // screen wins and the square is clipped from the top.
+                      final square = constraints.maxWidth;
+                      final maxFloor = square < available ? square : available;
+                      final floorHeight = (maxFloor * _floorOpen).clamp(
+                        0.0,
+                        maxFloor,
+                      );
 
-                  // The floor is either tall enough to hold the run button or
-                  // hidden outright - never a sliver too thin to start a program
-                  // from. Dragging the divider to the top is a legitimate way to
-                  // say "I am editing, not running".
-                  final floorVisible = floorHeight > _minRunnableFloor;
+                      // The floor is either tall enough to hold the run button or
+                      // hidden outright - never a sliver too thin to start a program
+                      // from. Dragging the divider to the top is a legitimate way to
+                      // say "I am editing, not running".
+                      final floorVisible = floorHeight > _minRunnableFloor;
 
-                  return Column(
-                    children: [
-                      SizedBox(
-                        height: floorHeight,
-                        child: floorVisible
-                            ? FloorPane(
-                                level: widget.level,
-                                run: _run,
-                                sfx: _sfx,
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                      _Divider(
-                        active: _draggingDivider,
-                        onDragStart: () =>
-                            setState(() => _draggingDivider = true),
-                        onDragUpdate: (dy) {
-                          if (maxFloor <= 0) return;
-                          setState(() {
-                            // Against the square, not the screen: a drag moves
-                            // the drawer, and the drawer is only ever one
-                            // square deep. Past the end it simply stops.
-                            _floorOpen = (_floorOpen + dy / maxFloor).clamp(
-                              0.0,
-                              1.0,
-                            );
-                          });
-                        },
-                        onDragEnd: () {
-                          setState(() => _draggingDivider = false);
-                          _settle();
-                        },
-                        onDoubleTap: _toggleSnap,
-                      ),
-                      Expanded(
-                        // The tray sits above the page, not over it: fixed
-                        // under the divider, and the program scrolls beneath.
-                        // It reads as the bottom lip of the splitter rather
-                        // than as something floating on the page - it moves
-                        // with the divider and the scrollable region starts
-                        // below it.
-                        //
-                        // It was laid over the page, and the page no longer
-                        // shows through it. That is the only thing given up:
-                        // the tray keeps its place during a run rather than
-                        // disappearing, so the program is never resized under
-                        // the player. Design pillar 2 - a run changes what can
-                        // be touched and nothing else - and the moment a run
-                        // starts is exactly when a row must not move.
-                        child: Column(
-                          children: [
-                            // Gone while running, not merely hidden: the
-                            // program takes the height back and shows more of
-                            // itself for the run.
+                      return Column(
+                        children: [
+                          SizedBox(
+                            height: floorHeight,
+                            child: floorVisible
+                                ? FloorPane(
+                                    level: widget.level,
+                                    run: _run,
+                                    sfx: _sfx,
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                          _Divider(
+                            active: _draggingDivider,
+                            onDragStart: () =>
+                                setState(() => _draggingDivider = true),
+                            onDragUpdate: (dy) {
+                              if (maxFloor <= 0) return;
+                              setState(() {
+                                // Against the square, not the screen: a drag moves
+                                // the drawer, and the drawer is only ever one
+                                // square deep. Past the end it simply stops.
+                                _floorOpen = (_floorOpen + dy / maxFloor).clamp(
+                                  0.0,
+                                  1.0,
+                                );
+                              });
+                            },
+                            onDragEnd: () {
+                              setState(() => _draggingDivider = false);
+                              _settle();
+                            },
+                            onDoubleTap: _toggleSnap,
+                          ),
+                          Expanded(
+                            // The tray sits above the page, not over it: fixed
+                            // under the divider, and the program scrolls beneath.
+                            // It reads as the bottom lip of the splitter rather
+                            // than as something floating on the page - it moves
+                            // with the divider and the scrollable region starts
+                            // below it.
                             //
-                            // This is knowingly against pillar 2 as it was
-                            // written - a run changes what can be touched and
-                            // nothing else - because the tray is above the
-                            // program now. Anything the tray gives up comes
-                            // off the top, so every row moves up by its height
-                            // at the moment a run starts. There is no scroll
-                            // offset that hides it either: compensating would
-                            // mean scrolling *back* by that height, and at the
-                            // top of a program there is nothing to scroll back
-                            // into.
-                            if (!_running)
-                              ColoredBox(
-                                color: Paper.sheet,
-                                child: Chrome(
-                                  child: CommandNote(
+                            // It was laid over the page, and the page no longer
+                            // shows through it. That is the only thing given up:
+                            // the tray keeps its place during a run rather than
+                            // disappearing, so the program is never resized under
+                            // the player. Design pillar 2 - a run changes what can
+                            // be touched and nothing else - and the moment a run
+                            // starts is exactly when a row must not move.
+                            child: Column(
+                              children: [
+                                // Gone while running, not merely hidden: the
+                                // program takes the height back and shows more of
+                                // itself for the run.
+                                //
+                                // This is knowingly against pillar 2 as it was
+                                // written - a run changes what can be touched and
+                                // nothing else - because the tray is above the
+                                // program now. Anything the tray gives up comes
+                                // off the top, so every row moves up by its height
+                                // at the moment a run starts. There is no scroll
+                                // offset that hides it either: compensating would
+                                // mean scrolling *back* by that height, and at the
+                                // top of a program there is nothing to scroll back
+                                // into.
+                                if (!_running)
+                                  ColoredBox(
+                                    color: Paper.sheet,
+                                    child: Chrome(
+                                      child: CommandNote(
+                                        lift: _lift,
+                                        autoScroll: _autoScroll,
+                                        onTrash: (id) {
+                                          final node = _doc.nodeById(id);
+                                          if (node != null) _remove(node);
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                Expanded(
+                                  child: ProgramEditor(
+                                    doc: _doc,
+                                    brief: widget.level.brief,
+                                    controller: _scroll,
                                     lift: _lift,
                                     autoScroll: _autoScroll,
-                                    onTrash: (id) {
-                                      final node = _doc.nodeById(id);
-                                      if (node != null) _remove(node);
-                                    },
+                                    onChanged: _refresh,
+                                    onRemove: _remove,
+                                    running: _running,
+                                    executing: _run.executing,
+                                    // The system's gesture area, which the note
+                                    // used to absorb by sitting on it. Nothing is
+                                    // down there now but the program, so the
+                                    // program owes it the room.
+                                    bottomInset: MediaQuery.viewPaddingOf(
+                                      context,
+                                    ).bottom,
                                   ),
                                 ),
-                              ),
-                            Expanded(
-                              child: ProgramEditor(
-                                doc: _doc,
-                                brief: widget.level.brief,
-                                controller: _scroll,
-                                lift: _lift,
-                                autoScroll: _autoScroll,
-                                onChanged: _refresh,
-                                onRemove: _remove,
-                                running: _running,
-                                executing: _run.executing,
-                                // The system's gesture area, which the note
-                                // used to absorb by sitting on it. Nothing is
-                                // down there now but the program, so the
-                                // program owes it the room.
-                                bottomInset: MediaQuery.viewPaddingOf(
-                                  context,
-                                ).bottom,
-                              ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          // Over the lot, including the floor: the verdict is the app talking
+          // about the whole shift, not a thing that happened on the warehouse
+          // floor. It used to be drawn inside the floor pane, which put it
+          // under the bloom - the one thing the player was waiting for,
+          // arriving at 40% brightness.
+          if (verdict != null)
+            _Verdict(result: verdict, size: _run.size, onDismiss: _run.stop),
+        ],
       ),
     );
   }
 
   void _refresh() => setState(() {});
+}
+
+/// The end of a shift, as a modal.
+///
+/// A wireframe has no elevation to lean on - no shadow, no radius, no
+/// material - so the only thing that can say "in front" is the scrim behind
+/// it. That is also what makes it modal in fact and not just in look: the
+/// scrim eats the taps, so the program underneath cannot be edited while a
+/// verdict about a different program is on screen.
+class _Verdict extends StatelessWidget {
+  const _Verdict({
+    required this.result,
+    required this.size,
+    required this.onDismiss,
+  });
+
+  final RunResult result;
+
+  /// Command rows. Closers are free, so this is not the number of lines on the
+  /// page (level-04-briefing 5.1, rule 1).
+  final int size;
+
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final good = result.passed;
+
+    return Positioned.fill(
+      child: Semantics(
+        container: true,
+        // Announced as one thing: a screen reader should read the outcome and
+        // its reason together, not offer them as two labels to hunt through.
+        label: good
+            ? 'Shift complete. Size $size, speed ${result.steps}.'
+            : 'Shift failed. ${result.verdict}',
+        child: GestureDetector(
+          // Absorbs everything, and does *not* dismiss. Tapping a scrim by
+          // accident is how you lose a message you had not read yet, and this
+          // one is the whole point of having pressed run.
+          behavior: HitTestBehavior.opaque,
+          onTap: () {},
+          child: ColoredBox(
+            color: W.scrim,
+            child: Center(
+              child: Chrome(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: W.chrome,
+                    border: Border.all(
+                      // The one bit of colour: red means the shift did not go
+                      // out, which is meaning rather than decoration and so
+                      // survives the wireframe.
+                      color: good ? W.line : W.danger,
+                      width: 2,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        good ? 'SHIFT COMPLETE' : 'SHIFT FAILED',
+                        style: W.label.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: good ? W.text : W.danger,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        good
+                            ? 'SIZE $size   SPEED ${result.steps}'
+                            : result.verdict,
+                        style: W.console.copyWith(color: W.textDim),
+                      ),
+                      const SizedBox(height: 20),
+                      WButton(
+                        // Keyed so a test can end a run without knowing which
+                        // of the two words this is wearing.
+                        key: const Key('verdict-dismiss'),
+                        label: good ? 'CARRY ON' : 'BACK TO THE PROGRAM',
+                        wide: true,
+                        emphasised: true,
+                        onTap: onDismiss,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// The draggable divider: a short bar, and nothing else.
