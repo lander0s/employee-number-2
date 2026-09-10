@@ -528,11 +528,13 @@ class _Floor extends CustomPainter {
     // --------------------------------------------------------------- claws
     if (to.claws != null) {
       final arriving = took || to.op == Op.copyFrom;
-      // The package's own place, not the slot's: a pallet square is bigger
-      // than a package, and starting a transfer from it made the box grow.
+      // The package's own place, not the square's: a pallet is bigger than a
+      // package and does not hold it centred, so the square's middle is not
+      // where the box is. Starting a transfer from there made the box grow,
+      // and would now make it jump as well.
       final source = took
           ? g.intakeSlot(0).center
-          : g.palletSlot(to.station.pallet).center;
+          : g.palletPackage(to.station.pallet).center;
 
       // Arriving cargo starts where it was and meets the claw as it closes;
       // after that it is the hand's. Anything already held just rides.
@@ -587,7 +589,7 @@ class _Floor extends CustomPainter {
           g.packageAt(
             g.transfer(
               claw: hand(Payload.mergeB, rig),
-              slot: g.palletSlot(pallet).center,
+              slot: g.palletPackage(pallet).center,
               // A read lifts a package off the pallet; a copy sets one on it.
               outward: splitting,
               act: act,
@@ -649,15 +651,23 @@ class _Floor extends CustomPainter {
     for (var i = 0; i < palletCount; i++) {
       final rect = g.palletSlot(i);
       canvas.drawRect(rect, _stroke());
-      _label(canvas, palletName(i), rect.center.dx, rect.bottom, g.side);
 
       final value = i == hide || i >= to.pallets.length ? null : to.pallets[i];
       if (value != null) {
-        // [FloorGeometry.packageAt], like every other package on the floor.
-        // Fitting one to the pallet instead is what made it a different size
-        // here than on a belt.
-        _package(canvas, g.packageAt(rect.center), value);
+        // Top-left of the square rather than the middle of it, which is what
+        // leaves the letter its corner. Still [boxSize] - fitting a package to
+        // its pallet instead is what once made it a different size here than
+        // on a belt.
+        _package(canvas, g.palletPackage(i), value);
       }
+
+      // After the package, not before. A pallet is only a lip wider than the
+      // package standing on it - 2.7dp a side - so there is no corner the
+      // letter can have to itself, and drawn underneath it would be hidden
+      // whenever the pallet was in use. An identifier that disappears when the
+      // thing it identifies is occupied is not an identifier, so it goes on
+      // top and overlaps the corner of the box.
+      _palletLetter(canvas, g, i);
     }
   }
 
@@ -696,6 +706,13 @@ class _Floor extends CustomPainter {
   /// The gap is measured from the edge it hangs off rather than to the middle
   /// of the glyphs - see [FloorGeometry.labelCentreUnder], which is where both
   /// numbers live so that they cannot be set independently of each other.
+  /// A pallet's letter, hung off the inside of its own bottom-right corner.
+  void _palletLetter(Canvas canvas, FloorGeometry g, int i) {
+    final letter = _laidOut(palletName(i), g.palletLabelHeight, W.floorLabel);
+    final corner = g.palletLabelAnchor(i);
+    letter.paint(canvas, corner - Offset(letter.width, letter.height));
+  }
+
   void _label(Canvas canvas, String text, double x, double below, double s) {
     final g = FloorGeometry(s);
     _text(
@@ -708,7 +725,13 @@ class _Floor extends CustomPainter {
   }
 
   void _text(Canvas canvas, String text, Offset at, double size, Color colour) {
-    final painter = TextPainter(
+    final painter = _laidOut(text, size, colour);
+    painter.paint(canvas, at - Offset(painter.width / 2, painter.height / 2));
+  }
+
+  /// Measured, so a caller can place it by a corner rather than its middle.
+  TextPainter _laidOut(String text, double size, Color colour) {
+    return TextPainter(
       text: TextSpan(
         text: text,
         style: TextStyle(
@@ -721,8 +744,6 @@ class _Floor extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-
-    painter.paint(canvas, at - Offset(painter.width / 2, painter.height / 2));
   }
 
   @override

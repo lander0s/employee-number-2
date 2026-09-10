@@ -12,7 +12,6 @@ library;
 
 import 'dart:ui';
 
-import '../../model/commands.dart';
 import '../../model/vm.dart';
 
 class FloorGeometry {
@@ -47,30 +46,82 @@ class FloorGeometry {
 
   /// A package, and the pallet it sits on, as fractions of the side.
   ///
-  /// The pallet is a package with a lip round it and nothing more. It used to
-  /// be the belt's whole thickness - the same surround a belt gives a package -
-  /// which made it half again as wide as the box and read as a crate the box
-  /// was sitting *in*. A place to put something down only needs to be big
-  /// enough to say "here".
-  static const box = beltThickness * 0.59;
-  static const palletLip = 0.006;
-  static const pallet = box + palletLip * 2;
-
-  /// The air left under the pallet row's *labels*, before the edge.
+  /// The pallet is the package, the air above and left of it, and the corner
+  /// its letter needs. One of each, not two: the package is tucked into the
+  /// top-left rather than centred, so the two things sharing the square each
+  /// get a corner instead of the letter having to clear a box in the middle.
   ///
-  /// More than [pad], which is the margin the square keeps at its other three
+  /// That is worth most of a centimetre. Centred, the same clearance had to
+  /// exist on all four sides whether anything used it or not, and the square
+  /// came to 51dp; this is 45dp. It has been 56 (the belt's whole thickness,
+  /// which read as a crate the box sat *inside*) and 38 (a bare lip, with
+  /// nowhere for a letter to go). Each of those was a number someone chose.
+  /// This one is what the contents add up to.
+  static const box = beltThickness * 0.59;
+  static const pallet =
+      box +
+      palletPad +
+      palletLabelGap +
+      palletLabelPad +
+      palletLabel * palletLabelAdvance;
+
+  /// The air above and to the left of a package on a pallet.
+  ///
+  /// Small on purpose. It is not there to centre anything - the letter's
+  /// corner does the balancing - it is there so the box does not sit on the
+  /// lines of the square it stands in.
+  static const palletPad = 0.006;
+
+  /// Between one pallet and the next.
+  ///
+  /// Enough to see the two squares as two, and no more: they are a rack, and a
+  /// rack is read as a group. Anything much wider and they stop being a group
+  /// and become five things that happen to be in a line.
+  static const palletGap = 0.014;
+
+  /// The air between the package and its letter.
+  ///
+  /// A term of its own, because without one there is none: every other
+  /// quantity in [pallet] is claimed by either the box or the letter, so the
+  /// two ended up sharing an edge - not overlapping, which is what was checked,
+  /// but touching, which looks like a mistake.
+  static const palletLabelGap = 0.006;
+
+  /// A pallet's letter: its size, how far it is tucked in from the corner, and
+  /// how wide one character of it is.
+  ///
+  /// Smaller than a belt's [labelSize]: a belt label hangs in open floor, and
+  /// this one has to share a square with a package.
+  ///
+  /// The advance is monospace's, which is what makes the reservation safe: a
+  /// fixed-pitch face sets every glyph in 0.6 of its em, so the letter the
+  /// painter measures is no wider than the cell reserved for it here. It is
+  /// the one number in this file that is a fact about a font rather than about
+  /// the floor, and [pallet] is sized from it - so a proportional face here
+  /// would silently overrun the corner.
+  static const palletLabel = 0.024;
+  static const palletLabelPad = 0.006;
+  static const palletLabelAdvance = 0.6;
+
+  /// The air left under the pallet row, before the edge of the square.
+  ///
+  /// Much more than [pad], the margin the square keeps at its other three
   /// edges. This edge is different: the splitter is immediately below it, a
-  /// couple of dp away, so a letter close to the bottom reads as though it were
-  /// printed on the divider rather than standing on the floor.
-  static const palletFoot = 0.075;
+  /// couple of dp away, so anything close to the bottom reads as though it
+  /// were printed on the divider rather than standing on the floor.
+  ///
+  /// The number grew when the letters moved *inside* the squares, and the air
+  /// below the row did not change at all: it used to be this margin plus a
+  /// label's height and its gap, and now the whole of it is margin.
+  static const palletFoot = 0.129;
 
   /// Where the pallet row sits.
   ///
   /// Derived from the foot rather than set by eye, so it cannot drift when the
-  /// pallet or its label changes size - which is exactly what happened last
-  /// time both were touched. It was 0.805, and by then the labels were 7dp off
-  /// the bottom of the square.
-  static const palletTop = 1 - palletFoot - labelSize - labelGap - pallet;
+  /// pallet changes size - which is exactly what happened last time it was
+  /// touched. It was 0.805, and by then whatever was under the row had been
+  /// squeezed to 7dp without anything noticing.
+  static const palletTop = 1 - palletFoot - pallet;
 
   /// The unit's footprint, and the box its sprite is drawn in.
   ///
@@ -138,6 +189,52 @@ class FloorGeometry {
   double labelCentreUnder(double bottom) =>
       bottom + labelHeight / 2 + side * labelGap;
 
+  double get palletLabelHeight => side * palletLabel;
+
+  /// The cell kept for a pallet's letter: inside its own square, bottom-right,
+  /// inset by [palletLabelPad].
+  ///
+  /// A reservation, not a measurement. Only the painter knows a glyph's real
+  /// width, and it hangs the text off this cell's bottom-right corner - so a
+  /// letter narrower than the reservation sits inside it, and the two cannot
+  /// disagree about the inset. This is also what [pallet] is sized against,
+  /// which is what keeps the letter off the package.
+  Rect palletLabelSlot(int i) {
+    final square = palletSlot(i);
+    final inset = side * palletLabelPad;
+    final height = palletLabelHeight;
+    final width = height * palletLabelAdvance;
+    return Rect.fromLTWH(
+      square.right - inset - width,
+      square.bottom - inset - height,
+      width,
+      height,
+    );
+  }
+
+  Offset palletLabelAnchor(int i) => palletLabelSlot(i).bottomRight;
+
+  /// Where a package sits on a pallet: tucked into the top-left, not centred.
+  ///
+  /// Every package on the floor is [boxSize]; this only decides where. Off
+  /// centre because the square has two tenants - a box and a letter - and
+  /// giving each a corner costs less room than centring one and making the
+  /// other clear it.
+  ///
+  /// Every drawing of a package on a pallet goes through here, the still ones
+  /// and the animated ones both. A transfer that used the square's centre
+  /// while the resting box used this would land the box and then jump it.
+  Rect palletPackage(int i) {
+    final square = palletSlot(i);
+    final inset = side * palletPad;
+    return Rect.fromLTWH(
+      square.left + inset,
+      square.top + inset,
+      boxSize,
+      boxSize,
+    );
+  }
+
   Rect get intakeBelt => Rect.fromLTRB(
     side * -beltOff,
     _mid - _beltW / 2,
@@ -176,17 +273,21 @@ class FloorGeometry {
   /// was picked up. A package is one size everywhere; the furniture adapts.
   double get palletSide => side * pallet;
 
+  /// A row of pallets packed to the left, a [palletGap] apart.
+  ///
+  /// They used to be spread across the whole width with their ends flush to
+  /// the margins, on the idea that the floor should read as one grid. It read
+  /// as five separate places instead: the gaps came out wider than the pallets
+  /// themselves, so nothing said the five belonged together.
+  ///
+  /// Packed, they are one rack. The empty floor that leaves on the right is
+  /// not waste - it is the room the unit crosses to reach the outbound belt,
+  /// and a rack the player can take in at a glance is worth more than a row
+  /// that fills the width.
   Rect palletSlot(int i) {
     final size = palletSide;
-    final margin = side * pad;
-    final span = side - margin * 2;
-    // Evenly spaced, ends flush with the margin: the floor should read as one
-    // grid rather than as a row of pallets floating under it.
-    final gap = palletCount > 1
-        ? (span - size * palletCount) / (palletCount - 1)
-        : 0.0;
     return Rect.fromLTWH(
-      margin + i * (size + gap),
+      side * pad + i * (size + side * palletGap),
       side * palletTop,
       size,
       size,

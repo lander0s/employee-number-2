@@ -314,7 +314,7 @@ void main() {
       final inClaws = g.packageAt(
         g.handAt(g.stand(Station.start), Payload.grip),
       );
-      final onPallet = g.packageAt(g.palletSlot(3).center);
+      final onPallet = g.palletPackage(3);
 
       for (final it in [onBelt, onOutbound, inClaws, onPallet]) {
         expect(it.width, closeTo(g.boxSize, 0.001));
@@ -328,48 +328,108 @@ void main() {
       // interpolates their size, and starting from the pallet square swelled
       // the box to the pallet's size on its way out of it.
       expect(g.palletSlot(0).width, greaterThan(g.boxSize));
-      expect(
-        g.packageAt(g.palletSlot(0).center).width,
-        closeTo(g.boxSize, 0.001),
-      );
+      expect(g.palletPackage(0).width, closeTo(g.boxSize, 0.001));
     });
 
-    test('and a pallet is barely bigger than the package on it', () {
-      // It was the belt's whole thickness, which made it half again as wide as
-      // the box and read as a crate the box sat inside. A lip is enough.
-      expect(g.palletSide, greaterThan(g.boxSize));
+    test('and a pallet is the package plus the corner its letter needs', () {
+      // The pallet's size is arithmetic, not taste: it is whatever leaves the
+      // letter a corner of its own. Asserted as the consequence rather than by
+      // repeating the formula - that the letter's cell and the package do not
+      // overlap - because that is the thing anyone changing either size would
+      // break.
+      for (var i = 0; i < palletCount; i++) {
+        final square = g.palletSlot(i);
+        final letter = g.palletLabelSlot(i);
+        final package = g.palletPackage(i);
+
+        // A gap, not merely an absence of overlap. `overlaps` is false for
+        // two rects sharing an edge, so this passed while the box and the
+        // letter were touching - which is the state it was written to catch.
+        expect(
+          letter.left - package.right,
+          closeTo(g.side * FloorGeometry.palletLabelGap, 0.001),
+          reason: 'pallet $i: the letter is against the box on it',
+        );
+        expect(square.contains(letter.topLeft), isTrue, reason: 'pallet $i');
+      }
+
+      // Still smaller than the belt-thickness square it started as.
       expect(
         g.palletSide,
-        closeTo(g.boxSize + g.side * FloorGeometry.palletLip * 2, 0.001),
-      );
-      expect(
-        g.palletSide / g.boxSize,
-        lessThan(1.2),
-        reason: 'the pallet is meant to be the size of what stands on it',
+        lessThan(g.side * FloorGeometry.beltThickness),
+        reason: 'back to reading as a crate the package sits inside',
       );
     });
 
-    test('the pallet row keeps its letters off the bottom edge', () {
-      // The splitter is a couple of dp below this edge, so a letter near it
-      // reads as printed on the divider. Derived, so shrinking the pallet or
-      // resizing the label cannot silently eat the margin - which is how it
-      // came to be 7dp before.
-      final bottom =
-          g.labelCentreUnder(g.palletSlot(0).bottom) + g.labelHeight / 2;
-      expect(g.side - bottom, closeTo(g.side * FloorGeometry.palletFoot, 0.5));
+    test('the whole rack fits on the floor', () {
+      // The row used to be spread to fit whatever [palletCount] was, so it
+      // could not overflow. Packed at a fixed gap it can: another pallet or a
+      // wider one extends the rack rightwards, and nothing in the geometry
+      // notices. This is what notices.
+      final last = g.palletSlot(palletCount - 1);
       expect(
-        g.side - bottom,
+        last.right,
+        lessThanOrEqualTo(g.side - g.side * FloorGeometry.pad),
+        reason: 'the rack runs off the right of the square',
+      );
+      expect(g.palletSlot(0).left, closeTo(g.side * FloorGeometry.pad, 0.001));
+
+      // And they are a rack, not a row of separate places: the gap between two
+      // has to be smaller than the pallets it separates.
+      final gap = g.palletSlot(1).left - g.palletSlot(0).right;
+      expect(gap, closeTo(g.side * FloorGeometry.palletGap, 0.001));
+      expect(gap, lessThan(g.palletSide / 2));
+    });
+
+    test('the pallet row keeps clear of the bottom edge', () {
+      // The splitter is a couple of dp below this edge, so anything near it
+      // reads as printed on the divider. Derived, so shrinking the pallet
+      // cannot silently eat the margin - which is how it came to be 7dp
+      // before.
+      final under = g.side - g.palletSlot(0).bottom;
+      expect(under, closeTo(g.side * FloorGeometry.palletFoot, 0.5));
+      expect(
+        under,
         greaterThan(g.side * FloorGeometry.pad),
         reason: 'this edge needs more air than the other three, not less',
       );
     });
 
-    test('a package on a pallet sits inside it', () {
+    test('the letter is inside its own square, in the bottom corner', () {
+      // It used to hang underneath, which is why [palletFoot] is as large as
+      // it is - that air was the label's.
+      for (var i = 0; i < palletCount; i++) {
+        final square = g.palletSlot(i);
+        final letter = g.palletLabelSlot(i);
+        final inset = g.side * FloorGeometry.palletLabelPad;
+
+        expect(
+          square.contains(letter.topLeft) &&
+              square.contains(letter.bottomRight - const Offset(0.01, 0.01)),
+          isTrue,
+          reason: 'pallet $i: the letter hangs out of its square',
+        );
+        expect(square.right - letter.right, closeTo(inset, 0.001));
+        expect(square.bottom - letter.bottom, closeTo(inset, 0.001));
+      }
+    });
+
+    test('a package on a pallet sits inside it, up in the corner', () {
+      // Not centred: the letter has the opposite corner. Checked on both
+      // edges anyway, because "off centre" is one nudge away from "hanging
+      // out of the square".
+      final inset = g.side * FloorGeometry.palletPad;
       for (var i = 0; i < palletCount; i++) {
         final slot = g.palletSlot(i);
-        final box = g.packageAt(slot.center);
+        final box = g.palletPackage(i);
         expect(slot.contains(box.topLeft), isTrue, reason: 'pallet $i');
-        expect(slot.contains(box.bottomRight), isTrue, reason: 'pallet $i');
+        expect(
+          slot.contains(box.bottomRight - const Offset(0.01, 0.01)),
+          isTrue,
+          reason: 'pallet $i',
+        );
+        expect(box.left - slot.left, closeTo(inset, 0.001));
+        expect(box.top - slot.top, closeTo(inset, 0.001));
       }
     });
   });
@@ -571,11 +631,12 @@ void main() {
       }
     });
 
-    test('every pallet letter clears its square', () {
-      for (var i = 0; i < palletCount; i++) {
-        final square = g.palletSlot(i);
-        final top = g.labelCentreUnder(square.bottom) - g.labelHeight / 2;
-        expect(top, greaterThan(square.bottom), reason: 'pallet $i');
+    test('a belt label clears the belt it names', () {
+      // Belts still hang their labels underneath - INTAKE and OUTBOUND sit in
+      // open floor, where there is room. Only the pallets moved theirs inside.
+      for (final belt in [g.intakeBelt, g.outBelt]) {
+        final top = g.labelCentreUnder(belt.bottom) - g.labelHeight / 2;
+        expect(top, greaterThan(belt.bottom));
       }
     });
   });
