@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 
 import '../model/level.dart';
 import '../model/vm.dart';
+import 'bloom.dart';
 import 'floor/floor_view.dart';
 import 'run_controller.dart';
 import 'sfx.dart';
@@ -46,29 +47,32 @@ class FloorPane extends StatelessWidget {
     // there is no frame left to set it apart from - the floor *is* the pane.
     // It also buys the square the width the margin was holding: 20dp on a
     // 448dp panel is a package and a half.
-    return Container(
-      color: W.paneWell,
-      width: double.infinity,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: run,
-              builder: (context, _) => _Floor(level: level, run: run, sfx: sfx),
-            ),
-          ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: Chrome(
+    return BloomLayer(
+      child: Container(
+        color: W.paneWell,
+        width: double.infinity,
+        child: Stack(
+          children: [
+            Positioned.fill(
               child: AnimatedBuilder(
                 animation: run,
                 builder: (context, _) =>
-                    RunButton(running: run.running, onTap: onToggleRun),
+                    _Floor(level: level, run: run, sfx: sfx),
               ),
             ),
-          ),
-        ],
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Chrome(
+                child: AnimatedBuilder(
+                  animation: run,
+                  builder: (context, _) =>
+                      RunButton(running: run.running, onTap: onToggleRun),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
