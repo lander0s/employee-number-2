@@ -160,11 +160,15 @@ abstract final class Paper {
   /// How much page is kept past the running line when the page does have to
   /// move.
   ///
-  /// One row's pitch. Bringing the line exactly flush with the edge would put
-  /// the *next* instruction off screen again, so a run down a long program
-  /// would scroll on every single step - a row of slack buys several steps of
-  /// stillness for one movement. It also stops the marked line reading as half
-  /// cut off by the edge it was pushed against.
+  /// One row's pitch, which buys exactly one instruction: bringing the line
+  /// flush with the edge would put the *next* one off screen again and scroll
+  /// on every single step, and a row of slack makes it every second step. It
+  /// also stops the marked line reading as half cut off by the edge it was
+  /// pushed against.
+  ///
+  /// More would buy more stillness at the cost of a larger jump each time, and
+  /// far enough down that road is the centring this replaced. One row is the
+  /// least that fixes the every-step case.
   static const caretSlack = rowHeight + gap;
 
   /// The marked command is also outlined, in the caret's own colour, so the

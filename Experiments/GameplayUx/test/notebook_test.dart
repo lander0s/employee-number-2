@@ -294,16 +294,17 @@ void main() {
     testWidgets('a drop far below the program still appends', (tester) async {
       await boot(tester);
       final page = tester.getRect(find.byType(ProgramEditor));
-      final note = tester.getRect(find.byType(CommandNote));
 
       final gesture = await tester.startGesture(
         tester.getCenter(onNote('SUBTRACT')),
       );
       await tester.pump(const Duration(milliseconds: 40));
-      await gesture.moveBy(const Offset(0, -30));
+      // Downwards, off the tray and onto the page: the tray is above the
+      // program now, so that is the direction a command travels.
+      await gesture.moveBy(const Offset(0, 30));
       await tester.pump();
-      // Above the note: the bottom of the page is behind it.
-      await gesture.moveTo(Offset(page.center.dx, note.top - 20));
+      // The empty tail, with nothing under it but page.
+      await gesture.moveTo(Offset(page.center.dx, page.bottom - 20));
       await tester.pump();
       await gesture.up();
       await tester.pumpAndSettle();
@@ -857,17 +858,34 @@ void main() {
       );
     });
 
-    testWidgets('and it keeps a row of slack off the edge', (tester) async {
-      // Flush against the edge would put the next instruction off screen
-      // again, so a long program would scroll on every single step.
+    testWidgets('and when it does move, it leaves a row of slack', (
+      tester,
+    ) async {
+      // Measured at a movement, not at an arbitrary moment. Slack is what a
+      // movement leaves behind so the *following* instruction can land inside
+      // it without moving the page again - which means that one step later the
+      // line is legitimately flush with the edge. Asserting it every frame
+      // would be asserting that the page scrolls every frame.
       await boot(tester, level: longLevel(), program: longProgram());
       await runFor(tester, const Duration(seconds: 12));
+      await tester.tap(find.bySemanticsLabel('Pause the shift'));
+      await tester.pump();
 
-      final page = pageOf(tester);
-      expect(
-        page.bottom - caretOf(tester).bottom,
-        greaterThanOrEqualTo(Paper.caretSlack - 0.5),
-      );
+      var before = offsetOf(tester);
+      for (var i = 0; i < rows; i++) {
+        await step(tester, 'Next instruction');
+        final now = offsetOf(tester);
+        if (now != before) {
+          expect(
+            pageOf(tester).bottom - caretOf(tester).bottom,
+            greaterThanOrEqualTo(Paper.caretSlack - 0.5),
+            reason: 'the page moved but left the line against the edge',
+          );
+          return;
+        }
+        before = now;
+      }
+      fail('the page never moved, so nothing was measured');
     });
 
     testWidgets('it comes back up for a line stepped back to', (tester) async {

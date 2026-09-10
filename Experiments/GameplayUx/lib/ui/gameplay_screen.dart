@@ -69,27 +69,18 @@ class _GameplayScreenState extends State<GameplayScreen> {
     visiblePage: _visiblePage,
   );
 
-  /// The note lies *over* the page, so the page has to know how much of its
-  /// bottom edge is covered. Measured rather than computed: the note's height
-  /// follows the OS text scale, so there is no constant to use.
   final _pageKey = GlobalKey();
-  final _noteKey = GlobalKey();
-  double _noteHeight = 0;
 
-  void _measureNote() {
-    final box = _noteKey.currentContext?.findRenderObject() as RenderBox?;
-    final height = _running ? 0.0 : (box?.size.height ?? 0);
-    if (mounted && height != _noteHeight) {
-      setState(() => _noteHeight = height);
-    }
-  }
-
-  /// The part of the page a finger can actually reach: the note covers the rest.
+  /// The part of the page a finger can reach, which is now all of it.
+  ///
+  /// It used to be the page minus the note's height, measured every frame,
+  /// because the note lay *over* the page and covered its bottom edge. The note
+  /// is a sibling above the page now and covers nothing, so there is nothing to
+  /// subtract and nothing to measure.
   Rect _visiblePage() {
     final box = _pageKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return Rect.zero;
-    final origin = box.localToGlobal(Offset.zero);
-    return origin & Size(box.size.width, box.size.height - _noteHeight);
+    return box.localToGlobal(Offset.zero) & box.size;
   }
 
   /// One way to delete, whichever gesture asked for it: a swipe on the page, or
@@ -206,7 +197,6 @@ class _GameplayScreenState extends State<GameplayScreen> {
   @override
   Widget build(BuildContext context) {
     // The note's height is only knowable once it has laid out.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measureNote());
 
     return Scaffold(
       backgroundColor: W.page,
@@ -284,17 +274,42 @@ class _GameplayScreenState extends State<GameplayScreen> {
                         onDoubleTap: _toggleSnap,
                       ),
                       Expanded(
-                        // The tray is laid over the page rather than beside it.
-                        // Two things fall out of that, and both are the point:
-                        // the page shows through the tray's translucency,
-                        // and pressing RUN does not resize the program - the
-                        // pane was already the full height, so the tray simply
-                        // stops covering part of it. It used to shrink the pane,
-                        // which meant every row jumped the moment a run started,
-                        // at exactly the moment you want to be watching them.
-                        child: Stack(
+                        // The tray sits above the page, not over it: fixed
+                        // under the divider, and the program scrolls beneath.
+                        // It reads as the bottom lip of the splitter rather
+                        // than as something floating on the page - it moves
+                        // with the divider and the scrollable region starts
+                        // below it.
+                        //
+                        // It was laid over the page, and the page no longer
+                        // shows through it. That is the only thing given up:
+                        // the tray keeps its place during a run rather than
+                        // disappearing, so the program is never resized under
+                        // the player. Design pillar 2 - a run changes what can
+                        // be touched and nothing else - and the moment a run
+                        // starts is exactly when a row must not move.
+                        child: Column(
                           children: [
-                            Positioned.fill(
+                            // Faded and inert while running, not removed: it
+                            // holds its space, and reads as locked rather than
+                            // as gone.
+                            IgnorePointer(
+                              ignoring: _running,
+                              child: Opacity(
+                                opacity: _running ? 0.4 : 1,
+                                child: Chrome(
+                                  child: CommandNote(
+                                    lift: _lift,
+                                    autoScroll: _autoScroll,
+                                    onTrash: (id) {
+                                      final node = _doc.nodeById(id);
+                                      if (node != null) _remove(node);
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
                               child: ProgramEditor(
                                 doc: _doc,
                                 brief: widget.level.brief,
@@ -305,26 +320,15 @@ class _GameplayScreenState extends State<GameplayScreen> {
                                 onRemove: _remove,
                                 running: _running,
                                 executing: _run.executing,
-                                bottomInset: _noteHeight,
+                                // The system's gesture area, which the note
+                                // used to absorb by sitting on it. Nothing is
+                                // down there now but the program, so the
+                                // program owes it the room.
+                                bottomInset: MediaQuery.viewPaddingOf(
+                                  context,
+                                ).bottom,
                               ),
                             ),
-                            if (!_running)
-                              Positioned(
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                child: Chrome(
-                                  child: CommandNote(
-                                    key: _noteKey,
-                                    lift: _lift,
-                                    autoScroll: _autoScroll,
-                                    onTrash: (id) {
-                                      final node = _doc.nodeById(id);
-                                      if (node != null) _remove(node);
-                                    },
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
                       ),

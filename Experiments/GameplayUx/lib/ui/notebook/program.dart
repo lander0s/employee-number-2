@@ -67,6 +67,10 @@ class ProgramEditor extends StatefulWidget {
   final String? executing;
 
   /// How much of the page's bottom edge the note covers.
+  /// Room kept below the last row, so it can be scrolled clear of whatever
+  /// the page cannot draw under - which is now only the system's gesture area.
+  /// It used to be the height of the command tray, back when the tray was laid
+  /// over the page.
   final double bottomInset;
 
   @override
