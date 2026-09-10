@@ -9,6 +9,8 @@
 // used to hide 8dp of drift are gone with it.
 
 import 'package:flutter/material.dart';
+import 'dart:ui' show Tristate;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gameplay_ux/model/commands.dart';
 import 'package:gameplay_ux/model/program.dart';
@@ -75,6 +77,24 @@ Future<void> boot(
   );
   await tester.pumpAndSettle();
 }
+
+/// The run controls are icons, so they are reached by what they say to a screen
+/// reader rather than by a word printed on them.
+const playControl = 'Run the shift';
+const stopControl = 'Stop the shift';
+const backControl = 'Previous instruction';
+const forwardControl = 'Next instruction';
+
+/// The row, left to right. The middle one is a toggle, so it is named by
+/// whichever face it is wearing.
+List<String> controlRow(String middle) => [backControl, middle, forwardControl];
+
+Finder control(String label) => find.bySemanticsLabel(label);
+
+/// Whether a control does anything, as the control itself reports it.
+bool controlEnabled(WidgetTester tester, String label) =>
+    tester.getSemantics(control(label)).flagsCollection.isEnabled ==
+    Tristate.isTrue;
 
 /// Command words appear both on the page and on the note, so assertions have to
 /// say which surface they mean.
@@ -217,7 +237,7 @@ void main() {
 
   group('2 and 3. running changes nothing but what can be touched', () {
     Future<void> run(WidgetTester tester) async {
-      await tester.tap(find.text('RUN'));
+      await tester.tap(control(playControl));
       await tester.pumpAndSettle();
     }
 
@@ -244,7 +264,7 @@ void main() {
         reason: 'moved up by something other than the tray height',
       );
 
-      await tester.tap(find.text('STOP'));
+      await tester.tap(control(stopControl));
       await tester.pumpAndSettle();
       expect(
         tester.getRect(boxOf(onPage('TAKE'))),
@@ -603,56 +623,121 @@ void main() {
     });
   });
 
-  group('the transport says what can be done to a run', () {
-    Finder control(String label) => find.bySemanticsLabel(label);
-
-    testWidgets('cold: run it, or step into it', (tester) async {
-      await boot(tester);
-
-      expect(find.text('RUN'), findsOneWidget);
-      expect(find.text('STOP'), findsNothing, reason: 'nothing to stop yet');
-      expect(control('Next instruction'), findsOneWidget);
-      // Offered, but disabled: a step with nowhere to go stays put rather than
-      // disappearing and shuffling every other control along.
-      expect(control('Previous instruction'), findsOneWidget);
-    });
-
+  group('the transport is three controls that never move', () {
     /// Starts a run and leaves it *playing*.
     ///
     /// Never `pumpAndSettle`: that runs the trace out to the verdict, which is
-    /// a different state with a different set of controls - and is what the
-    /// older tests in this file are unknowingly asserting against when they
-    /// reach for STOP.
+    /// a different state - and is what the older tests in this file are
+    /// unknowingly asserting against when they reach for stop.
     Future<void> startPlaying(WidgetTester tester) async {
-      await tester.tap(find.text('RUN'));
+      await tester.tap(control(playControl));
       await tester.pump();
       // The first instruction is scheduled with no delay, and a bare pump does
       // not advance the clock far enough to fire a zero-duration timer.
       await tester.pump(const Duration(milliseconds: 1));
     }
 
-    testWidgets('playing: pause it, or stop it', (tester) async {
-      await boot(tester);
-      await startPlaying(tester);
+    Future<void> step(WidgetTester tester, String which) async {
+      await tester.tap(control(which));
+      await tester.pump();
+      await tester.pump();
+    }
 
-      expect(control('Pause the shift'), findsOneWidget);
-      expect(find.text('STOP'), findsOneWidget);
-      // The cursor is being moved for you; a step here would race the clock.
-      expect(control('Next instruction'), findsNothing);
-      expect(control('Previous instruction'), findsNothing);
+    testWidgets('three of them, and never a pause', (tester) async {
+      await boot(tester);
+      expect(control(backControl), findsOneWidget);
+      expect(control(playControl), findsOneWidget);
+      expect(control(forwardControl), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp('[Pp]ause')),
+        findsNothing,
+        reason: 'holding a run is what stepping is for',
+      );
     });
 
-    testWidgets('paused: step either way, resume, or stop', (tester) async {
+    testWidgets('the middle one is play until a run is loaded, then stop', (
+      tester,
+    ) async {
       await boot(tester);
-      await startPlaying(tester);
-      await tester.tap(control('Pause the shift'));
-      await tester.pump();
+      expect(control(playControl), findsOneWidget);
+      expect(control(stopControl), findsNothing, reason: 'nothing to stop');
 
-      expect(control('Run the shift'), findsOneWidget, reason: 'resume');
-      expect(control('Previous instruction'), findsOneWidget);
-      expect(control('Next instruction'), findsOneWidget);
-      expect(find.text('STOP'), findsOneWidget);
-      expect(control('Pause the shift'), findsNothing);
+      await startPlaying(tester);
+      expect(control(stopControl), findsOneWidget);
+      expect(control(playControl), findsNothing, reason: 'already running');
+
+      // Still stop while held, which is the trade for having no pause: the way
+      // out is always there, resuming is not.
+      await step(tester, forwardControl);
+      expect(control(stopControl), findsOneWidget);
+
+      await tester.tap(control(stopControl));
+      await tester.pumpAndSettle();
+      expect(control(playControl), findsOneWidget, reason: 'back to editing');
+    });
+
+    testWidgets('they are the same size, in order, and stay put', (
+      tester,
+    ) async {
+      await boot(tester);
+      final cold = {
+        for (final c in controlRow(playControl)) c: tester.getRect(control(c)),
+      };
+
+      final first = cold[backControl]!;
+      for (final r in cold.values) {
+        expect(r.size, first.size, reason: 'a control is a different size');
+      }
+      expect(first.width, first.height, reason: 'square');
+      expect(cold[playControl]!.left, greaterThan(first.left));
+      expect(cold[forwardControl]!.left, greaterThan(cold[playControl]!.left));
+
+      // The middle one changes face; it must not change place.
+      await startPlaying(tester);
+      expect(tester.getRect(control(backControl)), cold[backControl]);
+      expect(tester.getRect(control(stopControl)), cold[playControl]);
+      expect(tester.getRect(control(forwardControl)), cold[forwardControl]);
+    });
+
+    testWidgets('what is enabled is the readout', (tester) async {
+      await boot(tester);
+
+      // Cold: nowhere to step back to, and the middle offers a run.
+      expect(controlEnabled(tester, backControl), isFalse);
+      expect(controlEnabled(tester, forwardControl), isTrue);
+      expect(controlEnabled(tester, playControl), isTrue);
+
+      await startPlaying(tester);
+      // Playing: stepping stays live on purpose - it takes the wheel, which is
+      // how a person catches a run at the moment they spot something.
+      expect(controlEnabled(tester, backControl), isTrue);
+      expect(controlEnabled(tester, forwardControl), isTrue);
+      expect(controlEnabled(tester, stopControl), isTrue);
+    });
+
+    testWidgets('at the verdict, stepping back but not on', (tester) async {
+      await boot(tester);
+      await tester.tap(control(playControl));
+      await tester.pumpAndSettle();
+
+      expect(controlEnabled(tester, stopControl), isTrue);
+      expect(
+        controlEnabled(tester, backControl),
+        isTrue,
+        reason: 'reading back what went wrong is the point of it',
+      );
+      expect(controlEnabled(tester, forwardControl), isFalse);
+    });
+
+    testWidgets('a disabled control does nothing when tapped', (tester) async {
+      // Faint and inert, not faint and live: the enable state has to be real,
+      // not just drawn.
+      await boot(tester);
+      expect(find.byType(RunCaret), findsNothing);
+
+      await tester.tap(control(backControl));
+      await tester.pump();
+      expect(find.byType(RunCaret), findsNothing, reason: 'back started a run');
     });
 
     testWidgets('a step from cold marks a line without starting the clock', (
@@ -661,18 +746,33 @@ void main() {
       await boot(tester);
       expect(find.byType(RunCaret), findsNothing);
 
-      await tester.tap(control('Next instruction'));
-      await tester.pump();
+      await step(tester, forwardControl);
 
       expect(find.byType(RunCaret), findsOneWidget);
-      expect(control('Pause the shift'), findsNothing, reason: 'not playing');
-      expect(find.text('STOP'), findsOneWidget, reason: 'a run is loaded');
+      expect(control(stopControl), findsOneWidget, reason: 'a run is loaded');
+    });
+
+    testWidgets('a step out of playback stops the clock', (tester) async {
+      // Stepping is live while the clock runs, so it has to take the wheel
+      // rather than race it - otherwise the next scheduled instruction lands
+      // on top of the one just stepped to.
+      await boot(tester);
+      await startPlaying(tester);
+      await step(tester, forwardControl);
+
+      final at = tester.getRect(find.byType(CaretGutter));
+      await tester.pump(const Duration(seconds: 6));
+      expect(
+        tester.getRect(find.byType(CaretGutter)),
+        at,
+        reason: 'a timer was left running underneath',
+      );
     });
   });
 
   group('a run says which line it is on', () {
     Future<void> run(WidgetTester tester) async {
-      await tester.tap(find.text('RUN'));
+      await tester.tap(control(playControl));
       await tester.pumpAndSettle();
     }
 
@@ -685,7 +785,7 @@ void main() {
       await run(tester);
       expect(find.byType(RunCaret), findsOneWidget);
 
-      await tester.tap(find.text('STOP'));
+      await tester.tap(control(stopControl));
       await tester.pumpAndSettle();
       expect(find.byType(RunCaret), findsNothing);
     });
@@ -699,7 +799,7 @@ void main() {
       // every row or none would otherwise pass whenever the roll was kind.
       for (var i = 0; i < 12; i++) {
         expect(find.byType(RunCaret), findsOneWidget);
-        await tester.tap(find.text('STOP'));
+        await tester.tap(control(stopControl));
         await tester.pumpAndSettle();
         await run(tester);
       }
@@ -777,7 +877,7 @@ void main() {
 
         // Re-roll rather than re-boot: pumping the screen again reuses its
         // State, so it would still be mid-run and the button would say STOP.
-        await tester.tap(find.text('STOP'));
+        await tester.tap(control(stopControl));
         await tester.pumpAndSettle();
         await run(tester);
       }
@@ -819,7 +919,7 @@ void main() {
     /// instruction, so settling runs the whole program and tears the caret down
     /// before anything can be measured.
     Future<void> runFor(WidgetTester tester, Duration elapsed) async {
-      await tester.tap(find.text('RUN'));
+      await tester.tap(control(playControl));
       await tester.pump();
       // The first instruction is scheduled with no delay, and a bare pump does
       // not advance the clock far enough to fire a zero-duration timer.
@@ -876,7 +976,10 @@ void main() {
       // clamped to no movement and the old rule passes by accident.
       await boot(tester, level: longLevel(), program: longProgram());
       await runFor(tester, const Duration(seconds: 12));
-      await tester.tap(find.bySemanticsLabel('Pause the shift'));
+      // A step is how a run is held now that there is no pause button: it
+      // takes the wheel, stopping the clock.
+      await tester.tap(control(forwardControl));
+      await tester.pump();
       await tester.pump();
 
       // Back up the page a few rows, so the next line forward cannot possibly
@@ -942,7 +1045,10 @@ void main() {
       // would be asserting that the page scrolls every frame.
       await boot(tester, level: longLevel(), program: longProgram());
       await runFor(tester, const Duration(seconds: 12));
-      await tester.tap(find.bySemanticsLabel('Pause the shift'));
+      // A step is how a run is held now that there is no pause button: it
+      // takes the wheel, stopping the clock.
+      await tester.tap(control(forwardControl));
+      await tester.pump();
       await tester.pump();
 
       var before = offsetOf(tester);
@@ -968,7 +1074,10 @@ void main() {
       await boot(tester, level: longLevel(), program: longProgram());
       await runFor(tester, const Duration(seconds: 12));
 
-      await tester.tap(find.bySemanticsLabel('Pause the shift'));
+      // A step is how a run is held now that there is no pause button: it
+      // takes the wheel, stopping the clock.
+      await tester.tap(control(forwardControl));
+      await tester.pump();
       await tester.pump();
 
       final scrolled = pageOf(tester);

@@ -163,100 +163,86 @@ class _Verdict extends StatelessWidget {
 
 /// The transport: everything the player can do to a run.
 ///
-/// A single RUN/STOP button was enough while a run was something you watched.
-/// It is not enough for something you *read*: the whole point of the trace
-/// being a list is that it can be walked, and a control set that can only start
-/// and abandon it hides that. So - step back, play or pause, step forward,
-/// stop.
+/// Three controls, always all three, in one order: back, play, forward. They
+/// enable and disable; they never come and go, and the row never changes width,
+/// so a control cannot move out from under the thumb reaching for it.
 ///
-/// The set changes with the state rather than greying out four buttons in every
-/// one of them. Cold there is nothing to stop; playing there is nothing to step
-/// through, because the cursor is being moved for you and a step would be a
-/// race with the clock.
+/// The middle one is a toggle. Nothing loaded, it is play; a run loaded, it is
+/// stop. One button, because those two are the same question - *is a run
+/// happening* - and a person who wants to start one and a person who wants to
+/// be rid of one are both reaching for the middle.
 ///
-///   cold      [<] [RUN] [>]
-///   playing   [||] [STOP]
-///   paused    [<] [>play] [>] [STOP]
-///   finished  [<] [STOP]
+/// **There is no pause, and that costs something.** Stepping is how a run gets
+/// held: a step takes the wheel, stops the clock and advances one instruction.
+/// What is gone is *resuming* - once a run has been stepped, the middle button
+/// says stop rather than play, so the way on is another step or a fresh run.
+/// The alternative was a middle button that showed play whenever the clock was
+/// idle, which reads better right up until you are parked at the verdict with
+/// no way back to editing.
 ///
-/// RUN keeps its word while cold and STOP keeps its whenever it is shown: those
-/// two are the ones a person looks for, and they are the two the tests reach
-/// for by name.
+/// Icons, no words. Three of these shapes are the most over-learned set in
+/// software - a tape deck from 1975 has the same row.
 class RunControls extends StatelessWidget {
   const RunControls({super.key, required this.run});
 
-  /// The height of one control, and so of the bar. [gameplay_screen] measures
-  /// the collapse threshold against it: a floor too short to show this is a
-  /// floor a program cannot be started from.
+  /// One control, square. [gameplay_screen] measures the collapse threshold
+  /// against it: a floor too short to show this is a floor a program cannot be
+  /// started from.
   static const height = 44.0;
+
+  /// Between two controls. Small - they read as one instrument, not three
+  /// buttons - but not nothing, or a thumb cannot tell where one ends.
+  static const gap = 6.0;
 
   final RunController run;
 
   @override
   Widget build(BuildContext context) {
-    final playing = run.playing;
+    final loaded = run.running;
+
+    final controls = <(_Glyph, String, VoidCallback?)>[
+      (
+        _Glyph.prev,
+        'Previous instruction',
+        run.canStepBack ? run.stepBack : null,
+      ),
+      if (loaded)
+        (_Glyph.stop, 'Stop the shift', run.stop)
+      else
+        (_Glyph.play, 'Run the shift', run.play),
+      (
+        _Glyph.next,
+        'Next instruction',
+        run.canStepForward ? run.stepForward : null,
+      ),
+    ];
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (!playing) ...[
-          _Control(
-            glyph: _Glyph.prev,
-            semantics: 'Previous instruction',
-            onTap: run.canStepBack ? run.stepBack : null,
-          ),
-          const SizedBox(width: 6),
-        ],
-        _Control(
-          glyph: playing ? _Glyph.pause : _Glyph.play,
-          // Only from cold: paused, the word would be reading the button back
-          // to itself, and the bar has three more controls to fit by then.
-          label: run.running ? null : 'RUN',
-          semantics: playing ? 'Pause the shift' : 'Run the shift',
-          emphasised: playing,
-          onTap: playing ? run.pause : run.play,
-        ),
-        if (!playing) ...[
-          const SizedBox(width: 6),
-          _Control(
-            glyph: _Glyph.next,
-            semantics: 'Next instruction',
-            onTap: run.canStepForward ? run.stepForward : null,
-          ),
-        ],
-        if (run.running) ...[
-          const SizedBox(width: 6),
-          _Control(
-            glyph: _Glyph.stop,
-            label: 'STOP',
-            semantics: 'Stop the shift',
-            onTap: run.stop,
-          ),
+        for (final (glyph, semantics, onTap) in controls) ...[
+          if (glyph != controls.first.$1) const SizedBox(width: gap),
+          _Control(glyph: glyph, semantics: semantics, onTap: onTap),
         ],
       ],
     );
   }
 }
 
-/// One control. Square when it is only a glyph, wider when it carries a word.
+/// One control: a square, a glyph, and whether it does anything.
 class _Control extends StatelessWidget {
   const _Control({
     required this.glyph,
     required this.semantics,
     required this.onTap,
-    this.label,
-    this.emphasised = false,
   });
 
   final _Glyph glyph;
   final String semantics;
 
-  /// Null disables it: a step with nowhere to go is drawn faint and does
-  /// nothing, rather than disappearing and moving every other control along.
+  /// Null disables it. Drawn faint and inert rather than removed - see
+  /// [RunControls].
   final VoidCallback? onTap;
-
-  final String? label;
-  final bool emphasised;
 
   @override
   Widget build(BuildContext context) {
@@ -272,43 +258,19 @@ class _Control extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          constraints: const BoxConstraints(
-            minHeight: RunControls.height,
-            minWidth: RunControls.height,
-          ),
-          padding: EdgeInsets.symmetric(
-            horizontal: label == null ? 0 : 14,
-            vertical: 8,
-          ),
+          width: RunControls.height,
+          height: RunControls.height,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: emphasised ? W.buttonPressed : W.button,
+            color: W.button,
             border: Border.all(color: ink),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 14,
-                height: 14,
-                // Painted rather than set as a glyph, for the same reason as the
-                // divider arrows: at this size an icon font's built-in padding
-                // fights the layout.
-                child: CustomPaint(
-                  painter: _RunGlyph(glyph: glyph, color: ink),
-                ),
-              ),
-              if (label != null) ...[
-                const SizedBox(width: 8),
-                Text(
-                  label!,
-                  style: W.label.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: ink,
-                  ),
-                ),
-              ],
-            ],
+          // Painted rather than set as a glyph, for the same reason as the
+          // splitter's handle: at this size an icon font's built-in padding
+          // fights the layout.
+          child: CustomPaint(
+            size: const Size(16, 16),
+            painter: _RunGlyph(glyph: glyph, color: ink),
           ),
         ),
       ),
