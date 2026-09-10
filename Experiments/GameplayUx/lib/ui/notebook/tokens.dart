@@ -89,9 +89,23 @@ abstract final class Paper {
   static const chipPadV = 2.0;
   static const chipTarget = 36.0;
 
-  /// The tray's buttons are tapped and dragged from cold, so they keep the full
-  /// target.
+  /// The tray's buttons are dragged from cold, so they keep the full target.
+  ///
+  /// This was written down and then never applied: the buttons were their text
+  /// plus 2dp, about 19dp tall, and a drag that has to start inside 19dp is a
+  /// drag that misses. A declared guarantee nothing implements is worse than no
+  /// guarantee, so there is now a test measuring it.
+  ///
+  /// It costs real height - two rows of it, out of a shelf that shares a phone
+  /// screen with the program. Worth it here because the tray is the one thing
+  /// on screen whose entire job is to be grabbed, and because it collapses
+  /// while a run is playing, so the cost is only paid while editing.
   static const buttonTarget = 48.0;
+
+  /// A tray button's word, kept off the edges of its own block. Wider than it
+  /// was: a finger lands on the middle of a word, and the block should extend
+  /// past where the finger thinks the word is.
+  static const buttonPadH = 12.0;
 
   /// The air above the first command and below the last.
   ///

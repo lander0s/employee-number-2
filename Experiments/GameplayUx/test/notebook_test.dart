@@ -311,7 +311,7 @@ void main() {
       final page = tester.getRect(find.byType(ProgramEditor));
 
       final gesture = await tester.startGesture(
-        tester.getCenter(onNote('SUBTRACT')),
+        tester.getCenter(onNote('SUB')),
       );
       await tester.pump(const Duration(milliseconds: 40));
       // Downwards, off the tray and onto the page: the tray is above the
@@ -324,7 +324,7 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
 
-      final dropped = tester.getRect(boxOf(onPage('SUBTRACT')));
+      final dropped = tester.getRect(boxOf(onPage('SUB')));
       final block = tester.getRect(boxOf(onPage('REPEAT')));
       expect(dropped.top, greaterThan(block.top));
       expect(dropped.left, closeTo(block.left, 0.5), reason: 'at the root');
@@ -334,7 +334,7 @@ void main() {
       await boot(tester);
       await clearProgram(tester);
 
-      expect(find.text('Drag a command up from below.'), findsOneWidget);
+      expect(find.text('Drag a command down from above.'), findsOneWidget);
       final page = tester.getRect(find.byType(ProgramEditor));
 
       final gesture = await tester.startGesture(
@@ -349,7 +349,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(onPage('TAKE'), findsOneWidget);
-      expect(find.text('Drag a command up from below.'), findsNothing);
+      expect(find.text('Drag a command down from above.'), findsNothing);
     });
   });
 
@@ -436,6 +436,24 @@ void main() {
   });
 
   group('the commands sit centred in their strip', () {
+    testWidgets('every command is big enough to get a finger on', (
+      tester,
+    ) async {
+      // [Paper.buttonTarget] was declared and never applied - the buttons were
+      // their text plus 2dp, about 19dp, and a drag that has to start inside
+      // 19dp is a drag that misses. A guarantee written in a doc comment and
+      // implemented nowhere is what this is here to catch.
+      await boot(tester);
+      for (final spec in commandCatalogue) {
+        final box = tester.getRect(boxOf(onNote(spec.trayLabel)));
+        expect(
+          box.height,
+          greaterThanOrEqualTo(Paper.buttonTarget - 0.5),
+          reason: '${spec.trayLabel} is ${box.height} tall',
+        );
+      }
+    });
+
     testWidgets('the same air above the first row as below the last', (
       tester,
     ) async {
@@ -448,7 +466,7 @@ void main() {
       final handle = tester.getRect(find.byKey(const Key('splitter-handle')));
       final note = tester.getRect(find.byType(CommandNote));
       final firstRow = tester.getRect(boxOf(onNote('TAKE')));
-      final lastRow = tester.getRect(boxOf(onNote('SUBTRACT')));
+      final lastRow = tester.getRect(boxOf(onNote('SUB')));
 
       final above = firstRow.top - handle.bottom;
       final below = note.bottom - lastRow.bottom;

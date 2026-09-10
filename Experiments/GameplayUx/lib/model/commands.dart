@@ -171,8 +171,8 @@ const commandCatalogue = <CommandSpec>[
   ),
   CommandSpec(
     id: 'sub',
-    label: 'SUBTRACT',
-    trayLabel: 'SUBTRACT',
+    label: 'SUB',
+    trayLabel: 'SUB',
     argKind: ArgKind.pallet,
     colour: _arithmetic,
   ),

@@ -402,7 +402,7 @@ class Machine {
         final sign = instr.op == Op.sum ? '+' : '-';
         _trace(
           instr,
-          '${instr.op == Op.sum ? 'SUM' : 'SUBTRACT'} '
+          '${instr.op == Op.sum ? 'SUM' : 'SUB'} '
           '${palletName(instr.pallet)}'
           '  $before $sign $operand = ${_claws!}',
         );

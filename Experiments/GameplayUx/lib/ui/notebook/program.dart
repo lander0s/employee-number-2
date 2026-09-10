@@ -217,9 +217,12 @@ class ProgramEditorState extends State<ProgramEditor> {
                     accepts: (payload) => _accepts(payload, null),
                     onAccept: (payload) =>
                         _drop(payload, Slot(null, doc.root.length, 0)),
+                    // Down from above, since the tray moved to the top of
+                    // the pane. The direction is the instruction, so it has to
+                    // follow the shelf around.
                     hint: doc.root.isEmpty
                         ? const Text(
-                            'Drag a command up from below.',
+                            'Drag a command down from above.',
                             style: Paper.hint,
                           )
                         : null,

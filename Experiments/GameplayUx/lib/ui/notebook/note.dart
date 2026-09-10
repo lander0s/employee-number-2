@@ -266,20 +266,29 @@ class _Face extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Panel(
     fill: spec.colour,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: Center(
-        widthFactor: 1,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            spec.trayLabel,
-            // Smaller than the program's own rows, and smaller than the 17
-            // that 7.3 sets as the floor for functional text. Deliberate: the
-            // tray is a shelf of things to pick up, read at a glance rather
-            // than followed line by line. The program itself keeps 17 and up.
-            style: Paper.command.copyWith(fontSize: 15),
-            maxLines: 1,
+    // A minimum, not a height: the word decides the width and 200% text
+    // scaling has to be able to make it taller, so this only sets the floor
+    // that makes it grabbable.
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: Paper.buttonTarget),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Paper.buttonPadH,
+          vertical: 2,
+        ),
+        child: Center(
+          widthFactor: 1,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              spec.trayLabel,
+              // Smaller than the program's own rows, and smaller than the 17
+              // that 7.3 sets as the floor for functional text. Deliberate: the
+              // tray is a shelf of things to pick up, read at a glance rather
+              // than followed line by line. The program itself keeps 17 and up.
+              style: Paper.command.copyWith(fontSize: 15),
+              maxLines: 1,
+            ),
           ),
         ),
       ),
