@@ -69,8 +69,14 @@ abstract final class W {
 
   static const minTarget = 48.0;
 
-  /// The visible rule is 2dp; this is what a thumb has to hit.
-  static const dividerHitHeight = 34.0;
+  /// What a thumb has to hit. The bar drawn in it is 3dp.
+  ///
+  /// Not a free number any more: the handle is centred in this, so the white
+  /// left under it is `(dividerHitHeight - 3) / 2` - and that white *is* the
+  /// air above the first command in the tray below, because the two are one
+  /// surface. 31 makes it 14, which is [Paper.trayAir]. Changing this moves
+  /// the commands off centre.
+  static const dividerHitHeight = 31.0;
 
   /// Chrome text stops scaling here, while program rows keep scaling to 200%
   /// and beyond.

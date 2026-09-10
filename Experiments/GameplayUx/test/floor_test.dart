@@ -543,7 +543,11 @@ void main() {
           closeTo(g.side * FloorGeometry.labelGap, 0.001),
           reason: 'label under $bottom starts at $top',
         );
-        expect(top, greaterThan(bottom), reason: 'label under $bottom overlaps');
+        expect(
+          top,
+          greaterThan(bottom),
+          reason: 'label under $bottom overlaps',
+        );
       }
     });
 
@@ -679,5 +683,4 @@ void main() {
       }
     });
   });
-
 }

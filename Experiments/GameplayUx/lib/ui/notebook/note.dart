@@ -59,9 +59,14 @@ class CommandNote extends StatelessWidget {
             // It is under the divider now, with the page below it: both of
             // those are gone, and what is left is a strip that wants the same
             // air on both sides.
-            padding: const EdgeInsets.symmetric(
-              horizontal: Paper.noteSidePad,
-              vertical: Paper.notePad,
+            // No top padding: the air above the first command is the white
+            // the divider leaves below its handle, and this surface is a
+            // continuation of that one. See [Paper.trayAir].
+            padding: const EdgeInsets.fromLTRB(
+              Paper.noteSidePad,
+              0,
+              Paper.noteSidePad,
+              Paper.trayAir,
             ),
             // The note keeps its exact height in both states. Resizing it would
             // reflow the page in the middle of a drag, which is the one moment

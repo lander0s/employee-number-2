@@ -14,8 +14,7 @@ import 'package:gameplay_ux/model/vm.dart';
 
 // ------------------------------------------------------------------ building
 
-Node cmd(String id, {int pallet = 1}) =>
-    Node(commandId: id, palletArg: pallet);
+Node cmd(String id, {int pallet = 1}) => Node(commandId: id, palletArg: pallet);
 
 Node block(String id, List<Node> body, {String cond = 'ZERO'}) =>
     Node(commandId: id, comparator: cond, children: body);
@@ -209,7 +208,10 @@ void main() {
         block('ifCond', [cmd('ship')], cond: 'POSITIVE'),
       ], levelOf(s1));
       expect(r.halt.kind, HaltKind.failed);
-      expect(r.verdict, "UNIT-02 checked what it was holding. It wasn't holding anything.");
+      expect(
+        r.verdict,
+        "UNIT-02 checked what it was holding. It wasn't holding anything.",
+      );
     });
 
     test('leaving packages on the intake', () {
@@ -238,16 +240,19 @@ void main() {
   });
 
   group('a tick is the world after the instruction, not during it', () {
-    test('a shipped package is out of the claws by the time it is recorded', () {
-      // It was not, and nothing about the shipment was wrong - the goal is
-      // checked against live state - so only something *reading the trace*
-      // could notice. The floor did: it left the unit standing at the belt
-      // holding a box it had just put down.
-      final r = exec([cmd('take'), cmd('ship')], levelOf([5]));
-      expect(r.ticks[1].line, contains('SHIP 5'));
-      expect(r.ticks[1].claws, isNull, reason: 'it let go of it');
-      expect(r.ticks[1].outbound, [5]);
-    });
+    test(
+      'a shipped package is out of the claws by the time it is recorded',
+      () {
+        // It was not, and nothing about the shipment was wrong - the goal is
+        // checked against live state - so only something *reading the trace*
+        // could notice. The floor did: it left the unit standing at the belt
+        // holding a box it had just put down.
+        final r = exec([cmd('take'), cmd('ship')], levelOf([5]));
+        expect(r.ticks[1].line, contains('SHIP 5'));
+        expect(r.ticks[1].claws, isNull, reason: 'it let go of it');
+        expect(r.ticks[1].outbound, [5]);
+      },
+    );
 
     test('and a taken one is in them', () {
       final r = exec([cmd('take')], levelOf([5]));
@@ -288,11 +293,7 @@ void main() {
     test('TAKE with full claws bins what was held', () {
       // Silent in the fiction, loud in the trace: the line has to say so, or
       // the only symptom is a missing box several steps later.
-      final r = exec([
-        cmd('take'),
-        cmd('take'),
-        cmd('ship'),
-      ], levelOf([1, 2]));
+      final r = exec([cmd('take'), cmd('take'), cmd('ship')], levelOf([1, 2]));
       expect(r.outbound, [2]);
       expect(r.ticks[1].line, contains('binned 1'));
     });
@@ -485,10 +486,7 @@ void main() {
       // The filter level never sent it off the belt line, so the cross-floor
       // routing had no way to be seen. This one does.
       final r = exec(flipper(), absLevel([-4]));
-      expect(
-        r.ticks.map((t) => t.station.kind),
-        contains(StationKind.pallet),
-      );
+      expect(r.ticks.map((t) => t.station.kind), contains(StationKind.pallet));
     });
   });
 
@@ -499,9 +497,7 @@ void main() {
       // steps never trips and the app hangs (level-04-briefing 5.1, rule 3).
       final r = exec([
         cmd('take'),
-        block('repeat', [
-          block('ifCond', const [], cond: 'POSITIVE'),
-        ]),
+        block('repeat', [block('ifCond', const [], cond: 'POSITIVE')]),
       ], levelOf([7]));
 
       expect(r.halt.kind, HaltKind.stuck);
@@ -518,15 +514,18 @@ void main() {
   });
 
   group('compilation', () {
-    test('a block emits a branch around its body, and nothing for the closer', () {
-      // Closers are rendered but are not commands: they are free for SIZE, and
-      // they compile to nothing at all (level-04-briefing 5.1, rule 1).
-      final code = compile([
-        block('ifCond', [cmd('ship')], cond: 'POSITIVE'),
-      ]);
-      expect(code.map((i) => i.op), [Op.branchUnless, Op.ship]);
-      expect(code.first.target, 2, reason: 'skips to just past the body');
-    });
+    test(
+      'a block emits a branch around its body, and nothing for the closer',
+      () {
+        // Closers are rendered but are not commands: they are free for SIZE, and
+        // they compile to nothing at all (level-04-briefing 5.1, rule 1).
+        final code = compile([
+          block('ifCond', [cmd('ship')], cond: 'POSITIVE'),
+        ]);
+        expect(code.map((i) => i.op), [Op.branchUnless, Op.ship]);
+        expect(code.first.target, 2, reason: 'skips to just past the body');
+      },
+    );
 
     test('REPEAT WHILE tests at the top and jumps back to the test', () {
       final code = compile([

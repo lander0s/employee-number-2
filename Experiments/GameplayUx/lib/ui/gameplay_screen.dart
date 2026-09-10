@@ -291,13 +291,23 @@ class _GameplayScreenState extends State<GameplayScreen> {
                         // starts is exactly when a row must not move.
                         child: Column(
                           children: [
-                            // Faded and inert while running, not removed: it
-                            // holds its space, and reads as locked rather than
-                            // as gone.
-                            IgnorePointer(
-                              ignoring: _running,
-                              child: Opacity(
-                                opacity: _running ? 0.4 : 1,
+                            // Gone while running, not merely hidden: the
+                            // program takes the height back and shows more of
+                            // itself for the run.
+                            //
+                            // This is knowingly against pillar 2 as it was
+                            // written - a run changes what can be touched and
+                            // nothing else - because the tray is above the
+                            // program now. Anything the tray gives up comes
+                            // off the top, so every row moves up by its height
+                            // at the moment a run starts. There is no scroll
+                            // offset that hides it either: compensating would
+                            // mean scrolling *back* by that height, and at the
+                            // top of a program there is nothing to scroll back
+                            // into.
+                            if (!_running)
+                              ColoredBox(
+                                color: Paper.sheet,
                                 child: Chrome(
                                   child: CommandNote(
                                     lift: _lift,
@@ -309,7 +319,6 @@ class _GameplayScreenState extends State<GameplayScreen> {
                                   ),
                                 ),
                               ),
-                            ),
                             Expanded(
                               child: ProgramEditor(
                                 doc: _doc,
@@ -396,6 +405,9 @@ class _Divider extends StatelessWidget {
           color: Paper.sheet,
           alignment: Alignment.center,
           child: Container(
+            // Keyed so a test can measure the air under it: that gap is one
+            // half of the tray's symmetry and nothing else can find it.
+            key: const Key('splitter-handle'),
             width: 40,
             height: active ? 4 : 3,
             color: active ? W.text : W.lineSoft,

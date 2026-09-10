@@ -85,19 +85,22 @@ void main() {
       expect(run.canStepBack, isFalse);
     });
 
-    test('stepping off the end raises the verdict, and back off it returns', () {
-      final run = controllerFor();
-      final total = _walkToEnd(run);
+    test(
+      'stepping off the end raises the verdict, and back off it returns',
+      () {
+        final run = controllerFor();
+        final total = _walkToEnd(run);
 
-      expect(run.finished, isTrue);
-      expect(run.result, isNotNull);
-      expect(run.canStepForward, isFalse, reason: 'the shift is over');
+        expect(run.finished, isTrue);
+        expect(run.result, isNotNull);
+        expect(run.canStepForward, isFalse, reason: 'the shift is over');
 
-      run.stepBack();
-      expect(run.finished, isFalse);
-      expect(run.cursor, total - 1, reason: 'back onto the last instruction');
-      expect(run.canStepForward, isTrue);
-    });
+        run.stepBack();
+        expect(run.finished, isFalse);
+        expect(run.cursor, total - 1, reason: 'back onto the last instruction');
+        expect(run.canStepForward, isTrue);
+      },
+    );
 
     test('a loaded run stays loaded however it is being driven', () {
       // [running] is what locks the program for editing. A paused run has to

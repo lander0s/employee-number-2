@@ -93,19 +93,27 @@ abstract final class Paper {
   /// target.
   static const buttonTarget = 48.0;
 
-  /// The note's own margin, and extra below it.
+  /// The air above the first command and below the last.
   ///
-  /// The bottom row of commands is the last thing before the edge of the panel,
-  /// and on a phone with rounded corners the two commands at its ends are
-  /// exactly what the curve eats. Android reports the bars and the cutout and
-  /// that inset is added on top of this - but it does not report a corner
-  /// radius, so this is the part that has to be generous on its own.
+  /// One number, because a player reads the two as one measurement - the
+  /// commands sitting centred in their strip - and they were 21.7 and 6.0.
   ///
-  /// The sides carry more than the top for the same reason: a corner curve
-  /// comes in diagonally, so it takes width as well as height.
-  static const notePad = 6.0;
+  /// The two are not *built* the same way, which is the trap. Below the
+  /// commands this is simply the note's bottom padding. Above them the note has
+  /// no padding at all: the divider and the note are one white surface with a
+  /// 3dp bar drawn in it, so the air above the first command is the white the
+  /// divider leaves *under its handle* - half of [W.dividerHitHeight], less
+  /// half the bar. Those two have to come to the same number, and the one thing
+  /// that actually checks it is a test measuring both on screen.
+  static const trayAir = 14.0;
+
+  /// The note's side margin.
+  ///
+  /// More than [trayAir], because a rounded phone corner comes in diagonally
+  /// and so eats width as well as height. It kept the bottom row of commands
+  /// off the curve back when the note sat on the bottom edge of the screen;
+  /// under the divider it is only symmetry with the page's own gutter.
   static const noteSidePad = 10.0;
-  static const noteFoot = 18.0;
 
   /// How much empty page is kept below the last row, as a fraction of the pane.
   /// It is what makes a short program scrollable at all.

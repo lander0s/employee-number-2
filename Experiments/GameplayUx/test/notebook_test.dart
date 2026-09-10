@@ -71,12 +71,7 @@ Future<void> boot(
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
-    harness(
-      textScale: textScale,
-      brief: brief,
-      level: level,
-      program: program,
-    ),
+    harness(textScale: textScale, brief: brief, level: level, program: program),
   );
   await tester.pumpAndSettle();
 }
@@ -226,16 +221,36 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('no row moves when a run starts or stops', (tester) async {
+    testWidgets('a run takes the tray height, and gives it back', (
+      tester,
+    ) async {
+      // Pillar 2 said no row moves when a run starts or stops, and that
+      // cannot hold now the tray is *above* the program: whatever the tray
+      // gives up comes off the top, so every row moves up by its height.
+      //
+      // What can still be promised is that the move is exactly that and
+      // nothing else, and that it is reversible - a program that drifted a
+      // little further up on every run would be the real bug this is watching
+      // for.
       await boot(tester);
+      final tray = tester.getRect(find.byType(CommandNote)).height;
       final before = tester.getRect(boxOf(onPage('TAKE')));
 
       await run(tester);
-      expect(tester.getRect(boxOf(onPage('TAKE'))), before);
+      expect(find.byType(CommandNote), findsNothing, reason: 'tray collapsed');
+      expect(
+        before.top - tester.getRect(boxOf(onPage('TAKE'))).top,
+        closeTo(tray, 0.5),
+        reason: 'moved up by something other than the tray height',
+      );
 
       await tester.tap(find.text('STOP'));
       await tester.pumpAndSettle();
-      expect(tester.getRect(boxOf(onPage('TAKE'))), before);
+      expect(
+        tester.getRect(boxOf(onPage('TAKE'))),
+        before,
+        reason: 'the program did not come back to where it was',
+      );
     });
 
     testWidgets('the gaps stay, and refuse', (tester) async {
@@ -420,6 +435,30 @@ void main() {
     });
   });
 
+  group('the commands sit centred in their strip', () {
+    testWidgets('the same air above the first row as below the last', (
+      tester,
+    ) async {
+      // The two gaps are built out of different things - the white the divider
+      // leaves under its handle above, the note's own padding below - so
+      // nothing but a measurement can say they agree. They were 21.7dp and
+      // 6.0dp, which read as the commands hanging off the splitter rather than
+      // sitting in it.
+      await boot(tester);
+      final handle = tester.getRect(find.byKey(const Key('splitter-handle')));
+      final note = tester.getRect(find.byType(CommandNote));
+      final firstRow = tester.getRect(boxOf(onNote('TAKE')));
+      final lastRow = tester.getRect(boxOf(onNote('SUBTRACT')));
+
+      final above = firstRow.top - handle.bottom;
+      final below = note.bottom - lastRow.bottom;
+
+      expect(above, closeTo(Paper.trayAir, 0.6), reason: 'above is $above');
+      expect(below, closeTo(Paper.trayAir, 0.6), reason: 'below is $below');
+      expect(above, closeTo(below, 0.6));
+    });
+  });
+
   group('the note is where commands come from and go back to', () {
     testWidgets('it becomes a bin only while a placed command is held', (
       tester,
@@ -524,7 +563,8 @@ void main() {
       expect(
         block.left - page.left,
         closeTo(page.right - block.right, 0.5),
-        reason: 'left ${block.left - page.left}, '
+        reason:
+            'left ${block.left - page.left}, '
             'right ${page.right - block.right}',
       );
     });
@@ -652,14 +692,30 @@ void main() {
     ) async {
       await boot(tester);
       const rows = ['REPEAT', 'TAKE', 'IF', 'SHIP'];
-      final before = {for (final r in rows) r: tester.getRect(boxOf(onPage(r)))};
 
-      // Every row, not one of them: the stand-in marks a random line, and an
-      // outline that reserved space would only shift the program on the runs
-      // that happened to pick a row above the one being watched.
+      /// Each row's offset *inside the page*, not its position on screen.
+      ///
+      /// A run collapses the tray above the program, so the page grows upward
+      /// and every row on screen moves with it - which has nothing to do with
+      /// the outline. Measured against the page, that shift cancels and what
+      /// is left is only what the outline itself cost.
+      Map<String, double> offsets() {
+        final page = tester.getRect(find.byType(ProgramEditor));
+        return {
+          for (final r in rows)
+            r: tester.getRect(boxOf(onPage(r))).top - page.top,
+        };
+      }
+
+      final before = offsets();
+
+      // Every row, not one of them: an outline that reserved space would only
+      // shift the program on the runs that happened to mark a row above the
+      // one being watched.
       await run(tester);
+      final after = offsets();
       for (final r in rows) {
-        expect(tester.getRect(boxOf(onPage(r))), before[r], reason: r);
+        expect(after[r], closeTo(before[r]!, 0.5), reason: r);
       }
 
       final outlined = tester
@@ -916,18 +972,21 @@ void main() {
     });
 
     testWidgets('and does not fight the top of the page', (tester) async {
-      // The first line cannot be centred - there is nothing above it to scroll
-      // in - so the page must stay put rather than pulling the program down.
+      // The first line is already showing, so the right amount of scrolling is
+      // none - and there is nothing above it to scroll in even if it wanted to.
+      //
+      // Measured on the scroll offset, not on where the row lands. A run
+      // collapses the tray above the program, which moves every row up by its
+      // height without the page having scrolled a pixel, and this test is
+      // about the scrolling.
       await boot(tester, level: longLevel(), program: longProgram());
-      final before = tester.getRect(boxOf(onPage('TAKE').first));
-
       await runFor(tester, Duration.zero);
 
-      expect(tester.getRect(boxOf(onPage('TAKE').first)), before);
+      expect(offsetOf(tester), 0, reason: 'the page pulled itself about');
       expect(
         tester.getRect(find.byType(CaretGutter)).center.dy,
         lessThan(pageOf(tester).center.dy),
-        reason: 'clamped above centre, which is the honest answer here',
+        reason: 'still up near the top, which is the honest answer here',
       );
     });
   });
@@ -940,7 +999,11 @@ void main() {
     testWidgets('it is on the page, above the program', (tester) async {
       await boot(tester, brief: brief);
 
-      expect(find.text('TASK'), findsNothing, reason: 'no card above the floor');
+      expect(
+        find.text('TASK'),
+        findsNothing,
+        reason: 'no card above the floor',
+      );
       expect(
         find.descendant(
           of: find.byType(ProgramEditor),
