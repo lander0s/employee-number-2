@@ -544,6 +544,73 @@ void main() {
     });
   });
 
+  group('the transport says what can be done to a run', () {
+    Finder control(String label) => find.bySemanticsLabel(label);
+
+    testWidgets('cold: run it, or step into it', (tester) async {
+      await boot(tester);
+
+      expect(find.text('RUN'), findsOneWidget);
+      expect(find.text('STOP'), findsNothing, reason: 'nothing to stop yet');
+      expect(control('Next instruction'), findsOneWidget);
+      // Offered, but disabled: a step with nowhere to go stays put rather than
+      // disappearing and shuffling every other control along.
+      expect(control('Previous instruction'), findsOneWidget);
+    });
+
+    /// Starts a run and leaves it *playing*.
+    ///
+    /// Never `pumpAndSettle`: that runs the trace out to the verdict, which is
+    /// a different state with a different set of controls - and is what the
+    /// older tests in this file are unknowingly asserting against when they
+    /// reach for STOP.
+    Future<void> startPlaying(WidgetTester tester) async {
+      await tester.tap(find.text('RUN'));
+      await tester.pump();
+      // The first instruction is scheduled with no delay, and a bare pump does
+      // not advance the clock far enough to fire a zero-duration timer.
+      await tester.pump(const Duration(milliseconds: 1));
+    }
+
+    testWidgets('playing: pause it, or stop it', (tester) async {
+      await boot(tester);
+      await startPlaying(tester);
+
+      expect(control('Pause the shift'), findsOneWidget);
+      expect(find.text('STOP'), findsOneWidget);
+      // The cursor is being moved for you; a step here would race the clock.
+      expect(control('Next instruction'), findsNothing);
+      expect(control('Previous instruction'), findsNothing);
+    });
+
+    testWidgets('paused: step either way, resume, or stop', (tester) async {
+      await boot(tester);
+      await startPlaying(tester);
+      await tester.tap(control('Pause the shift'));
+      await tester.pump();
+
+      expect(control('Run the shift'), findsOneWidget, reason: 'resume');
+      expect(control('Previous instruction'), findsOneWidget);
+      expect(control('Next instruction'), findsOneWidget);
+      expect(find.text('STOP'), findsOneWidget);
+      expect(control('Pause the shift'), findsNothing);
+    });
+
+    testWidgets('a step from cold marks a line without starting the clock', (
+      tester,
+    ) async {
+      await boot(tester);
+      expect(find.byType(RunCaret), findsNothing);
+
+      await tester.tap(control('Next instruction'));
+      await tester.pump();
+
+      expect(find.byType(RunCaret), findsOneWidget);
+      expect(control('Pause the shift'), findsNothing, reason: 'not playing');
+      expect(find.text('STOP'), findsOneWidget, reason: 'a run is loaded');
+    });
+  });
+
   group('a run says which line it is on', () {
     Future<void> run(WidgetTester tester) async {
       await tester.tap(find.text('RUN'));

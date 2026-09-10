@@ -1,10 +1,22 @@
-/// Plays a [RunResult] back, one tick at a time.
+/// Plays a [RunResult] back, and lets the player drive it by hand.
 ///
 /// The machine has already finished by the time this starts: the verdict is
-/// known, the trace is a list, and this only decides how fast the player sees
-/// it. Keeping the clock out of the VM is what lets the whole language be
-/// tested without one, and it is the same shape the floor animation will want -
-/// a replay of a list, not a second interpreter.
+/// known, the trace is a list, and this only decides which part of it is on
+/// screen. Keeping the clock out of the VM is what lets the whole language be
+/// tested without one - and it is what makes stepping *backwards* possible at
+/// all. Nothing is recomputed to go back; the trace is a list and this is an
+/// index into it.
+///
+/// Four states, and they are what the controls read:
+///
+///  - **cold** - no trace. [running] false.
+///  - **playing** - the clock is advancing the cursor.
+///  - **paused** - a trace, a cursor, and no clock. Stepping lives here.
+///  - **finished** - past the last instruction, verdict up.
+///
+/// [running] means *a trace is loaded*, not *the clock is going*: it is what
+/// locks the program for editing, and a paused run has to stay locked or the
+/// trace on screen would describe a program that no longer exists.
 library;
 
 import 'dart:async';
@@ -16,13 +28,21 @@ import '../model/program.dart';
 import '../model/vm.dart';
 import 'floor/pace.dart';
 
-/// How long the verdict sits before the run lets go.
+/// How long the verdict sits before an *uninterrupted* run lets go.
 const _verdictFor = Duration(milliseconds: 2500);
 
 class RunController extends ChangeNotifier {
-  RunController({required this.level});
+  RunController({required this.level, required this.program});
 
   final Level level;
+
+  /// Where the program comes from when a control needs one.
+  ///
+  /// A callback rather than the document itself, because a run can now start
+  /// from a step as easily as from play, and whichever one starts it has to
+  /// compile what is on the page at that moment. The page is edited between
+  /// runs; holding a document from construction would pin the wrong version.
+  final ProgramDocument Function() program;
 
   RunResult? _result;
 
@@ -36,12 +56,40 @@ class RunController extends ChangeNotifier {
   Timer? _timer;
   bool _finished = false;
 
+  /// Whether the run still tidies itself away when it reaches the end.
+  ///
+  /// True for a run that plays start to finish untouched, which is the flow
+  /// worth keeping: watch it, read the verdict, carry on editing. The moment
+  /// the player pauses or steps they are reading the trace rather than
+  /// watching it, and having it vanish under them would be hostile - so the
+  /// first deliberate control turns this off and STOP becomes the way out.
+  bool _autoRelease = true;
+
+  /// How long the instruction on screen has been up. Measured rather than
+  /// assumed so that a pause halfway through an instruction resumes halfway
+  /// through it, instead of restarting the movement.
+  final _spent = Stopwatch();
+
+  /// A trace is loaded. Not the same as [playing]: this is what says the
+  /// program is locked.
   bool get running => _result != null;
 
-  /// True once the last tick has played and the verdict is up.
+  /// The clock is advancing.
+  bool get playing => _result != null && _timer != null && !_finished;
+
+  /// Loaded, stopped, and not at the end - the state stepping happens in.
+  bool get paused => running && !playing && !_finished;
+
+  /// True once the last instruction has played and the verdict is up.
   bool get finished => _finished;
 
   RunResult? get result => _result;
+
+  bool get canStepBack => running && (_finished || _cursor >= 0);
+
+  /// Cold counts: the first step compiles the program and shows instruction
+  /// one, the same way play does.
+  bool get canStepForward => !_finished;
 
   /// The row the caret points at, or null when nothing is running.
   String? get executing =>
@@ -70,28 +118,105 @@ class RunController extends ChangeNotifier {
       ? _result!.ticks[index]
       : null;
 
-  /// Compiles and runs [doc], then starts playing the result back.
+  // ----------------------------------------------------------- the controls
+
+  /// Runs, from wherever it is: compiles and starts from cold, or picks the
+  /// clock back up after a pause.
+  void play() {
+    if (playing || _finished) return;
+    if (_result == null) _load();
+    _spent.start();
+    _schedule();
+    notifyListeners();
+  }
+
+  /// Freezes the clock where it is. The trace stays loaded.
+  void pause() {
+    if (!playing) return;
+    _timer!.cancel();
+    _timer = null;
+    _spent.stop();
+    _autoRelease = false;
+    notifyListeners();
+  }
+
+  /// One instruction on, compiling first if nothing is loaded.
+  ///
+  /// Stepping past the last instruction is what raises the verdict, so the end
+  /// of a stepped run reads the same as the end of a played one.
+  void stepForward() {
+    if (_finished) return;
+    if (_result == null) _load();
+    _byHand();
+
+    if (_cursor + 1 >= _result!.ticks.length) {
+      _finished = true;
+    } else {
+      _cursor++;
+    }
+    notifyListeners();
+  }
+
+  /// One instruction back.
+  ///
+  /// Nothing is recomputed - the trace is already a list and this walks it the
+  /// other way. From the verdict it steps back onto the last instruction
+  /// rather than off the end of the run.
+  void stepBack() {
+    if (!canStepBack) return;
+    _byHand();
+
+    if (_finished) {
+      _finished = false;
+    } else {
+      _cursor--;
+    }
+    notifyListeners();
+  }
+
+  /// Unloads. The program becomes editable again.
+  void stop() {
+    _timer?.cancel();
+    _timer = null;
+    _spent
+      ..reset()
+      ..stop();
+    _result = null;
+    _cursor = -1;
+    _finished = false;
+    _autoRelease = true;
+    notifyListeners();
+  }
+
+  // ------------------------------------------------------------- the clock
+
+  /// Compiles what is on the page and loads the trace, without showing any of
+  /// it yet: the cursor sits before the first instruction, which is the floor
+  /// as the shift starts.
   ///
   /// A program that cannot be compiled is not a thing the editor can author -
   /// blocks come with their closers and every argument has a value - so a throw
   /// here is a bug, not a player mistake, and is left to crash loudly.
-  void start(ProgramDocument doc) {
-    stop();
+  void _load() {
+    final doc = program();
     _size = doc.size;
     _result = Machine(compile(doc.root), level).run();
     _cursor = -1;
     _finished = false;
-    notifyListeners();
-    _schedule();
+    _autoRelease = true;
+    _spent
+      ..reset()
+      ..stop();
   }
 
-  void stop() {
+  /// The player took the wheel: stop the clock, and stop tidying up.
+  void _byHand() {
     _timer?.cancel();
     _timer = null;
-    _result = null;
-    _cursor = -1;
-    _finished = false;
-    notifyListeners();
+    _spent
+      ..reset()
+      ..stop();
+    _autoRelease = false;
   }
 
   void _schedule() {
@@ -99,23 +224,30 @@ class RunController extends ChangeNotifier {
     final next = _cursor + 1;
 
     if (next >= ticks.length) {
-      // Out of trace: hold the verdict up, then let go. An empty program has
-      // no ticks at all and lands here immediately, which is right - it failed
-      // before the robot moved.
+      // Out of trace: raise the verdict. An empty program has no ticks at all
+      // and lands here immediately, which is right - it failed before the
+      // robot moved.
       _finished = true;
       notifyListeners();
-      _timer = Timer(_verdictFor, () {
-        _timer = null;
-        stop();
-      });
+      if (_autoRelease) {
+        _timer = Timer(_verdictFor, () {
+          _timer = null;
+          stop();
+        });
+      }
       return;
     }
 
-    // How long the instruction already on screen takes, not the next one.
-    final delay = _cursor < 0 ? Duration.zero : _hold(_cursor);
+    // What the instruction already on screen has *left*, not what it was
+    // given: resuming from a pause owes only the remainder.
+    final full = _cursor < 0 ? Duration.zero : _hold(_cursor);
+    final left = full - _spent.elapsed;
 
-    _timer = Timer(delay, () {
+    _timer = Timer(left > Duration.zero ? left : Duration.zero, () {
       _cursor = next;
+      _spent
+        ..reset()
+        ..start();
       notifyListeners();
       _schedule();
     });

@@ -233,11 +233,32 @@ class _FloorStageState extends State<FloorStage>
 
     final cursor = widget.run.cursor;
     if (cursor != _showing) {
+      final back = cursor < _showing;
       _showing = cursor;
       _retime();
-      // From zero every time rather than continuing: each instruction is its
-      // own movement, and one that started late should not finish early.
-      _anim.forward(from: 0);
+
+      if (back) {
+        // A step back has no animation to play. There is no reverse of a
+        // pickup that means anything, and replaying the instruction that led
+        // here would show the unit doing it a second time - so the floor jumps
+        // to the state instead. The cues are marked spent with it: rewinding
+        // is silent, because nothing happened.
+        _fired = List.filled(_cues.length, true);
+        _anim.value = 1;
+      } else {
+        // From zero every time rather than continuing: each instruction is its
+        // own movement, and one that started late should not finish early.
+        _anim.forward(from: 0);
+      }
+    } else if (!widget.run.playing && _anim.isAnimating) {
+      // Paused mid-instruction: the picture stops where the clock did.
+      _anim.stop();
+    } else if (widget.run.playing && !_anim.isAnimating && _anim.value < 1) {
+      // And picks up where it left off. `forward` from a part-played
+      // controller runs the *remainder* of the duration, which is the same
+      // arithmetic the controller does with its stopwatch - so the two stay
+      // in step across a pause.
+      _anim.forward();
     }
     setState(() {});
   }

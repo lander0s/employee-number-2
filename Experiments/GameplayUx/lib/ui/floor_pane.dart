@@ -9,11 +9,14 @@
 /// *reason*: "POSITIVE? 0 -> no" is the one thing a picture of a warehouse
 /// cannot say, and it is exactly the thing a player gets wrong.
 ///
-/// It carries the run control, top-right, because that is where the thing being
-/// run lives. A consequence worth knowing: the divider can hide the floor
-/// entirely, and when it does there is no run button, so a program cannot be
-/// started unless the floor is visible enough to reach it. That is intended -
+/// It carries the run controls, top-right, because that is where the thing
+/// being run lives. A consequence worth knowing: the divider can hide the floor
+/// entirely, and when it does there are no controls, so a program cannot be
+/// started unless the floor is visible enough to reach them. That is intended -
 /// see the collapse threshold in gameplay_screen.dart.
+///
+/// The control sits *beside* the bloom rather than inside it. Both are in this
+/// pane, and only one of them is part of the world.
 library;
 
 import 'package:flutter/material.dart';
@@ -32,13 +35,11 @@ class FloorPane extends StatelessWidget {
     required this.level,
     required this.run,
     required this.sfx,
-    required this.onToggleRun,
   });
 
   final Level level;
   final RunController run;
   final Sfx sfx;
-  final VoidCallback onToggleRun;
 
   @override
   Widget build(BuildContext context) {
@@ -47,33 +48,40 @@ class FloorPane extends StatelessWidget {
     // there is no frame left to set it apart from - the floor *is* the pane.
     // It also buys the square the width the margin was holding: 20dp on a
     // 448dp panel is a package and a half.
-    return BloomLayer(
-      child: Container(
-        color: W.paneWell,
-        width: double.infinity,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: AnimatedBuilder(
-                animation: run,
-                builder: (context, _) =>
-                    _Floor(level: level, run: run, sfx: sfx),
-              ),
+    // The bloom wraps the simulation and stops there. It grades its whole
+    // subtree down so the light has something to be bright against, and the
+    // run control was in that subtree - dimmed along with the warehouse, and
+    // feeding the glow's backdrop besides. It is the app talking, not a thing
+    // on the floor for light to fall on, so it is a sibling painted over the
+    // top instead.
+    //
+    // `expand` rather than the default: the pane is handed a tight box by the
+    // splitter, and passing that straight down is what the [Container] was
+    // doing before as the root. Loose constraints would collapse a stack whose
+    // only other child is positioned.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        BloomLayer(
+          child: Container(
+            color: W.paneWell,
+            child: AnimatedBuilder(
+              animation: run,
+              builder: (context, _) => _Floor(level: level, run: run, sfx: sfx),
             ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Chrome(
-                child: AnimatedBuilder(
-                  animation: run,
-                  builder: (context, _) =>
-                      RunButton(running: run.running, onTap: onToggleRun),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Chrome(
+            child: AnimatedBuilder(
+              animation: run,
+              builder: (context, _) => RunControls(run: run),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -153,35 +161,132 @@ class _Verdict extends StatelessWidget {
   }
 }
 
-/// The only execution control the game needs: one button that becomes STOP while
-/// a program is running. A separate stop button would be a second target that is
-/// dead most of the time.
-class RunButton extends StatelessWidget {
-  const RunButton({super.key, required this.running, required this.onTap});
+/// The transport: everything the player can do to a run.
+///
+/// A single RUN/STOP button was enough while a run was something you watched.
+/// It is not enough for something you *read*: the whole point of the trace
+/// being a list is that it can be walked, and a control set that can only start
+/// and abandon it hides that. So - step back, play or pause, step forward,
+/// stop.
+///
+/// The set changes with the state rather than greying out four buttons in every
+/// one of them. Cold there is nothing to stop; playing there is nothing to step
+/// through, because the cursor is being moved for you and a step would be a
+/// race with the clock.
+///
+///   cold      [<] [RUN] [>]
+///   playing   [||] [STOP]
+///   paused    [<] [>play] [>] [STOP]
+///   finished  [<] [STOP]
+///
+/// RUN keeps its word while cold and STOP keeps its whenever it is shown: those
+/// two are the ones a person looks for, and they are the two the tests reach
+/// for by name.
+class RunControls extends StatelessWidget {
+  const RunControls({super.key, required this.run});
 
+  /// The height of one control, and so of the bar. [gameplay_screen] measures
+  /// the collapse threshold against it: a floor too short to show this is a
+  /// floor a program cannot be started from.
   static const height = 44.0;
 
-  final bool running;
-  final VoidCallback onTap;
+  final RunController run;
 
   @override
   Widget build(BuildContext context) {
+    final playing = run.playing;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!playing) ...[
+          _Control(
+            glyph: _Glyph.prev,
+            semantics: 'Previous instruction',
+            onTap: run.canStepBack ? run.stepBack : null,
+          ),
+          const SizedBox(width: 6),
+        ],
+        _Control(
+          glyph: playing ? _Glyph.pause : _Glyph.play,
+          // Only from cold: paused, the word would be reading the button back
+          // to itself, and the bar has three more controls to fit by then.
+          label: run.running ? null : 'RUN',
+          semantics: playing ? 'Pause the shift' : 'Run the shift',
+          emphasised: playing,
+          onTap: playing ? run.pause : run.play,
+        ),
+        if (!playing) ...[
+          const SizedBox(width: 6),
+          _Control(
+            glyph: _Glyph.next,
+            semantics: 'Next instruction',
+            onTap: run.canStepForward ? run.stepForward : null,
+          ),
+        ],
+        if (run.running) ...[
+          const SizedBox(width: 6),
+          _Control(
+            glyph: _Glyph.stop,
+            label: 'STOP',
+            semantics: 'Stop the shift',
+            onTap: run.stop,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// One control. Square when it is only a glyph, wider when it carries a word.
+class _Control extends StatelessWidget {
+  const _Control({
+    required this.glyph,
+    required this.semantics,
+    required this.onTap,
+    this.label,
+    this.emphasised = false,
+  });
+
+  final _Glyph glyph;
+  final String semantics;
+
+  /// Null disables it: a step with nowhere to go is drawn faint and does
+  /// nothing, rather than disappearing and moving every other control along.
+  final VoidCallback? onTap;
+
+  final String? label;
+  final bool emphasised;
+
+  @override
+  Widget build(BuildContext context) {
+    final on = onTap != null;
+    final ink = on ? W.text : W.lineSoft;
+
     return Semantics(
       button: true,
       container: true,
       excludeSemantics: true,
-      label: running ? 'Stop the shift' : 'Run the shift',
+      enabled: on,
+      label: semantics,
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          constraints: const BoxConstraints(minHeight: height),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          constraints: const BoxConstraints(
+            minHeight: RunControls.height,
+            minWidth: RunControls.height,
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: label == null ? 0 : 14,
+            vertical: 8,
+          ),
           decoration: BoxDecoration(
-            color: running ? W.buttonPressed : W.button,
-            border: Border.all(color: W.text),
+            color: emphasised ? W.buttonPressed : W.button,
+            border: Border.all(color: ink),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               SizedBox(
                 width: 14,
@@ -190,14 +295,19 @@ class RunButton extends StatelessWidget {
                 // divider arrows: at this size an icon font's built-in padding
                 // fights the layout.
                 child: CustomPaint(
-                  painter: _RunGlyph(running: running, color: W.text),
+                  painter: _RunGlyph(glyph: glyph, color: ink),
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                running ? 'STOP' : 'RUN',
-                style: W.label.copyWith(fontWeight: FontWeight.w700),
-              ),
+              if (label != null) ...[
+                const SizedBox(width: 8),
+                Text(
+                  label!,
+                  style: W.label.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: ink,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -206,11 +316,13 @@ class RunButton extends StatelessWidget {
   }
 }
 
-/// A play triangle, or a stop square while running.
-class _RunGlyph extends CustomPainter {
-  const _RunGlyph({required this.running, required this.color});
+enum _Glyph { play, pause, stop, prev, next }
 
-  final bool running;
+/// The transport symbols, drawn rather than typed.
+class _RunGlyph extends CustomPainter {
+  const _RunGlyph({required this.glyph, required this.color});
+
+  final _Glyph glyph;
   final Color color;
 
   @override
@@ -220,25 +332,58 @@ class _RunGlyph extends CustomPainter {
       ..style = PaintingStyle.fill
       ..isAntiAlias = true;
 
-    if (running) {
-      canvas.drawRect(
-        Rect.fromLTWH(1, 1, size.width - 2, size.height - 2),
-        paint,
-      );
-      return;
-    }
+    final w = size.width;
+    final h = size.height;
 
-    canvas.drawPath(
-      Path()
-        ..moveTo(1, 0)
-        ..lineTo(size.width - 1, size.height / 2)
-        ..lineTo(1, size.height)
-        ..close(),
-      paint,
-    );
+    // The bar on a step control, and the width left for its triangle.
+    const barW = 2.5;
+    const gap = 1.5;
+
+    switch (glyph) {
+      case _Glyph.play:
+        canvas.drawPath(
+          Path()
+            ..moveTo(1, 0)
+            ..lineTo(w - 1, h / 2)
+            ..lineTo(1, h)
+            ..close(),
+          paint,
+        );
+
+      case _Glyph.pause:
+        // Two bars with a gap of the same weight: any thinner and at 14px they
+        // merge into one at the first fractional device pixel.
+        const bar = 4.0;
+        canvas.drawRect(Rect.fromLTWH(1.5, 0, bar, h), paint);
+        canvas.drawRect(Rect.fromLTWH(w - 1.5 - bar, 0, bar, h), paint);
+
+      case _Glyph.stop:
+        canvas.drawRect(Rect.fromLTWH(1, 1, w - 2, h - 2), paint);
+
+      case _Glyph.prev:
+        canvas.drawRect(Rect.fromLTWH(1, 0, barW, h), paint);
+        canvas.drawPath(
+          Path()
+            ..moveTo(w - 1, 0)
+            ..lineTo(1 + barW + gap, h / 2)
+            ..lineTo(w - 1, h)
+            ..close(),
+          paint,
+        );
+
+      case _Glyph.next:
+        canvas.drawRect(Rect.fromLTWH(w - 1 - barW, 0, barW, h), paint);
+        canvas.drawPath(
+          Path()
+            ..moveTo(1, 0)
+            ..lineTo(w - 1 - barW - gap, h / 2)
+            ..lineTo(1, h)
+            ..close(),
+          paint,
+        );
+    }
   }
 
   @override
-  bool shouldRepaint(_RunGlyph old) =>
-      old.running != running || old.color != color;
+  bool shouldRepaint(_RunGlyph old) => old.glyph != glyph || old.color != color;
 }

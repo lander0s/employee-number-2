@@ -38,7 +38,7 @@ const _snapFloor = 1.0;
 
 /// Floor heights below this collapse the pane entirely: the run button lives in
 /// the floor, and a floor too short to reach it would be a dead strip.
-const _minRunnableFloor = RunButton.height + 36;
+const _minRunnableFloor = RunControls.height + 36;
 
 class GameplayScreen extends StatefulWidget {
   const GameplayScreen({super.key, required this.level, this.program});
@@ -156,21 +156,19 @@ class _GameplayScreenState extends State<GameplayScreen> {
   /// The program is compiled and executed the instant RUN is pressed - the
   /// verdict exists before the first frame of playback - and this walks the
   /// trace so the page and the floor can show the same instruction.
-  late final RunController _run = RunController(level: widget.level);
+  late final RunController _run = RunController(
+    level: widget.level,
+    // Asked for at the moment a control needs it, not captured now: a run can
+    // start from a step as well as from play, and either has to compile what
+    // is on the page then.
+    program: () => _doc,
+  );
 
   /// Owned here so it is disposed with the screen. The floor decides *when*
   /// each sound plays; this only decides how long the players live.
   final _sfx = Sfx();
 
   bool get _running => _run.running;
-
-  void _toggleRun() {
-    if (_run.running) {
-      _run.stop();
-    } else {
-      _run.start(_doc);
-    }
-  }
 
   @override
   void initState() {
@@ -260,7 +258,6 @@ class _GameplayScreenState extends State<GameplayScreen> {
                                 level: widget.level,
                                 run: _run,
                                 sfx: _sfx,
-                                onToggleRun: _toggleRun,
                               )
                             : const SizedBox.shrink(),
                       ),
